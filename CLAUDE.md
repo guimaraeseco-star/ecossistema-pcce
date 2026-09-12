@@ -5,6 +5,7 @@
 O índice completo está em [`docs/README.md`](docs/README.md). Referências rápidas:
 
 - [`README.md`](README.md) — setup, arquitetura, módulos, padrões de código
+- [`docs/PARAMETROS.md`](docs/PARAMETROS.md) — **parâmetros do sistema**: o que existe e o que está planejado (módulos, perfis, dados, integrações, paleta, decisões E1–E38, glossário). Ler antes de propor ou escrever qualquer coisa nova; atualizar no mesmo PR de toda mudança de comportamento, tabela, rota, papel ou cor
 - [`DEPLOY.md`](DEPLOY.md) — runbook de produção (envs/secrets, papéis de admin, backup/rollback, go-live)
 - [`.env.example`](.env.example) — fonte autoritativa de variáveis de ambiente
 - [`TESTING.md`](TESTING.md) — roteiro manual de exceção (o gate de regressão é a suíte Vitest + Playwright)

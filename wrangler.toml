@@ -16,7 +16,7 @@ TSA_URL = "http://timestamp.digicert.com"
 [[d1_databases]]
 binding = "escalas_db"
 database_name = "escalas-db"
-database_id = "dc86ec72-7ed4-4e8c-9d29-67a4e509ea49"
+database_id = "a544616e-1f0f-4438-b88c-24e807c1c680"
 migrations_dir = "migrations"
 
 [[r2_buckets]]
@@ -50,7 +50,7 @@ TSA_URL = "http://timestamp.digicert.com"
 [[env.preview.d1_databases]]
 binding = "escalas_db"
 database_name = "escalas-db-staging"
-database_id = "c4da26fa-a92a-4553-9869-e53474ec4948"
+database_id = "705da488-3489-4bb4-95a2-73b0f2d8d123"
 migrations_dir = "migrations"
 
 [[env.preview.r2_buckets]]
