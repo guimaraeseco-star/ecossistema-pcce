@@ -44,7 +44,7 @@
 		"knip:fix": "knip --fix"
 	},
 	"devDependencies": {
-		"@cloudflare/workers-types": "^5.20260815.1",
+		"@cloudflare/workers-types": "^5.20260908.1",
 		"@eslint/js": "^10.0.1",
 		"@playwright/test": "^1.62.0",
 		"@sveltejs/adapter-cloudflare": "^7.0.0",
@@ -68,7 +68,7 @@
 		"typescript-eslint": "^8.60.1",
 		"vite": "^8.2.2",
 		"vitest": "^4.1.10",
-		"wrangler": "^4.123.0"
+		"wrangler": "^4.130.0"
 	},
 	"overrides": {
 		"cookie": "^0.7.2",
