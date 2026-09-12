@@ -116,7 +116,7 @@ jobs:
         if: >-
           vars.NOTIFY != 'false' && steps.diff.outputs.changed == 'true' &&
           steps.pr.outputs.pull-request-url != ''
-        uses: dawidd6/action-send-mail@v18
+        uses: dawidd6/action-send-mail@v20
         continue-on-error: true
         with:
           server_address: smtp.gmail.com
