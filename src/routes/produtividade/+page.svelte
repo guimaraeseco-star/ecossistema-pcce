@@ -101,7 +101,7 @@
 </script>
 
 <svelte:head>
-	<title>Produtividade — Escalas PC-CE</title>
+	<title>Produtividade | Ecossistema PCCE</title>
 </svelte:head>
 
 <div

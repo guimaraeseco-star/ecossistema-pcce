@@ -131,7 +131,7 @@
 </script>
 
 <svelte:head>
-	<title>{primeiroAcesso ? 'Defina sua senha' : 'Alterar Senha'} | Escalas</title>
+	<title>{primeiroAcesso ? 'Defina sua senha' : 'Alterar Senha'} | Ecossistema PCCE</title>
 </svelte:head>
 
 <div class="min-h-[80vh] flex items-center justify-center p-4">

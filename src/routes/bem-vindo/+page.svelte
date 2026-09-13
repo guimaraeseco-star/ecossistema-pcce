@@ -32,17 +32,17 @@
 	 */
 	const descricao = $derived(
 		semConvocacao
-			? 'Este é o seu espaço no Portal de Escalas. Quando você for convocado para uma escala extra, ela aparece aqui com o que houver a fazer.'
+			? 'Este é o seu espaço no Ecossistema PCCE. Quando você for convocado para uma escala extra, ela aparece aqui com o que houver a fazer.'
 			: 'Acompanhe suas escalas extras, confirme sua presença e assine o que for da sua responsabilidade.'
 	);
 </script>
 
 <svelte:head>
-	<title>Bem-vindo ao Portal de Escalas</title>
+	<title>Bem-vindo | Ecossistema PCCE</title>
 </svelte:head>
 
 <BemVindoPagina>
-	<BemVindoCabecalho modulo="Portal de Escalas" {usuario} {descricao} accent="secondary" />
+	<BemVindoCabecalho modulo="Ecossistema PCCE" {usuario} {descricao} accent="secondary" />
 
 	<BemVindoGradeAcoes {acoes} accent="secondary">
 		{#snippet aviso()}

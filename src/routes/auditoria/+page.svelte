@@ -162,7 +162,7 @@
 	let filtrosExpandidos = $state(filtrosAtivos > 0);
 </script>
 
-<svelte:head><title>Auditoria — Escalas PC</title></svelte:head>
+<svelte:head><title>Auditoria | Ecossistema PCCE</title></svelte:head>
 
 <div class="space-y-6">
 	<header class="flex flex-wrap items-center justify-between gap-3">

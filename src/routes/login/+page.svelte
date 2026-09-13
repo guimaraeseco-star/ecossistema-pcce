@@ -34,6 +34,7 @@
 	import { apagarReauth } from '$lib/assinatura-reauth';
 	import { loading as loadingService } from '$lib/loading.svelte';
 	import { conectarSerproParaLogin } from '$lib/serpro';
+	import { CORPORACAO_PROSA } from '$lib/institucional';
 	import type { ActionResult } from '@sveltejs/kit';
 	import FormCredenciais from './_components/FormCredenciais.svelte';
 	import Form2FA from './_components/Form2FA.svelte';
@@ -405,14 +406,29 @@
 </script>
 
 <svelte:head>
-	<title>{tituloDaAba} | Sistema de Escalas</title>
+	<title>{tituloDaAba} | Ecossistema PCCE</title>
 </svelte:head>
 
 <div class="min-h-screen flex items-center justify-center p-4">
-	<div class="w-full max-w-sm p-6 sm:p-8 rounded-3xl card-glass-auth">
+	<div class="w-full max-w-xl p-6 sm:p-10 rounded-3xl card-glass-auth">
 		{#if !recuperacao && !primeiroAcesso}
 			<div class="text-center mb-6">
-				<h1 class="h1 text-xl font-bold mb-1">Sistema de Escalas</h1>
+				<!-- Brasão institucional (static/brasao-pcce.png, 273×360, fundo
+				     transparente): a mesma identidade dos demais sistemas do
+				     departamento. O subtítulo é a corporação, não o departamento —
+				     departamento é dado, não constante (E19). -->
+				<img
+					src="/brasao-pcce.png"
+					alt="Brasão da Polícia Civil do Estado do Ceará"
+					class="h-24 w-auto mx-auto mb-3 drop-shadow-md"
+					width="273"
+					height="360"
+					decoding="async"
+				/>
+				<h1 class="h1 text-xl font-bold mb-1">Ecossistema PCCE</h1>
+				<p class="text-xs text-surface-600 dark:text-surface-400 tracking-wide">
+					{CORPORACAO_PROSA}
+				</p>
 			</div>
 		{/if}
 

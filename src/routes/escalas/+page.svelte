@@ -433,7 +433,7 @@
 </script>
 
 <svelte:head>
-	<title>Arquivo de Escalas - Portal de Escalas</title>
+	<title>Arquivo de Escalas | Ecossistema PCCE</title>
 </svelte:head>
 
 {#if visao === 'home'}

@@ -15,7 +15,7 @@
 </script>
 
 <svelte:head>
-	<title>Termo de Uso v{data.versao} — Escalas PC-CE</title>
+	<title>Termo de Uso v{data.versao} | Ecossistema PCCE</title>
 </svelte:head>
 
 <div

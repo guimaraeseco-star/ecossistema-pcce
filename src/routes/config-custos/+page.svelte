@@ -95,7 +95,7 @@
 	}
 </script>
 
-<svelte:head><title>Valores de custo — Escalas PC</title></svelte:head>
+<svelte:head><title>Valores de custo | Ecossistema PCCE</title></svelte:head>
 
 <div class="space-y-6">
 	<header>

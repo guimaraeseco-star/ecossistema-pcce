@@ -67,7 +67,7 @@
 </script>
 
 <svelte:head>
-	<title>Colaboradores - Portal de Escalas</title>
+	<title>Colaboradores | Ecossistema PCCE</title>
 </svelte:head>
 
 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">

@@ -220,7 +220,7 @@
 </script>
 
 <svelte:head>
-	<title>Gerenciar Unidades - Portal de Escalas</title>
+	<title>Gerenciar Unidades | Ecossistema PCCE</title>
 </svelte:head>
 
 <!-- Os mesmos badges das listagens de escala, aqui dizendo quais REGIMES a

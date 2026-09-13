@@ -239,7 +239,7 @@
 </script>
 
 <svelte:head>
-	<title>Escala — Escalas PC-CE</title>
+	<title>Escala | Ecossistema PCCE</title>
 </svelte:head>
 
 {#if !escala}

@@ -80,7 +80,7 @@
 </script>
 
 <svelte:head>
-	<title>Validação de Documento - Escalas PC-CE</title>
+	<title>Validação de Documento | Ecossistema PCCE</title>
 </svelte:head>
 
 <div

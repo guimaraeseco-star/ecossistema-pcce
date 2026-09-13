@@ -43,7 +43,7 @@
 	];
 </script>
 
-<svelte:head><title>Configurações Gerais — Escalas PC</title></svelte:head>
+<svelte:head><title>Configurações Gerais | Ecossistema PCCE</title></svelte:head>
 
 <div class="space-y-6">
 	<header>

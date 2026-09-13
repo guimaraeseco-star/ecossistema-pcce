@@ -114,7 +114,7 @@
 </script>
 
 <svelte:head>
-	<title>Plano {data.plano.numero}/{data.plano.ano} | Escalas</title>
+	<title>Plano {data.plano.numero}/{data.plano.ano} | Ecossistema PCCE</title>
 </svelte:head>
 
 <div class="min-w-0 space-y-6">

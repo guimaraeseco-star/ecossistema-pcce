@@ -365,7 +365,7 @@
 </script>
 
 <svelte:head>
-	<title>Painel de Compliance | Escalas</title>
+	<title>Painel de Compliance | Ecossistema PCCE</title>
 </svelte:head>
 
 {#if !isAdmin}

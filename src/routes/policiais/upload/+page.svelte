@@ -63,7 +63,7 @@
 </script>
 
 <svelte:head>
-	<title>Importar policiais — Escalas PC-CE</title>
+	<title>Importar policiais | Ecossistema PCCE</title>
 </svelte:head>
 
 <div class="mb-6 space-y-3">

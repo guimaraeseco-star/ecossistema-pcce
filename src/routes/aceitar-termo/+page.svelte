@@ -16,7 +16,7 @@
 </script>
 
 <svelte:head>
-	<title>Termo de Uso — Escalas PC-CE</title>
+	<title>Termo de Uso | Ecossistema PCCE</title>
 </svelte:head>
 
 <div

@@ -67,7 +67,7 @@
 </script>
 
 <svelte:head>
-	<title>Redefinir Senha | Escalas</title>
+	<title>Redefinir Senha | Ecossistema PCCE</title>
 </svelte:head>
 
 <div class="min-h-[80vh] flex items-center justify-center p-4">

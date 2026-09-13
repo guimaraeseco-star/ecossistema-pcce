@@ -140,7 +140,7 @@
 </script>
 
 <svelte:head>
-	<title>Operações | Escalas</title>
+	<title>Operações | Ecossistema PCCE</title>
 </svelte:head>
 
 <!-- Slide lateral: o container esconde o painel que está fora de tela. -->
