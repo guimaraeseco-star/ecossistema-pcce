@@ -1,20 +1,19 @@
 @import 'tailwindcss';
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Fontes self-hosted: Inter (corpo) e Outfit (títulos), subset `latin` apenas
+/* Fontes self-hosted: Inter (corpo e títulos), subset `latin` apenas
  * (app PT-BR). Evita round-trip para o Google (preconnect + TLS + CSS + WOFF2),
  * cacheia no edge da Cloudflare e simplifica a CSP. Pesos refletem o uso real:
  *  - Inter 400 (default body), 500/600/700 (Tailwind medium/semibold/bold);
  *    900 (font-black) só em KPI isolado — ver README §10 Tipografia
- *  - Outfit 500/700/800 (títulos; default do tema = 700) */
+ *  - Inter 800 nos títulos (default do tema; o protótipo do Ecossistema usa
+ *    Inter em tudo — Outfit saiu na fase 1) */
 @import '@fontsource/inter/latin-400.css';
 @import '@fontsource/inter/latin-500.css';
 @import '@fontsource/inter/latin-600.css';
 @import '@fontsource/inter/latin-700.css';
 @import '@fontsource/inter/latin-900.css';
-@import '@fontsource/outfit/latin-500.css';
-@import '@fontsource/outfit/latin-700.css';
-@import '@fontsource/outfit/latin-800.css';
+@import '@fontsource/inter/latin-800.css';
 
 @import '@skeletonlabs/skeleton';
 /* Skeleton v4: estilos dos componentes Svelte via @import (substitui @source nos dist). */
@@ -33,11 +32,11 @@
 	--text-2xs: 0.7rem;
 	--text-3xs: 0.625rem;
 
-	/* Wordmark / spans que precisam de Outfit sem a classe `.h1` do Skeleton. */
+	/* Wordmark / spans que precisam da fonte de título sem a classe `.h1` do Skeleton. */
 	--font-heading: var(--heading-font-family);
 
 	/* Fundo da página (body + folha xl) — espelha theme.css; gera `bg-page-canvas`. */
-	--color-page-canvas: oklch(99% 0.002 255deg);
+	--color-page-canvas: oklch(96.8% 0.007 247.9deg);
 
 	/* Breakpoint extra abaixo de `sm` para telefones estreitos (UX-10).
 	 * Use `xs:` em vez de `min-[400px]:`. O `min-[900px]:` do +layout.svelte
@@ -60,8 +59,8 @@
 	z-index: -1;
 	pointer-events: none;
 	background-image:
-		radial-gradient(circle at top right, oklch(25% 0.05 210deg / 20%), transparent 40%),
-		radial-gradient(circle at bottom left, oklch(25% 0.05 260deg / 20%), transparent 40%);
+		radial-gradient(circle at top right, oklch(37.9% 0.146 265.5deg / 20%), transparent 40%),
+		radial-gradient(circle at bottom left, oklch(20.8% 0.042 265.8deg / 40%), transparent 40%);
 }
 
 /* Respeita a preferência do SO para reduzir movimento. Cobre transitions do
@@ -373,12 +372,12 @@ textarea::placeholder {
 
 /* Utilitários centralizados de Glass Card (V-6) */
 @utility card-glass {
-	@apply bg-white/80 dark:bg-surface-900/60 backdrop-blur-md
-		border border-surface-200 dark:border-white/5;
+	@apply bg-white/80 dark:bg-surface-800/45 backdrop-blur-md
+		border border-surface-200 dark:border-white/8;
 }
 
 @utility card-glass-auth {
-	@apply bg-white/90 dark:bg-surface-900/60 backdrop-blur-xl
-		border border-surface-200 dark:border-white/10
-		shadow-2xl shadow-black/10 dark:shadow-black/50;
+	@apply bg-white/90 dark:bg-surface-800/45 backdrop-blur-xl
+		border border-surface-200 dark:border-white/8
+		shadow-[0_8px_32px_0_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.37)];
 }

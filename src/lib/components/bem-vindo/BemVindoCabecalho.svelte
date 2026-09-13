@@ -3,7 +3,7 @@
 	 * Cabeçalho das telas de boas-vindas: identificação do módulo, saudação, data
 	 * corrente e metadados do usuário (perfil, matrícula, lotação).
 	 *
-	 * O título usa a MESMA classe `.h1` das demais páginas (fonte Outfit, cor e
+	 * O título usa a MESMA classe `.h1` das demais páginas (fonte de título do tema, cor e
 	 * tracking do tema) para não destoar, e não há ícone ilustrativo — a tela de
 	 * entrada não é lugar de identidade visual própria.
 	 *

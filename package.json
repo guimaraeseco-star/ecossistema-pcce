@@ -80,7 +80,6 @@
 	},
 	"dependencies": {
 		"@fontsource/inter": "^5.2.8",
-		"@fontsource/outfit": "^5.2.8",
 		"@lucide/svelte": "^1.28.0",
 		"@sentry/browser": "^10.59.0",
 		"@sentry/cloudflare": "^10.66.0",

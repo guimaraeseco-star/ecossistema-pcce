@@ -1,4 +1,7 @@
-/* Tema institucional Escalas PCCE — superfície ops, não “command center neon”. */
+/* Tema institucional Ecossistema PCCE — a paleta do protótipo do departamento
+ * (azul #3b82f6, superfícies slate com fundos #0b0f19 / #131b2e no escuro e
+ * #f1f5f9 no claro, emerald / amber / red nas semânticas), portada para os
+ * tokens do Skeleton (decisão E2). Valores em oklch equivalentes aos hex. */
 
 [data-theme='policial'] {
 	--text-scaling: 1;
@@ -13,11 +16,11 @@
 	--base-font-style: normal;
 	--base-letter-spacing: 0.01em;
 
-	/* Títulos - Outfit */
+	/* Títulos - Inter (peso 800), como no protótipo do Ecossistema */
 	--heading-font-color: var(--color-primary-800);
 	--heading-font-color-dark: var(--color-primary-100);
-	--heading-font-family: 'Outfit', 'Inter', system-ui, sans-serif;
-	--heading-font-weight: 700;
+	--heading-font-family: 'Inter', system-ui, -apple-system, sans-serif;
+	--heading-font-weight: 800;
 	--heading-font-style: normal;
 	--heading-letter-spacing: -0.02em;
 
@@ -48,19 +51,19 @@
 	/* ============================================ */
 	/* PRIMARY - Neon Teal/Cyan (#06b6d4 -> tailwind cyan-500) */
 	/* ============================================ */
-	--color-primary-50: oklch(97.8% 0.025 210deg);
-	--color-primary-100: oklch(94.5% 0.05 210deg);
-	--color-primary-200: oklch(88% 0.09 210deg);
-	--color-primary-300: oklch(81% 0.13 210deg);
-	--color-primary-400: oklch(74% 0.16 210deg);
-	--color-primary-500: oklch(67% 0.17 210deg);
-	--color-primary-600: oklch(60% 0.15 210deg);
-	--color-primary-700: oklch(52% 0.13 210deg);
-	--color-primary-800: oklch(44% 0.11 210deg);
-	--color-primary-900: oklch(35% 0.09 210deg);
-	--color-primary-950: oklch(25% 0.06 210deg);
-	--color-primary-contrast-dark: oklch(15% 0.03 210deg);
-	--color-primary-contrast-light: oklch(98% 0.01 210deg);
+	--color-primary-50: oklch(97% 0.014 254.6deg);
+	--color-primary-100: oklch(93.2% 0.032 255.6deg);
+	--color-primary-200: oklch(88.2% 0.059 254.1deg);
+	--color-primary-300: oklch(80.9% 0.105 251.8deg);
+	--color-primary-400: oklch(70.7% 0.165 254.6deg);
+	--color-primary-500: oklch(62.3% 0.214 259.8deg);
+	--color-primary-600: oklch(54.6% 0.245 262.9deg);
+	--color-primary-700: oklch(48.8% 0.243 264.4deg);
+	--color-primary-800: oklch(42.4% 0.199 265.6deg);
+	--color-primary-900: oklch(37.9% 0.146 265.5deg);
+	--color-primary-950: oklch(28.2% 0.091 267.9deg);
+	--color-primary-contrast-dark: oklch(15% 0.03 265deg);
+	--color-primary-contrast-light: oklch(100% 0 none);
 	--color-primary-contrast-50: var(--color-primary-contrast-dark);
 	--color-primary-contrast-100: var(--color-primary-contrast-dark);
 	--color-primary-contrast-200: var(--color-primary-contrast-dark);
@@ -132,17 +135,17 @@
 	/* ============================================ */
 	/* SUCCESS - Verde (Mantém)                     */
 	/* ============================================ */
-	--color-success-50: oklch(97% 0.02 140deg);
-	--color-success-100: oklch(93% 0.04 140deg);
-	--color-success-200: oklch(86% 0.08 140deg);
-	--color-success-300: oklch(78% 0.12 140deg);
-	--color-success-400: oklch(70% 0.15 140deg);
-	--color-success-500: oklch(62% 0.16 140deg);
-	--color-success-600: oklch(54% 0.14 140deg);
-	--color-success-700: oklch(46% 0.11 140deg);
-	--color-success-800: oklch(37% 0.09 140deg);
-	--color-success-900: oklch(29% 0.06 140deg);
-	--color-success-950: oklch(20% 0.04 140deg);
+	--color-success-50: oklch(97.9% 0.021 166.1deg);
+	--color-success-100: oklch(95% 0.052 163.1deg);
+	--color-success-200: oklch(90.5% 0.093 164.2deg);
+	--color-success-300: oklch(84.5% 0.143 164.98deg);
+	--color-success-400: oklch(76.5% 0.177 163.2deg);
+	--color-success-500: oklch(69.6% 0.17 162.5deg);
+	--color-success-600: oklch(59.6% 0.145 163.2deg);
+	--color-success-700: oklch(50.8% 0.118 165.6deg);
+	--color-success-800: oklch(43.2% 0.095 166.9deg);
+	--color-success-900: oklch(37.8% 0.077 168.9deg);
+	--color-success-950: oklch(26.2% 0.051 172.6deg);
 	--color-success-contrast-dark: oklch(0% 0 none);
 	--color-success-contrast-light: oklch(100% 0 none);
 	--color-success-contrast-50: var(--color-success-contrast-dark);
@@ -160,17 +163,17 @@
 	/* ============================================ */
 	/* WARNING - Ambar                              */
 	/* ============================================ */
-	--color-warning-50: oklch(97% 0.02 80deg);
-	--color-warning-100: oklch(93% 0.05 80deg);
-	--color-warning-200: oklch(87% 0.09 80deg);
-	--color-warning-300: oklch(81% 0.13 80deg);
-	--color-warning-400: oklch(75% 0.16 80deg);
-	--color-warning-500: oklch(69% 0.18 80deg);
-	--color-warning-600: oklch(62% 0.16 80deg);
-	--color-warning-700: oklch(54% 0.13 80deg);
-	--color-warning-800: oklch(45% 0.11 80deg);
-	--color-warning-900: oklch(36% 0.08 80deg);
-	--color-warning-950: oklch(26% 0.05 80deg);
+	--color-warning-50: oklch(98.7% 0.022 95.3deg);
+	--color-warning-100: oklch(96.2% 0.059 95.6deg);
+	--color-warning-200: oklch(92.4% 0.12 95.7deg);
+	--color-warning-300: oklch(87.9% 0.169 91.6deg);
+	--color-warning-400: oklch(82.8% 0.189 84.4deg);
+	--color-warning-500: oklch(76.9% 0.188 70.1deg);
+	--color-warning-600: oklch(66.6% 0.179 58.3deg);
+	--color-warning-700: oklch(55.5% 0.163 48.998deg);
+	--color-warning-800: oklch(47.3% 0.137 46.2deg);
+	--color-warning-900: oklch(41.4% 0.112 45.9deg);
+	--color-warning-950: oklch(27.9% 0.077 45.6deg);
 	--color-warning-contrast-dark: oklch(15% 0.05 80deg);
 	--color-warning-contrast-light: oklch(100% 0 none);
 	--color-warning-contrast-50: var(--color-warning-contrast-dark);
@@ -188,17 +191,17 @@
 	/* ============================================ */
 	/* ERROR - Rosa/Vermelho Neon                   */
 	/* ============================================ */
-	--color-error-50: oklch(97% 0.02 15deg);
-	--color-error-100: oklch(93% 0.04 15deg);
-	--color-error-200: oklch(85% 0.08 15deg);
-	--color-error-300: oklch(76% 0.12 15deg);
-	--color-error-400: oklch(67% 0.16 15deg);
-	--color-error-500: oklch(58% 0.2 15deg);
-	--color-error-600: oklch(51% 0.18 15deg);
-	--color-error-700: oklch(44% 0.15 15deg);
-	--color-error-800: oklch(36% 0.12 15deg);
-	--color-error-900: oklch(28% 0.09 15deg);
-	--color-error-950: oklch(19% 0.06 15deg);
+	--color-error-50: oklch(97.1% 0.013 17.4deg);
+	--color-error-100: oklch(93.6% 0.032 17.7deg);
+	--color-error-200: oklch(88.5% 0.062 18.3deg);
+	--color-error-300: oklch(80.8% 0.114 19.6deg);
+	--color-error-400: oklch(70.4% 0.191 22.2deg);
+	--color-error-500: oklch(63.7% 0.237 25.3deg);
+	--color-error-600: oklch(57.7% 0.245 27.3deg);
+	--color-error-700: oklch(50.5% 0.213 27.5deg);
+	--color-error-800: oklch(44.4% 0.177 26.9deg);
+	--color-error-900: oklch(39.6% 0.141 25.7deg);
+	--color-error-950: oklch(25.8% 0.092 26deg);
 	--color-error-contrast-dark: oklch(0% 0 none);
 	--color-error-contrast-light: oklch(100% 0 none);
 	--color-error-contrast-50: var(--color-error-contrast-dark);
@@ -216,20 +219,20 @@
 	/* ============================================ */
 	/* SURFACE - Slate profundo (Azul acinzentado escuro) */
 	/* ============================================ */
-	--color-surface-50: oklch(98% 0.005 255deg);
-	--color-surface-100: oklch(95% 0.01 255deg);
-	--color-surface-200: oklch(90% 0.015 255deg);
-	--color-surface-300: oklch(82% 0.02 255deg);
-	--color-surface-400: oklch(71% 0.025 255deg);
-	--color-surface-500: oklch(59% 0.03 255deg);
-	--color-surface-600: oklch(47% 0.03 255deg);
-	--color-surface-700: oklch(36% 0.03 255deg);
-	--color-surface-800: oklch(26% 0.03 255deg);
-	--color-surface-900: oklch(17% 0.025 255deg); /* Fundo dos cards escuro */
-	--color-surface-950: oklch(13% 0.02 255deg); /* Fundo da página escuro */
+	--color-surface-50: oklch(98.4% 0.003 247.9deg);
+	--color-surface-100: oklch(96.8% 0.007 247.9deg);
+	--color-surface-200: oklch(92.9% 0.013 255.5deg);
+	--color-surface-300: oklch(86.9% 0.022 252.9deg);
+	--color-surface-400: oklch(70.4% 0.04 256.8deg);
+	--color-surface-500: oklch(55.4% 0.046 257.4deg);
+	--color-surface-600: oklch(44.6% 0.043 257.3deg);
+	--color-surface-700: oklch(37.2% 0.044 257.3deg);
+	--color-surface-800: oklch(27.9% 0.041 260deg);
+	--color-surface-900: oklch(21% 0.04 265deg); /* Fundo dos cards escuro */
+	--color-surface-950: oklch(15% 0.03 265deg); /* Fundo da página escuro */
 	/* Canvas da app (body + folha): branco suave, um degrau abaixo de `bg-white`
 	 * dos cards — menos “cinza mesa”, sem competir com card-elevated. */
-	--color-page-canvas: oklch(99% 0.002 255deg);
+	--color-page-canvas: oklch(96.8% 0.007 247.9deg);
 	--color-surface-contrast-dark: var(--color-surface-950);
 	--color-surface-contrast-light: var(--color-surface-50);
 	--color-surface-contrast-50: var(--color-surface-contrast-dark);

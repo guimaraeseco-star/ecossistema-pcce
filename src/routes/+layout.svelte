@@ -42,7 +42,7 @@
 	// @font-face do app.css referencia — um download só. Demais pesos seguem
 	// sob demanda via @fontsource.
 	import inter400Url from '@fontsource/inter/files/inter-latin-400-normal.woff2?url';
-	import outfit700Url from '@fontsource/outfit/files/outfit-latin-700-normal.woff2?url';
+	import inter800Url from '@fontsource/inter/files/inter-latin-800-normal.woff2?url';
 	import { tick } from 'svelte';
 	import { page, navigating, updated } from '$app/state';
 	import { goto, onNavigate, afterNavigate, beforeNavigate } from '$app/navigation';
@@ -189,7 +189,7 @@
 	<!-- crossorigin é obrigatório em preload de fonte (fetch em modo CORS
 	     mesmo same-origin); sem ele o browser baixa o arquivo duas vezes. -->
 	<link rel="preload" href={inter400Url} as="font" type="font/woff2" crossorigin="anonymous" />
-	<link rel="preload" href={outfit700Url} as="font" type="font/woff2" crossorigin="anonymous" />
+	<link rel="preload" href={inter800Url} as="font" type="font/woff2" crossorigin="anonymous" />
 	<title>Ecossistema PCCE</title>
 	<meta
 		name="description"
