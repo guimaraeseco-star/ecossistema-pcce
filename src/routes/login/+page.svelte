@@ -410,9 +410,11 @@
 </svelte:head>
 
 <div class="min-h-screen flex items-center justify-center p-4">
-	<div class="w-full max-w-xl p-6 sm:p-10 rounded-3xl card-glass-auth">
+	<!-- `p-6 sm:p-8`, brasão `h-20` e `mb-4`: a tela inteira tem de caber em
+	     720 px de altura sem rolar (pedido de 13/09/2026). -->
+	<div class="w-full max-w-xl p-6 sm:p-8 rounded-3xl card-glass-auth">
 		{#if !recuperacao && !primeiroAcesso}
-			<div class="text-center mb-6">
+			<div class="text-center mb-4">
 				<!-- Brasão institucional (static/brasao-pcce.png, 273×360, fundo
 				     transparente): a mesma identidade dos demais sistemas do
 				     departamento. O subtítulo é a corporação, não o departamento —
@@ -420,7 +422,7 @@
 				<img
 					src="/brasao-pcce.png"
 					alt="Brasão da Polícia Civil do Estado do Ceará"
-					class="h-24 w-auto mx-auto mb-3 drop-shadow-md"
+					class="h-20 w-auto mx-auto mb-2 drop-shadow-md"
 					width="273"
 					height="360"
 					decoding="async"
