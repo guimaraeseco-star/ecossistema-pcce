@@ -18,11 +18,12 @@ import { and, eq, asc } from 'drizzle-orm';
 import { unidades, policiais, escalas, giseSeccionais } from '../server/schema';
 import type * as schema from '../server/schema';
 import { linhasAfetadas, type Database } from './core';
+import type { TipoUnidade } from '$lib/unidades/tipos';
 
 /** Campos editáveis de uma unidade (mesmo shape em criar e atualizar). */
 type DadosUnidade = {
 	nome: string;
-	tipo: 'departamento' | 'sub_departamento' | 'seccional' | 'delegacia';
+	tipo: TipoUnidade;
 	seccional_id: number | null;
 	tem_plantao: boolean;
 	tem_expediente: boolean;
@@ -306,7 +307,7 @@ export async function upsertUnidade(
 	db: Database,
 	data: {
 		nome: string;
-		tipo: 'departamento' | 'sub_departamento' | 'seccional' | 'delegacia';
+		tipo: TipoUnidade;
 		seccional_id: number | null;
 		cidade: string;
 	}
@@ -374,4 +375,92 @@ export async function buscarSeccionaisUnidades(db: Database) {
 		.where(eq(unidades.tipo, 'seccional'))
 		.orderBy(asc(unidades.nome))
 		.all();
+}
+
+// ---- A árvore (fase 1 do Ecossistema, decisões E23 e E24) ----------------
+
+/** O que a caminhada na árvore precisa de cada unidade. */
+export type NoUnidade = Pick<
+	schema.Unidade,
+	'id' | 'nome' | 'tipo' | 'seccional_id' | 'sigla' | 'abrangencia' | 'ativo'
+>;
+
+/**
+ * Carrega a árvore inteira (unidades ativas) indexada por id. São poucas
+ * dezenas de linhas por departamento e algumas centenas na corporação toda:
+ * uma consulta e caminhar em memória é mais simples e mais barato que uma
+ * consulta recursiva por chamada, e dispensa caminho materializado.
+ */
+export async function arvoreUnidades(db: Database): Promise<Map<number, NoUnidade>> {
+	const linhas = await db
+		.select({
+			id: unidades.id,
+			nome: unidades.nome,
+			tipo: unidades.tipo,
+			seccional_id: unidades.seccional_id,
+			sigla: unidades.sigla,
+			abrangencia: unidades.abrangencia,
+			ativo: unidades.ativo
+		})
+		.from(unidades)
+		.where(eq(unidades.ativo, true));
+	return new Map(linhas.map((u) => [u.id, u]));
+}
+
+/**
+ * Do pai imediato até a raiz, nessa ordem. Para em ciclo (defesa contra dado
+ * corrompido: `a.pai = b, b.pai = a` não pode travar um `load()`) e em pai
+ * inexistente ou desativado — a unidade vira raiz do que sobrou.
+ */
+export function ancestraisDe(arvore: Map<number, NoUnidade>, unidadeId: number): NoUnidade[] {
+	const saida: NoUnidade[] = [];
+	const vistos = new Set<number>([unidadeId]);
+	let atual = arvore.get(unidadeId);
+	while (atual?.seccional_id != null) {
+		const pai = arvore.get(atual.seccional_id);
+		if (!pai || vistos.has(pai.id)) break;
+		vistos.add(pai.id);
+		saida.push(pai);
+		atual = pai;
+	}
+	return saida;
+}
+
+/** A unidade e tudo abaixo dela — o ESCOPO de quem a administra (decisão E25). */
+export function subarvoreDe(arvore: Map<number, NoUnidade>, unidadeId: number): NoUnidade[] {
+	const raiz = arvore.get(unidadeId);
+	if (!raiz) return [];
+	const saida: NoUnidade[] = [raiz];
+	const vistos = new Set<number>([unidadeId]);
+	for (let i = 0; i < saida.length; i++) {
+		for (const u of arvore.values()) {
+			if (u.seccional_id === saida[i].id && !vistos.has(u.id)) {
+				vistos.add(u.id);
+				saida.push(u);
+			}
+		}
+	}
+	return saida;
+}
+
+/**
+ * O departamento de uma unidade: ela mesma, se for departamento, senão o
+ * ancestral mais próximo desse tipo. Subdepartamento conta como o departamento
+ * que o contém — o subdepartamento de Juazeiro emite documento em nome do DPI
+ * SUL. `null` para unidade fora de qualquer departamento (órgãos corporativos,
+ * raiz).
+ *
+ * É a substituta de `buscarDepartamentoPadrao` sempre que há uma unidade de
+ * contexto (decisão E24): "o único departamento ativo" só existe enquanto o
+ * sistema serve um departamento.
+ */
+export function departamentoDe(
+	arvore: Map<number, NoUnidade>,
+	unidadeId: number
+): Departamento | null {
+	const propria = arvore.get(unidadeId);
+	if (!propria) return null;
+	const candidatos = [propria, ...ancestraisDe(arvore, unidadeId)];
+	const dep = candidatos.find((u) => u.tipo === 'departamento');
+	return dep ? { id: dep.id, nome: dep.nome, sigla: dep.sigla } : null;
 }

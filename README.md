@@ -235,6 +235,35 @@ O projeto usa **Cloudflare D1** (SQLite serverless) via **Drizzle ORM**. O schem
 | `audit_log`                      | Trilha de auditoria forense (eventos de negócio, cadeia de hash tamper-evident)                                              |
 | `app_log`                        | Logs técnicos do servidor (warn/error do logger, correlacionados por `request_id`)                                           |
 
+### Unidades formam UMA árvore, e a pergunta é sempre "está abaixo de"
+
+Desde a fase 1 do Ecossistema (migração `0084`, decisões E23/E24/E26) a árvore de
+`unidades` cobre o organograma inteiro da Polícia Civil (Decreto 37.465/2026), não só
+departamento → subdepartamento → seccional → delegacia. Os tipos vivem num
+catálogo único, [`src/lib/unidades/tipos.ts`](src/lib/unidades/tipos.ts) — fonte
+do enum do schema, do Zod de `/unidades`, dos rótulos e da régua "quem pode ser pai
+de quem" (pai precisa estar ACIMA na precedência; mesmo nível não pode).
+
+- `seccional_id` é o **pai genérico**, apesar do nome (renomear a coluna exigiria
+  reconstruir a tabela sem ganho de comportamento). Departamento especializado
+  liga delegacia direto a si, sem seccional — por isso **nenhum código conta
+  níveis fixos**: `ancestraisDe`, `subarvoreDe` e `departamentoDe` em
+  [`src/lib/db/unidades.ts`](src/lib/db/unidades.ts) caminham na árvore carregada
+  em memória (`arvoreUnidades`), param em ciclo e em pai inexistente.
+- **O departamento é derivado**, nunca "o único ativo": `departamentoDoPlano(db,
+demandanteUnidadeId)` resolve pela unidade demandante do plano operacional;
+  `buscarDepartamentoPadrao` ficou só como fallback para quando não há unidade de
+  contexto.
+- `unidades.abrangencia` (`departamental` | `corporativa`): os órgãos de direção,
+  gerência superior e execução instrumental (Delegacia-Geral, DPGI, COGEP,
+  Logística, DTO, Corregedoria, CTIC) são irmãos dos departamentos na árvore e
+  não ancestrais deles; marcados como corporativos, quem os administra vê a
+  corporação inteira. A coluna existe desde a 0084; o resolvedor de escopo passa a
+  lê-la na fase 2 (E25/E26).
+- A tela `/unidades` mostra qualquer tipo do catálogo e trata toda unidade sem pai
+  como raiz; o **cadastro pela tela ainda oferece só seccional e delegacia** — os
+  demais níveis entram por migração de semente ou pela tela da fase 2.
+
 ### Unidade é referenciada por NOME
 
 Herança da planilha que originou o sistema: `policiais.lotacao` e

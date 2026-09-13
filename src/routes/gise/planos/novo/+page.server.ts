@@ -190,7 +190,7 @@ export const actions: Actions = {
 		const [vigente, escolhido, depto] = await Promise.all([
 			buscarCustoParametrosVigente(db),
 			diretorId ? buscarPolicial(db, diretorId) : Promise.resolve(null),
-			departamentoDoPlano(db)
+			departamentoDoPlano(db, demandanteId)
 		]);
 
 		const diretorNome = escolhido?.nome ?? '';

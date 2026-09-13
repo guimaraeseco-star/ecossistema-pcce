@@ -35,6 +35,7 @@ import {
 	primaryKey
 } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
+import { TIPO_UNIDADE_VALORES } from '$lib/unidades/tipos';
 
 // ---- Policiais ----
 
@@ -245,13 +246,32 @@ export const unidades = sqliteTable(
 	{
 		id: integer('id').primaryKey({ autoIncrement: true }),
 		nome: text('nome').notNull().unique(),
-		tipo: text('tipo', {
-			enum: ['departamento', 'sub_departamento', 'seccional', 'delegacia']
-		})
-			.notNull()
-			.default('delegacia'),
-		/** ID da unidade pai na hierarquia (dept → subdept → seccional → delegacia). */
+		/**
+		 * Tipo no organograma — os valores vêm do catálogo `$lib/unidades/tipos`
+		 * (fase 1 do Ecossistema, decisão E23). Sem CHECK no banco desde a 0004;
+		 * a régua é o Zod de `/unidades` e o catálogo.
+		 */
+		tipo: text('tipo', { enum: TIPO_UNIDADE_VALORES }).notNull().default('delegacia'),
+		/**
+		 * ID da unidade PAI na árvore — o nome é histórico (nasceu apontando a
+		 * seccional da delegacia) e ficou porque renomear exigiria reconstruir a
+		 * tabela e reescrever toda referência sem ganho de comportamento. Vale
+		 * para qualquer nível: departamento → seccional, departamento →
+		 * delegacia (especializados), coordenadoria → célula, etc. Quem precisa de
+		 * "está abaixo de" usa `ancestraisDe`/`departamentoDe` em `$lib/db/unidades`.
+		 */
 		seccional_id: integer('seccional_id'),
+		/**
+		 * Alcance de quem administra a unidade (migração 0084, decisão E26):
+		 * `departamental` = a própria subárvore; `corporativa` = a corporação
+		 * inteira, para os órgãos de direção e instrumentais (Gabinete, DPGI,
+		 * COGEP, Logística, DTO, Corregedoria, CTIC), que são irmãos dos
+		 * departamentos e não ancestrais deles. O que cada órgão pode FAZER além
+		 * de ver é regra do módulo, não desta coluna.
+		 */
+		abrangencia: text('abrangencia', { enum: ['departamental', 'corporativa'] })
+			.notNull()
+			.default('departamental'),
 		cidade: text('cidade').notNull().default(''),
 		/**
 		 * Forma curta ("DPI SUL"), atributo de departamento e subdepartamento;
