@@ -10,6 +10,7 @@
  * o consome reprova até o card acompanhar também.
  */
 import { visibilidadeDoMenu, itensExtraDoMenu, type FlagsMenu } from '../menu-visibilidade';
+import { gruposHome } from '../home-modulos';
 
 export interface UsuarioDeTeste {
 	tipo?: 'policial' | 'admin' | 'colaborador';
@@ -59,6 +60,10 @@ export function destinosDoMenu(usuario: UsuarioDeTeste, flags: FlagsMenu): strin
 	const ehAdmin = usuario.tipo === 'admin';
 	const destinos: string[] = [];
 
+	// Os títulos de grupo são links para a tela do grupo — a barra desenha um
+	// para cada grupo que a HOME mostra (mesma fonte: `gruposHome`), mesmo sem
+	// item de menu embaixo. O policial sem papel tem a barra plana.
+	for (const g of gruposHome({ usuario, flags })) destinos.push(g.href);
 	// Gestão de pessoal
 	if (flags.showPoliciais) destinos.push('/policiais');
 	if (flags.showSolicitacoes) destinos.push('/solicitacoes');
@@ -68,12 +73,13 @@ export function destinosDoMenu(usuario: UsuarioDeTeste, flags: FlagsMenu): strin
 	}
 	// Gestão operacional
 	if (flags.showGrupo2) {
-		destinos.push(...itensExtraDoMenu(flags, new URL('http://x/')).map((i) => i.href));
+		const extra = itensExtraDoMenu(flags, new URL('http://x/')).map((i) => i.href);
+		destinos.push(...extra);
 		if (flags.showGise && ehAdmin) destinos.push('/gise/operacoes', '/gise/planos');
 	}
 	// Gestão de unidade
 	if (flags.showUnidade) destinos.push('/unidade');
-	// Administrativo
+	// Gestão administrativa
 	if (flags.showColaboradores) destinos.push('/colaboradores');
 	// Meu perfil
 	if (usuario.tipo === 'policial') destinos.push('/perfil');

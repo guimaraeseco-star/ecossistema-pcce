@@ -422,7 +422,8 @@ escalas/
 │   │   ├── alterar-senha/          # Troca de senha obrigatória (primeiro acesso)
 │   │   ├── redefinir-senha/        # Reset de senha via token
 │   │   ├── aceitar-termo/          # Aceite de termo de uso
-│   │   ├── +page.svelte            # HOME DE MÓDULOS dos perfis administrativos (4 grupos, E39)
+│   │   ├── +page.svelte            # INÍCIO dos perfis administrativos: 4 cartões grandes (E39)
+│   │   ├── grupo/[id]/             # Tela de um grupo da home: os cartões detalhados
 │   │   ├── _components/            # Regras de navegação compartilhadas pelas rotas:
 │   │   │                           #   menu-visibilidade.ts (sidebar), home-modulos.ts (home) e
 │   │   │                           #   bem-vindo-cards.ts (quadros) — as três do MESMO par de flags

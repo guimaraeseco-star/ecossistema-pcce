@@ -33,7 +33,9 @@ test.describe('Boas-vindas por papel', () => {
 		await expect(page).toHaveURL(/\/$/);
 		await expect(page.getByRole('heading', { name: 'Gestão de pessoal' })).toBeVisible();
 		await expect(page.getByRole('heading', { name: 'Gestão de unidade' })).toBeVisible();
-		// A delegacia vê a própria unidade, não a lista.
+		// O cartão grande abre a tela do grupo; a delegacia vê a própria unidade, não a lista.
+		await page.getByRole('link', { name: /Gestão de unidade/ }).click();
+		await expect(page).toHaveURL(/\/grupo\/unidade$/);
 		await expect(page.getByRole('heading', { name: 'Minha delegacia' })).toBeVisible();
 	});
 
@@ -42,9 +44,12 @@ test.describe('Boas-vindas por papel', () => {
 		test.skip(!ok, 'D1 local indisponível');
 		await page.goto('/escalas/bem-vindo');
 		await expect(page).toHaveURL(/\/$/);
-		await expect(page.getByRole('heading', { name: 'Departamento' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Gestão administrativa' })).toBeVisible();
 		// Planejado aparece desligado, não some.
+		await page.goto('/grupo/pessoal');
 		await expect(page.getByRole('heading', { name: 'Diárias' })).toBeVisible();
+		await page.goto('/grupo/unidade');
+		await expect(page.getByRole('heading', { name: 'Departamento' })).toBeVisible();
 	});
 
 	test('policial comum não tem gestão de unidade', async ({ page }) => {

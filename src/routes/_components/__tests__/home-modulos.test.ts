@@ -81,6 +81,13 @@ describe('home de módulos × navegação lateral', () => {
 				expect(soDaHome.every((d) => d.startsWith('/escalas?tipo=fds'))).toBe(true);
 			});
 
+			it('cada grupo tem a sua tela e um resumo do que contém', () => {
+				for (const g of grupos) {
+					expect(g.href).toBe(`/grupo/${g.id}`);
+					expect(g.descricao.length).toBeGreaterThan(5);
+				}
+			});
+
 			it('nenhum cartão duplicado', () => {
 				const ids = grupos.flatMap((g) => g.cartoes.map((c) => c.id));
 				expect(new Set(ids).size).toBe(ids.length);
@@ -96,8 +103,8 @@ describe('home de módulos × navegação lateral', () => {
 				}
 			});
 
-			it('os grupos saem na ordem fixada: pessoal, operacional, unidade, administrativo', () => {
-				const ordem = ['pessoal', 'operacional', 'unidade', 'administrativo'];
+			it('os grupos saem na ordem fixada: pessoal, operacional, unidade, administrativa', () => {
+				const ordem = ['pessoal', 'operacional', 'unidade', 'administrativa'];
 				const ids = grupos.map((g) => g.id);
 				expect(ids).toEqual(ordem.filter((o) => ids.includes(o as (typeof ids)[number])));
 			});
@@ -179,14 +186,14 @@ describe('a organização fixada em 13/09/2026', () => {
 
 	it('E39: Atualização de valores e Municípios são de departamento para cima', () => {
 		expect(idsDe(geral, 'pessoal')).toContain('valores');
-		expect(idsDe(geral, 'administrativo')).toContain('municipios');
+		expect(idsDe(geral, 'administrativa')).toContain('municipios');
 		expect(idsDe(unidade, 'pessoal')).not.toContain('valores');
-		expect(idsDe(unidade, 'administrativo')).not.toContain('municipios');
+		expect(idsDe(unidade, 'administrativa')).not.toContain('municipios');
 	});
 
-	it('E40: Armamento e Veículos em Gestão operacional; Patrimônio móvel em Administrativo', () => {
+	it('E40: Armamento e Veículos em Gestão operacional; Patrimônio móvel em Gestão administrativa', () => {
 		expect(idsDe(geral, 'operacional')).toEqual(expect.arrayContaining(['armamento', 'veiculos']));
-		expect(idsDe(geral, 'administrativo')).toContain('patrimonio-movel');
+		expect(idsDe(geral, 'administrativa')).toContain('patrimonio-movel');
 		// "para todos" = todos os NÍVEIS veem os seus (E42): a delegacia também os tem.
 		expect(idsDe(unidade, 'operacional')).toEqual(
 			expect.arrayContaining(['armamento', 'veiculos'])
@@ -246,6 +253,19 @@ describe('a organização fixada em 13/09/2026', () => {
 		const extraGeral = geral.flatMap((g) => g.cartoes).find((c) => c.id === 'escala-extra');
 		expect(extraGeral?.atalhos.map((a) => a.href)).not.toContain('/escalas?tipo=fds');
 		expect(extraGeral?.atalhos.map((a) => a.href)).toContain('/gise/finalizadas');
+	});
+
+	it('o resumo do cartão grande segue o que o perfil alcança', () => {
+		const pessoalGeral = geral.find((g) => g.id === 'pessoal');
+		expect(pessoalGeral?.descricao).toBe(
+			'Servidores, Escalas ordinárias, Diárias, Extras, Atualização de valores'
+		);
+		expect(geral.find((g) => g.id === 'unidade')?.descricao).toBe(
+			'Vê os dados da unidade e vinculadas'
+		);
+		expect(geral.find((g) => g.id === 'administrativa')?.titulo).toBe('Gestão administrativa');
+		// admin de unidade não tem Solicitações nem Valores: o resumo não os promete
+		expect(unidade.find((g) => g.id === 'pessoal')?.descricao).not.toMatch(/valores/i);
 	});
 
 	it('sessão de admin não recebe "Meu perfil" (não tem cadastro de policial)', () => {

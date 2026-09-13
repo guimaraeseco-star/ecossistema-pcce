@@ -1,8 +1,11 @@
 /**
- * A HOME DE MÓDULOS (`/`) — o que cada perfil administrativo vê ao entrar,
- * organizado nos quatro grupos que o responsável definiu em 13/09/2026
+ * A HOME DE MÓDULOS — o que cada perfil administrativo vê ao entrar,
+ * organizada nos quatro grupos que o responsável definiu em 13/09/2026
  * ("Telas e subtelas", decisão E39): Gestão de pessoal · Gestão operacional ·
- * Gestão de unidade · Administrativo.
+ * Gestão de unidade · Gestão administrativa. Em DOIS níveis, como no desenho
+ * dele: o Início (`/`) mostra os quatro cartões grandes, cada um com o resumo
+ * do que contém; clicar num deles abre a tela do grupo (`/grupo/[id]`), com
+ * os cartões detalhados. Um grupo sem cartão para o perfil não aparece.
  *
  * Mesma família de `menu-visibilidade.ts` e `bem-vindo-cards.ts`, e pelo mesmo
  * motivo: a home responde à MESMA pergunta da sidebar — "o que este usuário
@@ -60,13 +63,31 @@ export interface CartaoHome {
 	fase?: number;
 }
 
-type GrupoHomeId = 'pessoal' | 'operacional' | 'unidade' | 'administrativo';
+/** Os quatro grupos — também o segmento da URL da tela de cada um (`/grupo/[id]`). */
+const GRUPOS_HOME_IDS = ['pessoal', 'operacional', 'unidade', 'administrativa'] as const;
+export type GrupoHomeId = (typeof GRUPOS_HOME_IDS)[number];
+
+export function ehGrupoHomeId(v: string): v is GrupoHomeId {
+	return (GRUPOS_HOME_IDS as readonly string[]).includes(v);
+}
 
 export interface GrupoHome {
 	id: GrupoHomeId;
 	titulo: string;
+	/** O que o grupo contém, na voz do responsável: "Servidores, Escalas ordinárias, Diárias e etc". */
 	descricao: string;
+	/** Rota da tela do grupo (os cartões detalhados). */
+	href: string;
 	cartoes: CartaoHome[];
+}
+
+/**
+ * O subtítulo do cartão grande do Início: o nome de TODOS os cartões que este
+ * usuário tem no grupo — o texto segue o que o perfil alcança, em vez de
+ * prometer a um admin de delegacia o que só o departamento vê.
+ */
+function resumoDe(cartoes: CartaoHome[]): string {
+	return cartoes.map((c) => c.titulo).join(', ');
 }
 
 export interface EntradaHome {
@@ -305,7 +326,7 @@ function cardUnidade(u: UsuarioDaHome, flags: FlagsMenu): CartaoHome {
 	};
 }
 
-/* ── Administrativo ─────────────────────────────────────────────────────── */
+/* ── Gestão administrativa ──────────────────────────────────────────────── */
 
 const COLABORADORES: CartaoHome = {
 	id: 'colaboradores',
@@ -428,35 +449,40 @@ export function gruposHome({ usuario, flags }: EntradaHome): GrupoHome[] {
 		{
 			id: 'pessoal',
 			titulo: 'Gestão de pessoal',
-			descricao: 'Servidores, escalas ordinárias e o que se paga a quem trabalha.',
+			descricao: resumoDe(pessoal),
+			href: '/grupo/pessoal',
 			cartoes: pessoal
 		},
 		{
 			id: 'operacional',
 			titulo: 'Gestão operacional',
-			descricao: 'Meios e escalas do serviço extraordinário.',
+			descricao: resumoDe(operacional),
+			href: '/grupo/operacional',
 			cartoes: operacional
 		},
 		{
 			id: 'unidade',
 			titulo: 'Gestão de unidade',
-			descricao: 'A sua unidade e as que respondem a ela.',
+			descricao: 'Vê os dados da unidade e vinculadas',
+			href: '/grupo/unidade',
 			cartoes: unidade
 		},
 		{
-			id: 'administrativo',
-			titulo: 'Administrativo',
-			descricao: 'Acessos, bens e cadastros de apoio.',
+			id: 'administrativa',
+			titulo: 'Gestão administrativa',
+			descricao: resumoDe(administrativo),
+			href: '/grupo/administrativa',
 			cartoes: administrativo
 		}
 	];
 	return grupos.filter((g) => g.cartoes.length > 0);
 }
 
-/** Todos os destinos clicáveis da home (cartões ligados + atalhos) — para o teste de paridade. */
+/** Todos os destinos clicáveis da home (telas de grupo, cartões ligados e atalhos) — para o teste de paridade. */
 export function destinosDaHome(grupos: GrupoHome[]): string[] {
 	const saida: string[] = [];
 	for (const g of grupos) {
+		saida.push(g.href);
 		for (const c of g.cartoes) {
 			if (c.href) saida.push(c.href);
 			for (const a of c.atalhos) saida.push(a.href);

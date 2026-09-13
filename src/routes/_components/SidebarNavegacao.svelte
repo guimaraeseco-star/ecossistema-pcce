@@ -25,6 +25,7 @@
 	import { mensagemDeErro } from '$lib/utils/erro';
 	import { ICONE } from '$lib/constants/icones';
 	import type { NavegacaoEstado } from './navegacao-estado.svelte';
+	import { gruposHomeDaPagina } from './home-modulos';
 
 	const { nav, onSair }: { nav: NavegacaoEstado; onSair: () => void } = $props();
 
@@ -32,6 +33,15 @@
 	const flags = $derived(nav.flags);
 	const giseOperacoesPathAtivo = $derived(page.url.pathname.startsWith('/gise/operacoes'));
 	const planosPathAtivo = $derived(page.url.pathname.startsWith('/gise/planos'));
+
+	/**
+	 * Os grupos que a HOME mostra a este usuário — a barra desenha o título de
+	 * cada um (link para a tela do grupo) mesmo quando não há item de menu
+	 * embaixo, porque o grupo pode ter só cartões planejados (o admin de
+	 * unidade tem "Gestão operacional" com Armamento e Veículos "Em breve").
+	 * Mesma fonte da home: título na barra ⇔ cartão grande no Início.
+	 */
+	const gruposDaHome = $derived(new Set(gruposHomeDaPagina(usuario, page.data).map((g) => g.id)));
 
 	/**
 	 * A métrica das linhas da barra, uma só para as três formas: item que navega,
@@ -109,10 +119,13 @@
 >
 	<!-- Logo -->
 	<div class="h-16 flex items-center px-5 border-b border-surface-200 dark:border-white/5 shrink-0">
+		<!-- A marca da gaveta é a corporação; o departamento e a unidade da
+		     pessoa estão na barra do topo (`BarraTopo`), que tem espaço. -->
 		<div class="flex items-center gap-2 group">
+			<img src="/brasao-pcce.png" alt="" width="273" height="360" class="h-8 w-auto" />
 			<span
-				class="font-heading font-bold text-xl text-surface-900 dark:text-surface-50 tracking-tight"
-				>DPI SUL</span
+				class="font-heading font-bold text-base text-surface-900 dark:text-surface-50 tracking-tight"
+				>Ecossistema PCCE</span
 			>
 		</div>
 		<button
@@ -209,15 +222,22 @@
 			</a>
 		{/snippet}
 
-		<!-- Título de grupo da barra dos perfis administrativos — mesma escala
-		     tipográfica dos títulos de seção da home (`/`), para a barra e a
-		     home lerem como a mesma organização. -->
-		{#snippet tituloGrupo(rotulo: string)}
-			<p
-				class="!mt-4 mb-1 px-3 text-3xs font-semibold tracking-[0.18em] text-surface-500 uppercase dark:text-surface-500"
+		<!-- Título de grupo da barra dos perfis administrativos: o MESMO nome do
+		     cartão grande do Início, e um link para a tela do grupo
+		     (`/grupo/[id]`), para a barra e a home lerem como a mesma
+		     organização. Realça quando a rota atual é a própria tela do grupo. -->
+		{#snippet tituloGrupo(rotulo: string, grupoId: string)}
+			<a
+				href="/grupo/{grupoId}"
+				data-sveltekit-preload-data="hover"
+				class="!mt-4 mb-1 block px-3 text-3xs font-semibold tracking-[0.18em] uppercase no-underline transition-colors hover:text-primary-700 dark:hover:text-primary-400 {page
+					.url.pathname === `/grupo/${grupoId}`
+					? 'text-primary-700 dark:text-primary-400'
+					: 'text-surface-500 dark:text-surface-500'}"
+				onclick={() => void nav.aoNavegar()}
 			>
 				{rotulo}
-			</p>
+			</a>
 		{/snippet}
 
 		{#if nav.nivel === 'extra'}
@@ -268,8 +288,8 @@
 				Perfis ADMINISTRATIVOS (Admin Geral, admin de seccional, admin de
 				unidade): "Início" é a home de módulos, e a barra repete a organização
 				dela em quatro grupos (decisão E39) — Gestão de pessoal · Gestão
-				operacional · Gestão de unidade · Administrativo. Um grupo sem item
-				não desenha o título.
+				operacional · Gestão de unidade · Gestão administrativa. Um grupo sem
+				item não desenha o título.
 
 				`showGrupo1`/`showGrupo2` são o filtro de módulo do Admin Geral
 				(GISE ↔ Escalas), que continua valendo na barra; a home não o usa.
@@ -279,8 +299,8 @@
 			<!-- Gestão de pessoal: servidores (os três papéis), a fila de quem
 			     decide, e a escala ordinária — painel + caixa de entrada para o
 			     Admin Geral, a lista de escalas para quem monta/assina. -->
-			{#if flags.showPoliciais || flags.showGrupo1}
-				{@render tituloGrupo('Gestão de pessoal')}
+			{#if gruposDaHome.has('pessoal')}
+				{@render tituloGrupo('Gestão de pessoal', 'pessoal')}
 			{/if}
 			{#if flags.showPoliciais}
 				{@render itemMenu('/policiais', 'Servidores', ICONE.pessoas)}
@@ -314,8 +334,10 @@
 				O plano operacional NASCE em /gise/operacoes, mas a lista precisa de
 				entrada própria: sem ela, um plano já criado só se alcançaria pela URL.
 			-->
-			{#if flags.showGrupo2 && (nav.filhosExtra.length > 0 || (flags.showGise && usuario?.tipo === 'admin'))}
-				{@render tituloGrupo('Gestão operacional')}
+			{#if gruposDaHome.has('operacional')}
+				{@render tituloGrupo('Gestão operacional', 'operacional')}
+			{/if}
+			{#if flags.showGrupo2}
 				{#if nav.filhosExtra.length > 0}
 					{@render itemPaiExtra(nav.naRotaExtra)}
 				{/if}
@@ -331,8 +353,10 @@
 			{/if}
 
 			<!-- Gestão de unidade: a própria subárvore, com o rótulo do nível. -->
+			{#if gruposDaHome.has('unidade')}
+				{@render tituloGrupo('Gestão de unidade', 'unidade')}
+			{/if}
 			{#if flags.showUnidade}
-				{@render tituloGrupo('Gestão de unidade')}
 				{@render itemMenu(
 					'/unidade',
 					usuario?.tipo === 'admin'
@@ -346,8 +370,10 @@
 
 			<!-- Administrativo: só o Admin Geral cria identidade de acesso —
 			     administrar pessoa já cadastrada é outra coisa. -->
+			{#if gruposDaHome.has('administrativa')}
+				{@render tituloGrupo('Gestão administrativa', 'administrativa')}
+			{/if}
 			{#if flags.showColaboradores}
-				{@render tituloGrupo('Administrativo')}
 				{@render itemMenu('/colaboradores', 'Colaboradores', ICONE.pessoas)}
 			{/if}
 

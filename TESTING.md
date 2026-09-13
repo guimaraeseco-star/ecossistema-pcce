@@ -336,11 +336,17 @@ Verificar cada transição de status:
 - [ ] "Operações" e "Plano Op." aparecem lado a lado, e a rota atual acende só um
       dos dois — estar em `/gise/planos` **não** pode acender "Ativas"
 - [ ] "Valores de custo" NÃO aparece para o Admin Geral: é aba do Super Admin
-- [ ] A home de módulos (`/`) tem um cartão ou atalho para cada item do menu
-      (`__tests__/home-modulos.test.ts` reprova o esquecimento, mas a
-      conferência visual é a que pega texto trocado); a barra mostra os mesmos
-      quatro grupos da home (Gestão de pessoal · operacional · de unidade ·
-      Administrativo) e "Início" leva a `/`
+- [ ] O Início (`/`) mostra os quatro cartões grandes (cor #104862) sem rolagem
+      em 1366×720; o subtítulo de cada um lista TODOS os módulos do grupo para o
+      perfil; clicar abre `/grupo/[id]` com os cartões detalhados, um para cada
+      item do menu (`__tests__/home-modulos.test.ts` reprova o esquecimento,
+      mas a conferência visual é a que pega texto trocado); a barra mostra os
+      mesmos quatro grupos (Gestão de pessoal · operacional · de unidade ·
+      administrativa), cada título é link para a tela do grupo, e "Início" leva
+      a `/`
+- [ ] Barra do topo: brasão + "Polícia Civil do Ceará - DPI SUL" para o Admin
+      Geral; "- seccional" para o admin de seccional; "- seccional - delegacia"
+      para o admin de unidade; só "Polícia Civil do Ceará" para o Super Admin
 - [ ] Cartão planejado (Diárias, Extras, Armamento, Veículos, Patrimônio móvel,
       Municípios, Atualização de valores) aparece desligado com "Em breve · fase N";
       Municípios e Atualização de valores só para o Admin Geral

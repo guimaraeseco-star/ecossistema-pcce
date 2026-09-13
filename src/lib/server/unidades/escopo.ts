@@ -17,9 +17,11 @@
  * Nada aqui é a autorização das outras telas: `/policiais` continua com
  * `lotacoesAdministradas`, escalas com `verificarPermissaoEscala`. Este
  * resolvedor responde só "que unidades este usuário ENXERGA na gestão de
- * unidade".
+ * unidade" — e, por `trilhaDaUnidade`, "de onde ele olha", para a barra do
+ * topo.
  */
 import {
+	ancestraisDe,
 	arvoreUnidades,
 	buscarDepartamentoPadrao,
 	buscarPolicial,
@@ -29,6 +31,7 @@ import {
 	type NoUnidade
 } from '$lib/db';
 import { buscarUnidadePorNome } from '$lib/db/unidades';
+import { nivelTipoUnidade } from '$lib/unidades/tipos';
 import { isAdminGeral, isAdminSeccional, isAdminUnidade, type UsuarioLogado } from '$lib/auth';
 
 export interface EscopoUnidades {
@@ -77,4 +80,30 @@ async function idDaRaiz(
 /** A unidade `id` está no escopo? (`nos` é pequena: dezenas de linhas.) */
 export function unidadeNoEscopo(escopo: EscopoUnidades, id: number): boolean {
 	return escopo.nos.some((n) => n.id === id);
+}
+
+/**
+ * A TRILHA da unidade do usuário para a barra do topo — do departamento até
+ * a unidade dele, na ordem: `['DPI SUL', '1ª Seccional do Interior Sul',
+ * 'Delegacia de Polícia Civil de Aracati']`. O departamento vai pela sigla
+ * (é como se fala) e as demais pelo nome; o que está ACIMA do departamento
+ * (Delegacia-Geral, órgãos corporativos) fica de fora porque a barra já diz
+ * "Polícia Civil do Ceará" antes da trilha.
+ *
+ * A raiz é a MESMA do escopo (papel, ou departamento para o Admin Geral);
+ * para o policial sem papel é a lotação dele. Lista vazia para quem não tem
+ * unidade (Super Admin, colaborador, lotação sem cadastro).
+ */
+export async function trilhaDaUnidade(db: Database, u: UsuarioLogado): Promise<string[]> {
+	const arvore = await arvoreUnidades(db);
+	let id = await idDaRaiz(db, u, arvore);
+	if (id == null && u.tipo === 'policial' && u.lotacao) {
+		id = (await buscarUnidadePorNome(db, u.lotacao))?.id ?? null;
+	}
+	if (id == null || !arvore.get(id)) return [];
+	const propria = arvore.get(id) as NoUnidade;
+	const cadeia = [...ancestraisDe(arvore, id).reverse(), propria];
+	return cadeia
+		.filter((n) => nivelTipoUnidade(n.tipo) >= nivelTipoUnidade('departamento'))
+		.map((n) => (n.tipo === 'departamento' && n.sigla ? n.sigla : n.nome));
 }

@@ -38,6 +38,11 @@
 	/* Fundo da página (body + folha xl) — espelha theme.css; gera `bg-page-canvas`. */
 	--color-page-canvas: oklch(96.8% 0.007 247.9deg);
 
+	/* Cartões da home de módulos (Início e telas de grupo) — cor pedida pelo
+	 * responsável em 13/09/2026 (decisão E39), igual nos dois temas; gera
+	 * `bg-gestao`, `text-gestao`, `border-gestao`. Só a home a usa. */
+	--color-gestao: #104862;
+
 	/* Breakpoint extra abaixo de `sm` para telefones estreitos (UX-10).
 	 * Use `xs:` em vez de `min-[400px]:`. O `min-[900px]:` do +layout.svelte
 	 * é deliberado e exclusivo do corte da sidebar — não migrar para `lg:`. */

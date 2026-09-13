@@ -12,6 +12,7 @@ import { lerFlagsAssinatura } from '$lib/server/assinatura/cfg-ass-cache';
 import { lerPapelGise } from '$lib/server/gise/papel-cache';
 import { lerTemLinhaBasePendente } from '$lib/server/operacoes/linha-base-cache';
 import { resumoRecebidosAdmin } from '$lib/server/escalas/sync-estado';
+import { trilhaDaUnidade } from '$lib/server/unidades/escopo';
 import { logger } from '$lib/server/logger';
 import { mensagemDeErro } from '$lib/utils/erro';
 import {
@@ -42,6 +43,8 @@ export const load: LayoutServerLoad = async ({ locals, platform, cookies, depend
 	// usuário → admin: exige o policial ter conta Admin Geral vinculada.
 	const podeAlternarParaUsuario = u?.tipo === 'admin' && u.adminPolicialId != null;
 	let podeAlternarParaAdmin = false;
+	// Barra do topo: "Polícia Civil do Ceará - DPI SUL - seccional - delegacia".
+	let trilhaUnidade: string[] = [];
 
 	if (u) {
 		try {
@@ -62,7 +65,7 @@ export const load: LayoutServerLoad = async ({ locals, platform, cookies, depend
 			depends('app:assinatura-flags');
 			depends('app:chave-assinatura');
 			if (u.tipo === 'policial') depends('app:papel-gise');
-			const [flags, papel, vinculadoAdmin, recebidos, linhaBasePendente, credencial] =
+			const [flags, papel, vinculadoAdmin, recebidos, linhaBasePendente, credencial, trilha] =
 				await Promise.all([
 					lerFlagsAssinatura(platform),
 					u.tipo === 'policial' ? lerPapelGise(db, u.id) : Promise.resolve(null),
@@ -71,8 +74,12 @@ export const load: LayoutServerLoad = async ({ locals, platform, cookies, depend
 					// Cache próprio (TTL 60s): a resposta cruza operações ativas, modelos e
 					// participação — cara demais para o `load` que roda a cada navegação.
 					lerTemLinhaBasePendente(db, u),
-					temCadastro(u) ? buscarCredencialAtiva(db, credencialDoUsuario(u)) : Promise.resolve(null)
+					temCadastro(u)
+						? buscarCredencialAtiva(db, credencialDoUsuario(u))
+						: Promise.resolve(null),
+					trilhaDaUnidade(db, u)
 				]);
+			trilhaUnidade = trilha;
 			temLinhaBasePendente = linhaBasePendente;
 			podeAlternarParaAdmin = vinculadoAdmin;
 			exigirFotoAssinatura = flags.exigirFotoAssinatura;
@@ -129,6 +136,7 @@ export const load: LayoutServerLoad = async ({ locals, platform, cookies, depend
 		adminModulo,
 		podeAlternarModulo,
 		podeAlternarParaUsuario,
-		podeAlternarParaAdmin
+		podeAlternarParaAdmin,
+		trilhaUnidade
 	};
 };
