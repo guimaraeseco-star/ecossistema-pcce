@@ -126,7 +126,7 @@ export const load: PageServerLoad = async ({ locals, params, platform, depends }
 					.where(eq(unidades.id, plano.demandante_unidade_id))
 					.get()
 			: Promise.resolve(undefined),
-		departamentoDoPlano(db)
+		departamentoDoPlano(db, plano.demandante_unidade_id)
 	]);
 
 	return {

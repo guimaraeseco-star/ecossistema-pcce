@@ -12,7 +12,12 @@
  * rotas e as suas actions precisam da MESMA lista, senão o `<select>` de uma
  * aceita o que a régua da outra recusa.
  */
-import { buscarDepartamentoPadrao, type Departamento } from '$lib/db';
+import {
+	arvoreUnidades,
+	buscarDepartamentoPadrao,
+	departamentoDe,
+	type Departamento
+} from '$lib/db';
 import type { Database } from '$lib/db';
 import { cargosSignatario } from '$lib/planos/padroes';
 
@@ -24,9 +29,24 @@ export type DepartamentoDoPlano = {
 	cargos: readonly string[];
 };
 
-/** Resolve o departamento ativo e deriva sigla e cargos. */
-export async function departamentoDoPlano(db: Database): Promise<DepartamentoDoPlano> {
-	const departamento = await buscarDepartamentoPadrao(db);
+/**
+ * Resolve o departamento e deriva sigla e cargos.
+ *
+ * Com a unidade DEMANDANTE do plano, o departamento é o dela na árvore
+ * (`departamentoDe`, decisão E24) — é o que faz um plano de outro departamento
+ * sair com a sigla e os cargos certos quando a árvore tiver mais de um. Sem
+ * unidade (plano ainda sem demandante, ou demandante fora de qualquer
+ * departamento), cai no departamento padrão — o único ativo hoje.
+ */
+export async function departamentoDoPlano(
+	db: Database,
+	demandanteUnidadeId?: number | null
+): Promise<DepartamentoDoPlano> {
+	const daArvore =
+		demandanteUnidadeId != null
+			? departamentoDe(await arvoreUnidades(db), demandanteUnidadeId)
+			: null;
+	const departamento = daArvore ?? (await buscarDepartamentoPadrao(db));
 	return {
 		departamento,
 		sigla: departamento?.sigla ?? '',

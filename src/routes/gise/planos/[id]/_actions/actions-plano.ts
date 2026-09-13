@@ -72,7 +72,7 @@ export const actionsPlano = {
 		const diretorId = getInt(fd, 'diretor_id');
 		const [escolhido, depto] = await Promise.all([
 			Number.isInteger(diretorId) ? buscarPolicial(db, diretorId) : Promise.resolve(null),
-			departamentoDoPlano(db)
+			departamentoDoPlano(db, Number.isInteger(demandanteId) ? demandanteId : null)
 		]);
 
 		try {

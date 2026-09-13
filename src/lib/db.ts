@@ -140,6 +140,11 @@ export {
 	descreverVinculosUnidade,
 	buscarSeccionaisUnidades,
 	buscarDepartamentoPadrao,
+	arvoreUnidades,
+	ancestraisDe,
+	subarvoreDe,
+	departamentoDe,
+	type NoUnidade,
 	type Departamento
 } from './db/unidades';
 

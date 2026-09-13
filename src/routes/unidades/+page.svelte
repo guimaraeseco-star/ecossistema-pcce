@@ -32,6 +32,7 @@
 	import { toaster } from '$lib/toast';
 	import type { Unidade } from '$lib/types';
 	import { CIDADES_CEARA } from '$lib/constants/cidades';
+	import { nivelTipoUnidade, rotuloTipoUnidade } from '$lib/unidades/tipos';
 	import { useAutorizacao, useFiltrosPaginados, useSamePathNavigating } from '$lib/composables';
 	import { getSavedFilters } from '$lib/utils/localStorage';
 	import type { ActionResult } from '@sveltejs/kit';
@@ -78,12 +79,9 @@
 		})
 	);
 
-	const tipoRank: Record<string, number> = {
-		departamento: 0,
-		sub_departamento: 1,
-		seccional: 2,
-		delegacia: 3
-	};
+	// Precedência do catálogo (`$lib/unidades/tipos`): irmãos ordenam por tipo
+	// (mais alto na árvore primeiro) e depois por nome.
+	const tipoRank = (tipo: string) => nivelTipoUnidade(tipo);
 
 	type LinhaUnidade = Unidade & {
 		depth: number;
@@ -98,20 +96,21 @@
 			all
 				.filter((u) => u.seccional_id === pid)
 				.sort((a, b) => {
-					const ta = tipoRank[a.tipo] ?? 9;
-					const tb = tipoRank[b.tipo] ?? 9;
+					const ta = tipoRank(a.tipo);
+					const tb = tipoRank(b.tipo);
 					if (ta !== tb) return ta - tb;
 					return a.nome.localeCompare(b.nome, 'pt-BR');
 				});
 
+		// Raiz é qualquer unidade sem pai — Delegacia-Geral, um departamento
+		// avulso, uma seccional órfã. Contar tipos aqui quebraria no primeiro
+		// órgão do organograma que não fosse departamento nem seccional.
 		const roots = all
-			.filter(
-				(u) =>
-					(u.tipo === 'departamento' && u.seccional_id == null) ||
-					(u.tipo === 'seccional' && u.seccional_id == null)
-			)
+			.filter((u) => u.seccional_id == null)
 			.sort((a, b) => {
-				if (a.tipo !== b.tipo) return a.tipo === 'departamento' ? -1 : 1;
+				const ta = tipoRank(a.tipo);
+				const tb = tipoRank(b.tipo);
+				if (ta !== tb) return ta - tb;
 				return a.nome.localeCompare(b.nome, 'pt-BR');
 			});
 
@@ -211,12 +210,7 @@
 		filtroBusca = '';
 	}
 
-	function tipoLabel(tipo: string) {
-		if (tipo === 'departamento') return 'Departamento';
-		if (tipo === 'sub_departamento') return 'Subdepartamento';
-		if (tipo === 'seccional') return 'Seccional';
-		return 'Delegacia';
-	}
+	const tipoLabel = (tipo: string) => rotuloTipoUnidade(tipo);
 </script>
 
 <svelte:head>
