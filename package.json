@@ -80,7 +80,7 @@
 	},
 	"dependencies": {
 		"@fontsource/inter": "^5.2.8",
-		"@lucide/svelte": "^1.28.0",
+		"@lucide/svelte": "^1.43.0",
 		"@sentry/browser": "^10.59.0",
 		"@sentry/cloudflare": "^10.66.0",
 		"@signpdf/placeholder-pdf-lib": "^3.3.0",
