@@ -358,7 +358,7 @@
 </script>
 
 <svelte:head>
-	<title>Escala extra - Portal de Escalas</title>
+	<title>Escala extra | Ecossistema PCCE</title>
 </svelte:head>
 
 <!-- A folha desta tela é curta com poucas escalas. Sem altura mínima ela

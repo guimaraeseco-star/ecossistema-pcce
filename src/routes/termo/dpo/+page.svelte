@@ -5,7 +5,7 @@
 </script>
 
 <svelte:head>
-	<title>Encarregado de Dados (DPO) — Escalas PC-CE</title>
+	<title>Encarregado de Dados (DPO) | Ecossistema PCCE</title>
 </svelte:head>
 
 <div
@@ -30,7 +30,7 @@
 				Encarregado de Dados (DPO)
 			</h1>
 			<p class="text-xs text-surface-600 dark:text-surface-400 mt-1 text-center">
-				Polícia Civil do Estado do Ceará · Sistema de Escalas de Plantão
+				Polícia Civil do Estado do Ceará · Ecossistema PCCE
 			</p>
 		</header>
 
@@ -104,7 +104,7 @@
 				</h2>
 				<p class="mb-2 leading-relaxed">
 					Você pode exercer os seguintes direitos em relação aos seus dados pessoais tratados pelo
-					Sistema de Escalas da PCCE:
+					Ecossistema PCCE:
 				</p>
 				<ul class="list-disc list-inside space-y-1 leading-relaxed">
 					<li>Confirmação da existência de tratamento e acesso aos dados;</li>

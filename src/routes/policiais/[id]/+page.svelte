@@ -175,7 +175,7 @@
 </script>
 
 <svelte:head>
-	<title>{solicitando ? 'Ficha do servidor' : 'Editar policial'} — Escalas PC-CE</title>
+	<title>{solicitando ? 'Ficha do servidor' : 'Editar policial'} | Ecossistema PCCE</title>
 </svelte:head>
 
 <div class="mb-6 space-y-3">

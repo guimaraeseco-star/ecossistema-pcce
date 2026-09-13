@@ -158,7 +158,7 @@
 </script>
 
 <svelte:head>
-	<title>{tituloPagina} - Portal de Escalas</title>
+	<title>{tituloPagina} | Ecossistema PCCE</title>
 </svelte:head>
 
 <!-- A folha desta tela é curta quando o policial tem poucas escalas. Sem

@@ -70,7 +70,7 @@
 	let filtrosExpandidos = $state(filtrosAtivos > 0);
 </script>
 
-<svelte:head><title>Logs técnicos — Escalas PC</title></svelte:head>
+<svelte:head><title>Logs técnicos | Ecossistema PCCE</title></svelte:head>
 
 <div class="space-y-6">
 	<header>

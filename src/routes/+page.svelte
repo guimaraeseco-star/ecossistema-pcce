@@ -5,7 +5,7 @@
 </script>
 
 <svelte:head>
-	<title>Início — Escalas PC-CE</title>
+	<title>Início | Ecossistema PCCE</title>
 </svelte:head>
 
 <div class="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">

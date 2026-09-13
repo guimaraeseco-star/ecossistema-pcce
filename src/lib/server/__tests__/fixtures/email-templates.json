@@ -1,48 +1,48 @@
 {
 	"codigo2FA": {
 		"subject": "Código de Verificação — Acesso ao Sistema",
-		"sha256": "e5b94c3686cb57bf9e2880aed2b8ba37bb77e5a04bb24dddc1e46f6d6f50c2fb",
-		"tamanho": 2046
+		"sha256": "f4025556cfd321f500465542bea455d8df3da9ea684642459d701dc9ce0f81ca",
+		"tamanho": 2020
 	},
 	"codigoEmailPessoal": {
-		"subject": "Verificação de E-mail Pessoal — Sistema de Escalas",
-		"sha256": "0de31771e3c50f7a52e02b10c846d3b0e378955b22a4db7d8f8f1bc5e0dcdac7",
-		"tamanho": 2229
+		"subject": "Verificação de E-mail Pessoal — Ecossistema PCCE",
+		"sha256": "6f17accad620f1feb43921d0ee6d8f4bd3ab7cfa4ffcf68638798d82b6c9558e",
+		"tamanho": 2203
 	},
 	"avisoTrocaEmailPessoal": {
-		"subject": "Aviso de segurança: e-mail pessoal alterado — Sistema de Escalas",
-		"sha256": "4269e16bfe16eaed570caa254595ce6bfc044123012987e9100122247d0e2d18",
-		"tamanho": 1988
+		"subject": "Aviso de segurança: e-mail pessoal alterado — Ecossistema PCCE",
+		"sha256": "4683cf6c861fba39df2b6601b0e1a52ddfdaacb81ce199af771f24730cd16fe8",
+		"tamanho": 1962
 	},
 	"avisoChaveCadastrada": {
-		"subject": "Aviso de segurança: chave de assinatura cadastrada — Sistema de Escalas",
-		"sha256": "f215c57ef25ed0a461442c45e7602c0558078f056376e929fc481a58e1b41180",
-		"tamanho": 2218
+		"subject": "Aviso de segurança: chave de assinatura cadastrada — Ecossistema PCCE",
+		"sha256": "6a7ac6bf06afe58d8ccb3b1551578f4967d54f5127175292dccebd6bb1d6cd50",
+		"tamanho": 2192
 	},
 	"avisoChaveSubstituida": {
-		"subject": "Aviso de segurança: chave de assinatura substituída — Sistema de Escalas",
-		"sha256": "6795ddced1d27861616adf862aba4f9b5a327f8f78987100b2223c3e7f5a1aab",
-		"tamanho": 2275
+		"subject": "Aviso de segurança: chave de assinatura substituída — Ecossistema PCCE",
+		"sha256": "90389c37f2071341b223c0b06146a1281f9da13a9f93f89b5f736d81c437d1ff",
+		"tamanho": 2249
 	},
 	"avisoChaveRevogada": {
-		"subject": "Aviso de segurança: chave de assinatura revogada — Sistema de Escalas",
-		"sha256": "ac7a0ace5d27f9dd4b92377746a1e41a7ae0974f095471a3a1670cc3a00a84a7",
-		"tamanho": 2234
+		"subject": "Aviso de segurança: chave de assinatura revogada — Ecossistema PCCE",
+		"sha256": "c941dca79f331231b401b63d4455c81bbb6069a6f012318ddbe275a4cff74ab6",
+		"tamanho": 2208
 	},
 	"codigoRedefinicaoSenha": {
-		"subject": "Código de Redefinição de Senha — Sistema de Escalas",
-		"sha256": "b5315773a266be6470e3cbcd1740b82e7a6b51c636bdd48e6bcc8b14ff98de16",
-		"tamanho": 2221
+		"subject": "Código de Redefinição de Senha — Ecossistema PCCE",
+		"sha256": "e66a312665baec3da31da2dfa87daadd690f8373c0013a0b2b40d938a7b64e52",
+		"tamanho": 2195
 	},
 	"linkRedefinicaoSenha": {
-		"subject": "Redefinição de Senha — Sistema de Escalas",
-		"sha256": "e116358343c29d8b7af50fd5df8ef713525f851437dd875afd60b893ad9b9bb4",
-		"tamanho": 2682
+		"subject": "Redefinição de Senha — Ecossistema PCCE",
+		"sha256": "247ff8077527f9b5db091bacfc80c5d96faaf0f8076c882b36ae5b99f38bf95c",
+		"tamanho": 2643
 	},
 	"linkPrimeiroAcesso": {
-		"subject": "Primeiro Acesso — Sistema de Escalas",
-		"sha256": "68366d039ac03c23666dd6cb41076461bc9006c6453cec8efb83e46ddfee54a3",
-		"tamanho": 2627
+		"subject": "Primeiro Acesso — Ecossistema PCCE",
+		"sha256": "624bbd5785961c0e1ce05b4b9f4f0875a2caadf0eef03f123bebea2263dd957a",
+		"tamanho": 2588
 	},
 	"notificacaoAssessorGise": {
 		"subject": "GISE — seccional enviou a escala (resumo para WhatsApp)",

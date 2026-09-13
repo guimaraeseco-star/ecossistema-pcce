@@ -217,7 +217,7 @@
 </script>
 
 <svelte:head>
-	<title>Gerenciar Policiais - Portal de Escalas</title>
+	<title>Gerenciar Policiais | Ecossistema PCCE</title>
 </svelte:head>
 
 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">

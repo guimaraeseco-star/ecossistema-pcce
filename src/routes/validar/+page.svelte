@@ -27,7 +27,7 @@
 </script>
 
 <svelte:head>
-	<title>Validar Documento - Escalas PC-CE</title>
+	<title>Validar Documento | Ecossistema PCCE</title>
 </svelte:head>
 
 <div

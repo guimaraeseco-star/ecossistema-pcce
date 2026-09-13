@@ -26,7 +26,7 @@
 </script>
 
 <svelte:head>
-	<title>Finalizadas - Portal de Escalas</title>
+	<title>Finalizadas | Ecossistema PCCE</title>
 </svelte:head>
 
 <div class="min-w-0 space-y-6">

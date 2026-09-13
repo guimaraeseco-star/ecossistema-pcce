@@ -19,7 +19,7 @@
 </script>
 
 <svelte:head>
-	<title>Administração do Sistema — Portal de Escalas</title>
+	<title>Administração do Sistema | Ecossistema PCCE</title>
 </svelte:head>
 
 <BemVindoPagina>

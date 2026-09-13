@@ -18,7 +18,7 @@
 import { montarHtmlEmailNotificacaoAssessorGise } from './gise/assessor-notificacao-text';
 import { logger } from './logger';
 import { redigirEmails } from '$lib/utils/pii';
-import { CORPORACAO_PROSA } from '$lib/institucional';
+import { CORPORACAO_PROSA, SISTEMA_NOME } from '$lib/institucional';
 import { mascararEmail } from '$lib/utils/pii';
 import { getDB, buscarProvedorEmailPadrao, type EmailProvedor } from '$lib/db';
 import { abreviarCredencial } from '$lib/chave-assinatura-ui';
@@ -48,7 +48,7 @@ function escapeHtml(value: string): string {
  * (`RESEND_FROM_EMAIL`) e não depende daqui.
  */
 const CF_FROM = 'sistema@nao-responda.escalaspcce.com.br';
-const CF_FROM_NAME = 'Sistema de Escalas - PCCE';
+const CF_FROM_NAME = SISTEMA_NOME;
 
 interface EmailAttachment {
 	filename: string;
@@ -336,7 +336,7 @@ function layoutEmail(corpo: string): string {
         <tr>
           <td style="background:#1a3a6e;padding:24px 32px;">
             <p style="margin:0;color:#ffffff;font-size:18px;font-weight:bold;">${CORPORACAO_PROSA}</p>
-            <p style="margin:4px 0 0;color:#a0b4d6;font-size:13px;">Sistema de Escalas de Plantão</p>
+            <p style="margin:4px 0 0;color:#a0b4d6;font-size:13px;">${SISTEMA_NOME}</p>
           </td>
         </tr>
         <tr>
@@ -345,7 +345,7 @@ ${corpo}          </td>
         </tr>
         <tr>
           <td style="background:#f8f9fc;padding:16px 32px;border-top:1px solid #eee;">
-            <p style="margin:0;color:#999;font-size:11px;">Sistema de Escalas de Plantão — ${CORPORACAO_PROSA}</p>
+            <p style="margin:0;color:#999;font-size:11px;">${SISTEMA_NOME} — ${CORPORACAO_PROSA}</p>
           </td>
         </tr>
       </table>
@@ -517,7 +517,7 @@ ${caixaCodigo(codigo, 'Código de Verificação')}
 		platform,
 		'verificacao-pessoal',
 		destinatario,
-		'Verificação de E-mail Pessoal — Sistema de Escalas',
+		`Verificação de E-mail Pessoal — ${SISTEMA_NOME}`,
 		html,
 		'Código enviado'
 	);
@@ -553,7 +553,7 @@ export async function enviarAvisoTrocaEmailPessoal(
 		platform,
 		'aviso-troca-email-pessoal',
 		destinatarioFuncional,
-		'Aviso de segurança: e-mail pessoal alterado — Sistema de Escalas',
+		`Aviso de segurança: e-mail pessoal alterado — ${SISTEMA_NOME}`,
 		html,
 		'Aviso enviado'
 	);
@@ -563,9 +563,9 @@ export async function enviarAvisoTrocaEmailPessoal(
 export type EventoAvisoChaveAssinatura = 'cadastrada' | 'substituida' | 'revogada';
 
 const ASSUNTO_AVISO_CHAVE: Record<EventoAvisoChaveAssinatura, string> = {
-	cadastrada: 'Aviso de segurança: chave de assinatura cadastrada — Sistema de Escalas',
-	substituida: 'Aviso de segurança: chave de assinatura substituída — Sistema de Escalas',
-	revogada: 'Aviso de segurança: chave de assinatura revogada — Sistema de Escalas'
+	cadastrada: `Aviso de segurança: chave de assinatura cadastrada — ${SISTEMA_NOME}`,
+	substituida: `Aviso de segurança: chave de assinatura substituída — ${SISTEMA_NOME}`,
+	revogada: `Aviso de segurança: chave de assinatura revogada — ${SISTEMA_NOME}`
 };
 
 function corpoEventoChave(evento: EventoAvisoChaveAssinatura, quando: string): string {
@@ -671,7 +671,7 @@ ${caixaCodigo(codigo, 'Código de Redefinição')}
 		platform,
 		'redefinicao-codigo',
 		destinatario,
-		'Código de Redefinição de Senha — Sistema de Escalas',
+		`Código de Redefinição de Senha — ${SISTEMA_NOME}`,
 		html,
 		'Código enviado'
 	);
@@ -691,7 +691,7 @@ export async function enviarLinkRedefinicaoSenha(
 	const html =
 		layoutEmail(`            <p style="margin:0 0 8px;color:#333;font-size:15px;">Olá, <strong>${escapeHtml(nomeUsuario)}</strong>!</p>
             <p style="margin:0 0 24px;color:#555;font-size:14px;">
-              Recebemos uma solicitação de redefinição de senha para a sua conta no Sistema de Escalas de Plantão.
+              Recebemos uma solicitação de redefinição de senha para a sua conta no ${SISTEMA_NOME}.
               Clique no botão abaixo para definir uma nova senha:
             </p>
 ${botaoComLink(linkRedefinicao, 'Redefinir minha senha')}
@@ -704,7 +704,7 @@ ${botaoComLink(linkRedefinicao, 'Redefinir minha senha')}
 		platform,
 		'redefinicao',
 		destinatario,
-		'Redefinição de Senha — Sistema de Escalas',
+		`Redefinição de Senha — ${SISTEMA_NOME}`,
 		html,
 		'Link enviado'
 	);
@@ -724,7 +724,7 @@ export async function enviarLinkPrimeiroAcesso(
 	const html =
 		layoutEmail(`            <p style="margin:0 0 8px;color:#333;font-size:15px;">Olá, <strong>${escapeHtml(nomeUsuario)}</strong>!</p>
             <p style="margin:0 0 24px;color:#555;font-size:14px;">
-              Sua conta no Sistema de Escalas de Plantão foi criada. Clique no botão abaixo para definir sua senha e ativar o acesso:
+              Sua conta no ${SISTEMA_NOME} foi criada. Clique no botão abaixo para definir sua senha e ativar o acesso:
             </p>
 ${botaoComLink(linkPrimeiroAcesso, 'Definir minha senha')}
             <p style="margin:0;color:#e53e3e;font-size:13px;font-weight:bold;">
@@ -736,7 +736,7 @@ ${botaoComLink(linkPrimeiroAcesso, 'Definir minha senha')}
 		platform,
 		'primeiro-acesso',
 		destinatario,
-		'Primeiro Acesso — Sistema de Escalas',
+		`Primeiro Acesso — ${SISTEMA_NOME}`,
 		html,
 		'Link enviado'
 	);

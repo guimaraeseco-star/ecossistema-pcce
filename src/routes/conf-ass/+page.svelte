@@ -122,7 +122,7 @@
 </script>
 
 <svelte:head>
-	<title>Conf. Assinatura | Escalas</title>
+	<title>Conf. Assinatura | Ecossistema PCCE</title>
 </svelte:head>
 
 <div class="space-y-6">

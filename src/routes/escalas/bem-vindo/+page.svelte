@@ -38,7 +38,7 @@
 
 	const descricao = $derived.by(() => {
 		if (usuario?.tipo === 'admin') {
-			return 'Você está no ambiente de gestão do Portal de Escalas. Use as áreas abaixo para acompanhar a conformidade das escalas e cuidar do que chega na caixa de entrada.';
+			return 'Você está no ambiente de gestão de escalas do Ecossistema PCCE. Use as áreas abaixo para acompanhar a conformidade das escalas e cuidar do que chega na caixa de entrada.';
 		}
 		if (isSubAdmin && isDpc) {
 			return `Você está no ambiente ${local}. Aqui você confere e assina as escalas de plantão e expediente, e acompanha o que ainda está pendente.`;
@@ -49,12 +49,12 @@
 		if (usuario?.papel === 'admin_unidade') {
 			return 'Você está no ambiente administrativo da sua unidade. Monte as escalas de plantão, expediente e fim de semana, e peça ao delegado a assinatura de cada uma.';
 		}
-		return 'Você está no ambiente de gestão do Portal de Escalas. Use as áreas abaixo para acompanhar as escalas da sua unidade.';
+		return 'Você está no ambiente de gestão de escalas do Ecossistema PCCE. Use as áreas abaixo para acompanhar as escalas da sua unidade.';
 	});
 </script>
 
 <svelte:head>
-	<title>Bem-vindo às Escalas - Portal de Escalas</title>
+	<title>Bem-vindo às Escalas | Ecossistema PCCE</title>
 </svelte:head>
 
 <BemVindoPagina>

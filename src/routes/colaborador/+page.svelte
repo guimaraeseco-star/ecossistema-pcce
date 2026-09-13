@@ -13,7 +13,7 @@
 </script>
 
 <svelte:head>
-	<title>Colaborador — Portal de Escalas</title>
+	<title>Colaborador | Ecossistema PCCE</title>
 </svelte:head>
 
 <BemVindoPagina>

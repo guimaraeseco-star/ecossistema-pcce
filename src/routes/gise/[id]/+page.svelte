@@ -514,7 +514,7 @@
 			)}</title
 		>
 	{:else}
-		<title>Carregando GISE... — Portal de Escalas</title>
+		<title>Carregando GISE... | Ecossistema PCCE</title>
 	{/if}
 </svelte:head>
 

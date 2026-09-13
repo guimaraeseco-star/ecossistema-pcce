@@ -45,7 +45,7 @@
 	}
 </script>
 
-<svelte:head><title>Planos operacionais | Escalas</title></svelte:head>
+<svelte:head><title>Planos operacionais | Ecossistema PCCE</title></svelte:head>
 
 <div class="min-w-0 space-y-6 px-1">
 	<div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">

@@ -16,7 +16,7 @@
 </script>
 
 <svelte:head>
-	<title>Erro {page.status} - Escalas PC-CE</title>
+	<title>Erro {page.status} | Ecossistema PCCE</title>
 </svelte:head>
 
 <div class="min-h-[60vh] flex flex-col items-center justify-center p-4 sm:p-6 text-center">

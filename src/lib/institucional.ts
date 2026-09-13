@@ -26,6 +26,18 @@ export const DEPARTAMENTO = 'DEPARTAMENTO DE POLÍCIA DO INTERIOR SUL - DPI SUL'
 export const CORPORACAO_PROSA = 'Polícia Civil do Estado do Ceará';
 
 /**
+ * Nome do sistema — cabeçalho e remetente de e-mail, tela de login, título
+ * padrão do layout e página do DPO. Decisão E30 do plano do Ecossistema
+ * (set/2026): o sistema deixa de ser "Sistema de Escalas" e vira a plataforma
+ * modular da corporação; o departamento aparece como DADO (E19), nunca no nome.
+ *
+ * Os `<title>` das páginas usam o sufixo literal `| Ecossistema PCCE` em vez
+ * de importar esta constante: são 40 arquivos `.svelte` para um único token, e
+ * o sufixo não entra em documento assinado nem em golden.
+ */
+export const SISTEMA_NOME = 'Ecossistema PCCE';
+
+/**
  * Endereço e contato do DPI SUL — o rodapé que o plano operacional repete em
  * todas as páginas.
  *

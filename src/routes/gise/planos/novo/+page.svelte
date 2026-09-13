@@ -88,7 +88,7 @@
 	const podeCriar = $derived(nome.trim().length > 0 && dataInicio !== '');
 </script>
 
-<svelte:head><title>Novo plano operacional | Escalas</title></svelte:head>
+<svelte:head><title>Novo plano operacional | Ecossistema PCCE</title></svelte:head>
 
 <div class="min-w-0 space-y-6">
 	<div>

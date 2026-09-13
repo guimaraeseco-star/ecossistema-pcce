@@ -60,7 +60,7 @@
 </script>
 
 <svelte:head>
-	<title>Dados base · {data.operacao.nome} | Escalas</title>
+	<title>Dados base · {data.operacao.nome} | Ecossistema PCCE</title>
 </svelte:head>
 
 <div class="min-w-0 space-y-6">

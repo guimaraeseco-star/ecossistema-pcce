@@ -27,7 +27,7 @@
 </script>
 
 <svelte:head>
-	<title>Bem-vindo ao GISE - Portal de Escalas</title>
+	<title>Bem-vindo ao GISE | Ecossistema PCCE</title>
 </svelte:head>
 
 <BemVindoPagina>
