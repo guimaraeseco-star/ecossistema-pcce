@@ -209,6 +209,17 @@
 			</a>
 		{/snippet}
 
+		<!-- Título de grupo da barra dos perfis administrativos — mesma escala
+		     tipográfica dos títulos de seção da home (`/`), para a barra e a
+		     home lerem como a mesma organização. -->
+		{#snippet tituloGrupo(rotulo: string)}
+			<p
+				class="!mt-4 mb-1 px-3 text-3xs font-semibold tracking-[0.18em] text-surface-500 uppercase dark:text-surface-500"
+			>
+				{rotulo}
+			</p>
+		{/snippet}
+
 		{#if nav.nivel === 'extra'}
 			<!--
 				SUBMENU de "Escala extra". Substitui a barra inteira em vez de expandir
@@ -244,15 +255,41 @@
 			{@render itemMenu('/config-geral', 'Config. Geral', ICONE.sliders)}
 			{@render itemMenu('/config-custos', 'Valores de custo', ICONE.barras)}
 			{@render itemMenu('/auditoria', 'Auditoria', ICONE.documento)}
-		{:else}
-			{#if usuario?.tipo === 'policial' && !usuario.papel}
-				{@render itemMenu('/bem-vindo', 'Boas-vindas', ICONE.casa)}
+		{:else if usuario?.tipo === 'policial' && !usuario.papel}
+			<!-- Policial sem papel: boas-vindas, o que houver de escala extra, perfil. -->
+			{@render itemMenu('/bem-vindo', 'Boas-vindas', ICONE.casa)}
+			{#if nav.filhosExtra.length > 0}
+				{@render itemPaiExtra(nav.naRotaExtra)}
 			{/if}
+			<hr class="!my-3 border-surface-200 dark:border-white/10" />
+			{@render itemMenu('/perfil', 'Meu perfil', ICONE.perfil)}
+		{:else}
+			<!--
+				Perfis ADMINISTRATIVOS (Admin Geral, admin de seccional, admin de
+				unidade): "Início" é a home de módulos, e a barra repete a organização
+				dela em quatro grupos (decisão E39) — Gestão de pessoal · Gestão
+				operacional · Gestão de unidade · Administrativo. Um grupo sem item
+				não desenha o título.
 
-			<!-- Grupo 1: Painel · Cx. de Entrada · Arquivo/Escalas -->
+				`showGrupo1`/`showGrupo2` são o filtro de módulo do Admin Geral
+				(GISE ↔ Escalas), que continua valendo na barra; a home não o usa.
+			-->
+			{@render itemMenu('/', 'Início', ICONE.casa, page.url.pathname === '/')}
+
+			<!-- Gestão de pessoal: servidores (os três papéis), a fila de quem
+			     decide, e a escala ordinária — painel + caixa de entrada para o
+			     Admin Geral, a lista de escalas para quem monta/assina. -->
+			{#if flags.showPoliciais || flags.showGrupo1}
+				{@render tituloGrupo('Gestão de pessoal')}
+			{/if}
+			{#if flags.showPoliciais}
+				{@render itemMenu('/policiais', 'Servidores', ICONE.pessoas)}
+			{/if}
+			{#if flags.showSolicitacoes}
+				{@render itemMenu('/solicitacoes', 'Solicitações', ICONE.checkLista)}
+			{/if}
 			{#if flags.showGrupo1}
 				{#if usuario?.tipo === 'admin'}
-					{@render itemMenu('/escalas/bem-vindo', 'Boas-vindas', ICONE.casa)}
 					{@render itemMenu('/painel', 'Painel', ICONE.painel)}
 					{@render itemMenu(
 						'/recebidos',
@@ -263,93 +300,58 @@
 					)}
 				{/if}
 				{#if flags.showEscalasPoliciais}
-					{@render itemMenu('/escalas/bem-vindo', 'Boas-vindas', ICONE.casa)}
-					{@render itemMenu(
-						'/escalas',
-						usuario?.tipo === 'admin' ? 'Arquivo' : 'Escalas ordinárias',
-						ICONE.calendario,
-						nav.rotaEstaAtiva('/escalas') && !page.url.pathname.startsWith('/escalas/bem-vindo')
-					)}
+					{@render itemMenu('/escalas', 'Escalas ordinárias', ICONE.calendario)}
 				{/if}
-			{/if}
-			<!-- end showGrupo1 -->
-
-			<!-- Separador 1 (só admin geral, entre grupos que ambos existem) -->
-			{#if flags.showGrupo2Separator}
-				<hr class="!my-3 border-surface-200 dark:border-white/10" />
 			{/if}
 
 			<!--
-				Grupo 2: tudo o que é de ESCALA EXTRA, atrás de um pai.
+				Gestão operacional: tudo o que é de ESCALA EXTRA atrás de um pai
+				(a lista vive em `nav.filhosExtra`), mais o cadastro de operações e
+				o plano operacional do Admin Geral.
 
-				Antes eram até cinco linhas soltas (Escala extra, Produtividade, Dados
-				base, Minha presença, Meu histórico), e o admin seccional via oito itens
-				na barra. Nada dizia que os cinco eram do mesmo assunto — estavam só
-				perto uns dos outros. O que cada um exige para aparecer continua
-				idêntico; a lista vive em `nav.filhosExtra`.
-
-				"Operações" NÃO entra: é cadastro, e fica na raiz ao lado dos outros
-				itens de gestão do Admin Geral.
+				"Conf. GISE" e "Conf. Form." saíram do menu: o que editavam virou
+				configuração POR OPERAÇÃO, nos botões de cada linha de /gise/operacoes.
+				O plano operacional NASCE em /gise/operacoes, mas a lista precisa de
+				entrada própria: sem ela, um plano já criado só se alcançaria pela URL.
 			-->
-			{#if flags.showGrupo2}
-				<!-- Só o Admin Geral em módulo GISE tem /gise/bem-vindo como home
-				     (obterRotaBemVindo); para os demais (admin_seccional,
-				     admin_unidade e supervisor GISE) a página redireciona e o item
-				     duplicaria o "Boas-vindas" do próprio grupo do usuário. -->
-				{#if flags.showGise && usuario?.tipo === 'admin' && nav.adminModulo === 'gise'}
-					{@render itemMenu('/gise/bem-vindo', 'Boas-vindas', ICONE.casa)}
-				{/if}
-
+			{#if flags.showGrupo2 && (nav.filhosExtra.length > 0 || (flags.showGise && usuario?.tipo === 'admin'))}
+				{@render tituloGrupo('Gestão operacional')}
 				{#if nav.filhosExtra.length > 0}
 					{@render itemPaiExtra(nav.naRotaExtra)}
 				{/if}
-
 				{#if flags.showGise && usuario?.tipo === 'admin'}
-					<!-- "Conf. GISE" saiu do menu: o que ela editava (vagas padrão,
-					     horário e textos do breve relatório) virou configuração POR
-					     OPERAÇÃO, no botão "Configurações" de cada linha de /gise/operacoes.
-
-					     "Conf. Form." saiu pelo mesmo motivo: o editor de formulário é
-					     alcançado pelo botão "Formulário" de cada operação, que é onde
-					     ele tem contexto. -->
 					{@render itemMenu(
 						'/gise/operacoes',
 						'Operações',
 						ICONE.engrenagem,
 						giseOperacoesPathAtivo
 					)}
-
-					<!-- O plano operacional NASCE em /gise/operacoes (o botão pergunta
-					     qual dos dois se está cadastrando), mas a lista precisa de
-					     entrada própria: sem ela, um plano já criado só se alcançaria
-					     pela URL. -->
 					{@render itemMenu('/gise/planos', 'Plano Op.', ICONE.pranchetaLista, planosPathAtivo)}
 				{/if}
 			{/if}
-			<!-- end showGrupo2 -->
 
-			<!-- Separador 2 (acesso à gestão de pessoas) -->
-			{#if flags.showGrupo3Separator}
-				<hr class="!my-3 border-surface-200 dark:border-white/10" />
+			<!-- Gestão de unidade: a própria subárvore, com o rótulo do nível. -->
+			{#if flags.showUnidade}
+				{@render tituloGrupo('Gestão de unidade')}
+				{@render itemMenu(
+					'/unidade',
+					usuario?.tipo === 'admin'
+						? 'Departamento'
+						: usuario?.papel === 'admin_seccional'
+							? 'Minha seccional'
+							: 'Minha delegacia',
+					ICONE.predio
+				)}
 			{/if}
 
-			<!-- Grupo 3: gestão de pessoas.
-			     "Policiais" é dos TRÊS papéis administrativos (o admin de seccional
-			     e o de unidade veem só o escopo deles, e é da ficha que pedem a
-			     correção de um dado); "Solicitações" é a fila de QUEM DECIDE;
-			     "Colaboradores" é só do Admin Geral — criar identidade de acesso
-			     não é administrar pessoa já cadastrada. -->
-			{#if flags.showPoliciais}
-				{@render itemMenu('/policiais', 'Policiais', ICONE.pessoas)}
-			{/if}
+			<!-- Administrativo: só o Admin Geral cria identidade de acesso —
+			     administrar pessoa já cadastrada é outra coisa. -->
 			{#if flags.showColaboradores}
+				{@render tituloGrupo('Administrativo')}
 				{@render itemMenu('/colaboradores', 'Colaboradores', ICONE.pessoas)}
 			{/if}
-			{#if flags.showSolicitacoes}
-				{@render itemMenu('/solicitacoes', 'Solicitações', ICONE.checkLista)}
-			{/if}
 
-			<!-- Grupo 4: Meu perfil (todo policial) -->
+			<!-- Meu perfil (todo policial; sessão de admin não tem cadastro) -->
 			{#if usuario?.tipo === 'policial'}
 				<hr class="!my-3 border-surface-200 dark:border-white/10" />
 				{@render itemMenu('/perfil', 'Meu perfil', ICONE.perfil)}

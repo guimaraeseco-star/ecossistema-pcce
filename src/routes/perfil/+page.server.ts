@@ -37,7 +37,7 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 	if (!u) redirect(302, '/login');
 	// Admin geral não tem cadastro de policial próprio — perfil é do servidor.
 	// `temCadastro` é o narrowing de tipo (colaborador também não tem perfil).
-	if (!temCadastro(u) || u.tipo !== 'policial') redirect(302, '/escalas/bem-vindo');
+	if (!temCadastro(u) || u.tipo !== 'policial') redirect(302, '/');
 
 	const db = getDB(platform);
 	const [row, credencial] = await Promise.all([

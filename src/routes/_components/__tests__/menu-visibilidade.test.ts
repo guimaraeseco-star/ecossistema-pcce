@@ -138,15 +138,18 @@ describe('Policiais e Solicitações são perguntas diferentes', () => {
 		).toBe(false);
 	});
 
-	it('o separador do grupo aparece só para quem tem item nele', () => {
-		expect(visibilidadeDoMenu(entrada({ usuario: { tipo: 'admin' } })).showGrupo3Separator).toBe(
-			true
+	it('Gestão de unidade é dos três papéis administrativos — cada um com a própria subárvore', () => {
+		expect(visibilidadeDoMenu(entrada({ usuario: { tipo: 'admin' } })).showUnidade).toBe(true);
+		for (const papel of PAPEIS_COM_ESCOPO) {
+			expect(
+				visibilidadeDoMenu(entrada({ usuario: { tipo: 'policial', papel } })).showUnidade,
+				papel
+			).toBe(true);
+		}
+		expect(visibilidadeDoMenu(entrada()).showUnidade).toBe(false);
+		expect(visibilidadeDoMenu(entrada({ usuario: { tipo: 'colaborador' } })).showUnidade).toBe(
+			false
 		);
-		expect(
-			visibilidadeDoMenu(entrada({ usuario: { tipo: 'policial', papel: 'admin_unidade' } }))
-				.showGrupo3Separator
-		).toBe(true);
-		expect(visibilidadeDoMenu(entrada()).showGrupo3Separator).toBe(false);
 	});
 });
 
@@ -189,19 +192,6 @@ describe('eixo QUAL MÓDULO — só existe para admin', () => {
 		const gise = visibilidadeDoMenu(entrada({ usuario: admin, adminModulo: 'gise' }));
 		expect(gise.showGrupo1).toBe(false);
 		expect(gise.showGrupo2).toBe(true);
-	});
-
-	it('o separador só existe para admin com os DOIS grupos na tela', () => {
-		const admin = { tipo: 'admin' } as const;
-		expect(
-			visibilidadeDoMenu(entrada({ usuario: admin, adminModulo: 'ambas' })).showGrupo2Separator
-		).toBe(true);
-		expect(
-			visibilidadeDoMenu(entrada({ usuario: admin, adminModulo: 'gise' })).showGrupo2Separator
-		).toBe(false);
-		// Não-admin tem os dois grupos, mas não tem separador: ele separa uma
-		// escolha de módulo que só o admin faz.
-		expect(visibilidadeDoMenu(entrada()).showGrupo2Separator).toBe(false);
 	});
 });
 

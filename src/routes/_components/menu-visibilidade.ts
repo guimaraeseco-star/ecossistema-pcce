@@ -62,13 +62,16 @@ export interface FlagsMenu {
 	 * já cadastradas, e por isso esta flag não acompanha `showPoliciais`.
 	 */
 	showColaboradores: boolean;
+	/**
+	 * Gestão de unidade (`/unidade`) — Admin Geral e os dois papéis com escopo,
+	 * cada um vendo a própria subárvore (decisão E39, itens 3.1–3.3). Quem
+	 * recorta é o servidor.
+	 */
+	showUnidade: boolean;
 	temPresencaGiseAtiva: boolean;
 	temGiseHistorico: boolean;
 	showGrupo1: boolean;
 	showGrupo2: boolean;
-	showGrupo2Separator: boolean;
-	/** Há o que separar antes do grupo de gestão de pessoas? */
-	showGrupo3Separator: boolean;
 }
 
 /**
@@ -124,12 +127,11 @@ export function visibilidadeDoMenu(entrada: EntradaVisibilidade): FlagsMenu {
 		showPoliciais: ehAdmin || temPapelComEscopo,
 		showSolicitacoes: ehAdmin,
 		showColaboradores: ehAdmin,
+		showUnidade: ehAdmin || temPapelComEscopo,
 		temPresencaGiseAtiva: temPresencaGisePendente,
 		temGiseHistorico,
 		showGrupo1,
-		showGrupo2,
-		showGrupo2Separator: ehAdmin && showGrupo1 && showGrupo2,
-		showGrupo3Separator: ehAdmin || temPapelComEscopo
+		showGrupo2
 	};
 }
 

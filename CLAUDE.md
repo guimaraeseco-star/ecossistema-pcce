@@ -228,14 +228,17 @@ moradas no pai e consumidas só pela sub-rota).
 
 `src/routes/_components/` (na RAIZ das rotas) é a exceção deliberada: regra de
 navegação que várias rotas consultam, em `.ts` puro e com teste. Hoje são
-`menu-visibilidade.ts` (o que a sidebar mostra) e `bem-vindo-cards.ts` (os
-quadros das telas de boas-vindas). **As duas respondem à mesma pergunta** — "o
-que este usuário alcança daqui?" — e por isso saem do MESMO par de flags, com
-`__tests__/bem-vindo-cards.test.ts` reprovando destino de menu sem quadro.
-Quando eram listas independentes elas divergiram em silêncio: admin de unidade
-e de seccional tinham Produtividade no menu e nenhum quadro, e o Admin Geral com
-os dois módulos ligados via 7 destinos contra 4 quadros. Item novo na navegação
-entra nos dois arquivos.
+`menu-visibilidade.ts` (o que a sidebar mostra), `home-modulos.ts` (os cartões
+da home de módulos dos perfis administrativos, nos quatro grupos da decisão
+E39) e `bem-vindo-cards.ts` (os quadros das boas-vindas que restam: policial
+sem papel e Super Admin). **As três respondem à mesma pergunta** — "o que este
+usuário alcança daqui?" — e por isso saem do MESMO par de flags, com
+`__tests__/home-modulos.test.ts` e `__tests__/bem-vindo-cards.test.ts`
+reprovando destino de menu sem cartão (o espelho da barra é um só, em
+`__tests__/destinos-do-menu.ts`). Quando eram listas independentes elas
+divergiram em silêncio: admin de unidade e de seccional tinham Produtividade no
+menu e nenhum quadro, e o Admin Geral com os dois módulos ligados via 7
+destinos contra 4 quadros. Item novo na navegação entra nos três arquivos.
 
 ## `$lib/utils/` não tem barrel
 

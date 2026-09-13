@@ -1,17 +1,12 @@
+/**
+ * `/gise/bem-vindo` — endereço antigo da tela de entrada do console GISE do
+ * Admin Geral. Desde a fase 1 do Ecossistema (decisão E39) a entrada é a home
+ * de módulos; este arquivo só redireciona quem chega por link salvo (301: o
+ * endereço morreu de propósito).
+ */
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { obterRotaBemVindo } from '$lib/auth';
 
-export const load: PageServerLoad = async ({ locals, cookies }) => {
-	const u = locals.usuario;
-	if (!u) redirect(302, '/login');
-
-	const adminModulo = cookies.get('admin_modulo');
-	const rotaCorreta = obterRotaBemVindo(u, adminModulo);
-	if (rotaCorreta !== '/gise/bem-vindo') {
-		redirect(302, rotaCorreta);
-	}
-	return {
-		usuario: u
-	};
+export const load: PageServerLoad = async () => {
+	redirect(301, '/');
 };

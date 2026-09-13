@@ -796,24 +796,29 @@ export async function verificarDesafio2FA(
 }
 
 /**
- * Retorna a rota de boas-vindas adequada para o usuário e módulo selecionado.
+ * A tela de entrada de cada perfil.
+ *
+ * Desde a fase 1 do Ecossistema (decisão E39) os perfis ADMINISTRATIVOS —
+ * sessão de admin e os dois papéis com escopo — entram pela home de módulos
+ * (`/`), organizada nos quatro grupos de gestão; `/escalas/bem-vindo` e
+ * `/gise/bem-vindo` viraram redirecionamentos para ela. O parâmetro
+ * `adminModulo` continua aceito porque os call sites o passam e a home ignora
+ * a preferência de tela de propósito (o que ela respeita é `modulosAdmin`,
+ * em `home-modulos.ts`).
  */
-export function obterRotaBemVindo(u: UsuarioLogado, adminModulo?: string | null): string {
+export function obterRotaBemVindo(u: UsuarioLogado, _adminModulo?: string | null): string {
 	// Super Admin tem console próprio (administração do sistema + auditoria).
 	if (u.isSuperAdmin) {
 		return '/super-admin';
 	}
 	if (u.tipo === 'admin') {
-		return adminModulo === 'gise' ? '/gise/bem-vindo' : '/escalas/bem-vindo';
+		return '/';
 	}
 	if (u.tipo === 'colaborador') {
 		return '/colaborador';
 	}
-	if (u.papel === 'admin_seccional') {
-		return '/escalas/bem-vindo';
-	}
-	if (u.papel === 'admin_unidade') {
-		return '/escalas/bem-vindo';
+	if (u.papel === 'admin_seccional' || u.papel === 'admin_unidade') {
+		return '/';
 	}
 	return '/bem-vindo';
 }
