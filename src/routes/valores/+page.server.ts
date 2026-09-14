@@ -20,7 +20,7 @@
  *
  * ## O signatário NÃO mora aqui
  *
- * Quem assina é campo do PLANO (`/gise/planos`), escolhido na criação e
+ * Quem assina é campo do PLANO (`/operacoes/planos`), escolhido na criação e
  * editável depois. Já esteve nesta tela como padrão global e saiu: quem assina
  * varia por operação — o Titular assina umas, o Adjunto outras —, então um
  * padrão único ou seria ignorado na maioria das vezes ou induziria a trocar a

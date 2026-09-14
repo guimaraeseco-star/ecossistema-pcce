@@ -12,15 +12,15 @@ import { autenticarPagina } from './session';
  * carregamento, permissão de acesso e presença dos blocos principais.
  */
 
-test.describe('GISE — detalhe (/gise/[id])', () => {
+test.describe('GISE — detalhe (/operacoes/gise/[id])', () => {
 	test('supervisor DPC designado acessa e vê o quadro de supervisão', async ({ page }) => {
 		const ok = await autenticarPagina(page, FIXTURE.supervisor.id);
 		if (!ok) test.skip(true, 'wrangler/D1 local indisponível');
 
-		await page.goto(`/gise/${FIXTURE.gise.id}`);
+		await page.goto(`/operacoes/gise/${FIXTURE.gise.id}`);
 
 		// Não foi redirecionado (permissão de supervisor reconhecida)
-		await expect(page).toHaveURL(new RegExp(`/gise/${FIXTURE.gise.id}`));
+		await expect(page).toHaveURL(new RegExp(`/operacoes/gise/${FIXTURE.gise.id}`));
 
 		// Quadro de supervisão com o supervisor designado
 		await expect(page.getByText('DPC Supervisão').first()).toBeVisible();
@@ -34,19 +34,19 @@ test.describe('GISE — detalhe (/gise/[id])', () => {
 		const ok = await autenticarPagina(page, FIXTURE.policialB.id);
 		if (!ok) test.skip(true, 'wrangler/D1 local indisponível');
 
-		await page.goto(`/gise/${FIXTURE.gise.id}`);
+		await page.goto(`/operacoes/gise/${FIXTURE.gise.id}`);
 		// O load redireciona quem não é admin/supervisor/seccional participante.
-		await expect(page).not.toHaveURL(new RegExp(`/gise/${FIXTURE.gise.id}`));
+		await expect(page).not.toHaveURL(new RegExp(`/operacoes/gise/${FIXTURE.gise.id}`));
 	});
 });
 
-test.describe('Res. GISE — visão do membro (/res-gise)', () => {
+test.describe('Res. GISE — visão do membro (/operacoes/presenca)', () => {
 	test('membro da equipe vê sua escala ativa listada', async ({ page }) => {
 		const ok = await autenticarPagina(page, FIXTURE.membroGise.id);
 		if (!ok) test.skip(true, 'wrangler/D1 local indisponível');
 
-		await page.goto('/res-gise');
-		await expect(page).toHaveURL(/\/res-gise/);
+		await page.goto('/operacoes/presenca');
+		await expect(page).toHaveURL(/\/operacoes\/presenca/);
 
 		// A linha da GISE da fixture aparece na lista "Minhas escalas extras"
 		// (formato da linha: "01/06/2026 #99001 operacional ...").
@@ -60,7 +60,7 @@ test.describe('Res. GISE — visão do membro (/res-gise)', () => {
 		const ok = await autenticarPagina(page, FIXTURE.policialB.id);
 		if (!ok) test.skip(true, 'wrangler/D1 local indisponível');
 
-		await page.goto('/res-gise');
-		await expect(page).not.toHaveURL(/\/res-gise/);
+		await page.goto('/operacoes/presenca');
+		await expect(page).not.toHaveURL(/\/operacoes\/presenca/);
 	});
 });

@@ -15,7 +15,7 @@ import {
 /**
  * Presença GISE em TELA (fluxo avançado, mobile-first) + comprovante — cobre a
  * parte do roteiro 6.2 do TESTING.md que não exige hardware: entrada e saída
- * com evidências (2FA semeado + GPS) via form actions do /res-gise,
+ * com evidências (2FA semeado + GPS) via form actions do /operacoes/presenca,
  * e o comprovante sob demanda (GET /api/gise/[id]/presenca/termo).
  *
  * As actions são chamadas como o `use:enhance` chamaria (POST form-encoded com
@@ -54,7 +54,7 @@ async function postAction(
 	action: 'salvarEntrada' | 'salvarSaida',
 	form: Record<string, string>
 ) {
-	return request.post(`/res-gise?/${action}`, {
+	return request.post(`/operacoes/presenca?/${action}`, {
 		headers: {
 			...cookieDeSessao(token),
 			origin: BASE_URL,
@@ -319,7 +319,7 @@ function presencasDa(giseId: number): number {
 	);
 }
 
-test.describe('FLW-AUT-006 / 007 — janela e GISE finalizada no /res-gise', () => {
+test.describe('FLW-AUT-006 / 007 — janela e GISE finalizada no /operacoes/presenca', () => {
 	const GISE_FUTURA = 99501;
 	const GISE_FECHADA = 99502;
 
@@ -402,7 +402,7 @@ test.describe('o portão de janela tem piso: data e hora recusadas na escrita', 
 			const tokenAdmin = seedSession(FIXTURE.adminGeral.id, 'admin');
 			test.skip(!tokenAdmin, 'D1 local indisponível');
 
-			const res = await request.post(`/gise/${GISE_EDITAVEL}?/salvarDatasHorarios`, {
+			const res = await request.post(`/operacoes/gise/${GISE_EDITAVEL}?/salvarDatasHorarios`, {
 				headers: headersFormAction(tokenAdmin!),
 				form: { ...payload, feriado: 'false' }
 			});
@@ -420,7 +420,7 @@ test.describe('o portão de janela tem piso: data e hora recusadas na escrita', 
 		const tokenAdmin = seedSession(FIXTURE.adminGeral.id, 'admin');
 		test.skip(!tokenAdmin, 'D1 local indisponível');
 
-		const res = await request.post(`/gise/${GISE_EDITAVEL}?/salvarDatasHorarios`, {
+		const res = await request.post(`/operacoes/gise/${GISE_EDITAVEL}?/salvarDatasHorarios`, {
 			headers: headersFormAction(tokenAdmin!),
 			// `9:00` de propósito, e DIFERENTE do horário semeado (08:00): é o que a
 			// tela manda (`validarHora` aceita um dígito e `normalizarHora` não

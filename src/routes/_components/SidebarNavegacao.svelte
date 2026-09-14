@@ -31,8 +31,10 @@
 
 	const usuario = $derived(nav.usuario);
 	const flags = $derived(nav.flags);
-	const giseOperacoesPathAtivo = $derived(page.url.pathname.startsWith('/gise/operacoes'));
-	const planosPathAtivo = $derived(page.url.pathname.startsWith('/gise/planos'));
+	const giseOperacoesPathAtivo = $derived(
+		page.url.pathname.startsWith('/operacoes/gise/operacoes')
+	);
+	const planosPathAtivo = $derived(page.url.pathname.startsWith('/operacoes/planos'));
 
 	/**
 	 * Os grupos que a HOME mostra a este usuário — a barra desenha o título de
@@ -333,8 +335,8 @@
 				o plano operacional do Admin Geral.
 
 				"Conf. GISE" e "Conf. Form." saíram do menu: o que editavam virou
-				configuração POR OPERAÇÃO, nos botões de cada linha de /gise/operacoes.
-				O plano operacional NASCE em /gise/operacoes, mas a lista precisa de
+				configuração POR OPERAÇÃO, nos botões de cada linha de /operacoes/gise/operacoes.
+				O plano operacional NASCE em /operacoes/gise/operacoes, mas a lista precisa de
 				entrada própria: sem ela, um plano já criado só se alcançaria pela URL.
 			-->
 			{#if gruposDaHome.has('operacional')}
@@ -346,12 +348,17 @@
 				{/if}
 				{#if flags.showGise && usuario?.tipo === 'admin'}
 					{@render itemMenu(
-						'/gise/operacoes',
+						'/operacoes/gise/operacoes',
 						'Operações',
 						ICONE.engrenagem,
 						giseOperacoesPathAtivo
 					)}
-					{@render itemMenu('/gise/planos', 'Plano Op.', ICONE.pranchetaLista, planosPathAtivo)}
+					{@render itemMenu(
+						'/operacoes/planos',
+						'Plano Op.',
+						ICONE.pranchetaLista,
+						planosPathAtivo
+					)}
 				{/if}
 			{/if}
 

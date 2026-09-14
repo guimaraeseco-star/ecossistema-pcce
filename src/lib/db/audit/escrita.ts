@@ -411,7 +411,7 @@ export type EventoSemContexto = Omit<
  * do RequestEvent.
  *
  * Encurta a instrumentação de um handler de três linhas para uma, e é o que as
- * form actions de `/gise/[id]` e `/escalas/[id]` usam. O ganho não é o
+ * form actions de `/operacoes/gise/[id]` e `/escalas/[id]` usam. O ganho não é o
  * tamanho: é que esquecer o `...contexto` deixava o evento sem IP e sem rota
  * — silenciosamente, porque todos os cinco campos são opcionais.
  */

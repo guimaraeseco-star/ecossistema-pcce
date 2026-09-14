@@ -8,7 +8,7 @@
  * por elas inteiras antes de chegar em qualquer código.
  *
  * Ter UMA fonte aqui é o que o projeto já pagou para aprender: existia uma
- * cópia idêntica de 122 linhas do modelo SEINT dentro da página `/res-gise`
+ * cópia idêntica de 122 linhas do modelo SEINT dentro da página `/operacoes/presenca`
  * (achado 11.3 do antigo `ARQUIVOS.md` — ver `docs/HISTORICO.md`). Editar um
  * lado e não o outro deixava o policial respondendo um formulário e o relatório
  * lendo outro.
@@ -144,7 +144,7 @@ export const DEFAULT_QUESTIONS = [
  * Divergência INTENCIONAL em relação aos rótulos curtos de `DEFAULT_QUESTIONS`:
  * na tela o policial precisa de comando ("DIGITE O KM..."); no relatório, de
  * rótulo compacto ("KM INICIAL"). Antes, a versão de formulário era uma cópia
- * integral de ~120 linhas dentro de `/res-gise/+page.server.ts`, escondendo a
+ * integral de ~120 linhas dentro de `/operacoes/presenca/+page.server.ts`, escondendo a
  * relação entre as duas (achado 11.3 do antigo ARQUIVOS.md — ver docs/HISTORICO.md).
  */
 const TEXTOS_FORM_OPERACIONAL: Record<
@@ -198,7 +198,7 @@ const TEXTOS_FORM_OPERACIONAL: Record<
 };
 
 /**
- * Modelo padrão OPERACIONAL para a UI do formulário (`/res-gise`): mesma
+ * Modelo padrão OPERACIONAL para a UI do formulário (`/operacoes/presenca`): mesma
  * estrutura de `DEFAULT_QUESTIONS`, com os textos de preenchimento aplicados.
  */
 export const DEFAULT_QUESTIONS_FORM_OPERACIONAL: PerguntaModelo[] = DEFAULT_QUESTIONS.map((q) => ({
@@ -208,7 +208,7 @@ export const DEFAULT_QUESTIONS_FORM_OPERACIONAL: PerguntaModelo[] = DEFAULT_QUES
 
 /**
  * Modelo padrão do formulário SEINT — fonte ÚNICA, usada como fallback tanto
- * aqui (agregação/relatórios) quanto no load de `/res-gise` (UI do formulário
+ * aqui (agregação/relatórios) quanto no load de `/operacoes/presenca` (UI do formulário
  * e botão "restaurar padrão"). Antes existia uma cópia idêntica de 122 linhas
  * na página (achado 11.3 do antigo ARQUIVOS.md — ver docs/HISTORICO.md).
  */

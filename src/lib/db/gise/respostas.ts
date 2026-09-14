@@ -408,7 +408,7 @@ export async function salvarGiseModeloFormulario(
 
 /**
  * Grava a ordem dos cards do painel de produtividade desta (operação, tipo) —
- * o array JSON de ids que o Admin Geral montou arrastando em `/produtividade`.
+ * o array JSON de ids que o Admin Geral montou arrastando em `/operacoes/produtividade`.
  *
  * Escreve SÓ a coluna `painel_ordem`, deliberadamente:
  *

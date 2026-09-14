@@ -22,8 +22,8 @@
 		{
 			"id": "0d6d35f7e34d",
 			"arquivos": [
-				"src/routes/gise/[id]/_components/modais/ModalDatasHoras.svelte",
-				"src/routes/gise/_components/ModalCriarGise.svelte"
+				"src/routes/operacoes/gise/[id]/_components/modais/ModalDatasHoras.svelte",
+				"src/routes/operacoes/gise/_components/ModalCriarGise.svelte"
 			],
 			"ocorrencias": 2,
 			"amostra": "function calMesAnterior() {",
@@ -51,7 +51,7 @@
 			"id": "1b3cdf55f494",
 			"arquivos": [
 				"src/routes/escalas/_components/ModalNovaEscala.svelte",
-				"src/routes/gise/[id]/_components/modais/ModalDatasHoras.svelte"
+				"src/routes/operacoes/gise/[id]/_components/modais/ModalDatasHoras.svelte"
 			],
 			"ocorrencias": 2,
 			"amostra": "stroke-width=\"2\"",
@@ -289,7 +289,7 @@
 			"id": "9ef741624ab6",
 			"arquivos": [
 				"src/routes/escalas/_components/ModalNovaEscala.svelte",
-				"src/routes/gise/_components/ModalCriarGise.svelte"
+				"src/routes/operacoes/gise/_components/ModalCriarGise.svelte"
 			],
 			"ocorrencias": 2,
 			"amostra": "<svg class=\"w-3 h-3\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\"",

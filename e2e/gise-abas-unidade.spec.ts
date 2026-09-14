@@ -3,7 +3,7 @@ import { FIXTURE } from './global-setup';
 import { autenticarPagina, execD1Local } from './session';
 
 /**
- * As ABAS de unidade no quadro da seccional (`/gise/[id]`).
+ * As ABAS de unidade no quadro da seccional (`/operacoes/gise/[id]`).
  *
  * Até ago/2026 cada delegacia era uma CAIXA empilhada: uma faixa com o nome e o
  * "Remover DP", a moldura, e as equipes espremidas dentro. Agora cada unidade é
@@ -87,7 +87,7 @@ test.afterAll(() => {
 async function abrirQuadro(page: Page) {
 	const ok = await autenticarPagina(page, FIXTURE.adminGeral.id, 'admin');
 	test.skip(!ok, 'D1 local indisponível');
-	await page.goto(`/gise/${C.gise}`);
+	await page.goto(`/operacoes/gise/${C.gise}`);
 }
 
 test('a aba aberta decide quais equipes aparecem', async ({ page }) => {

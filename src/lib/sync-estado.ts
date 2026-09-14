@@ -7,7 +7,7 @@
  * Numa tela de detalhe há DOIS pollers: o do badge, montado no layout e
  * presente em toda página, e o da própria tela. Ambos escutam
  * `visibilitychange`, então voltar para a aba dispara os dois no MESMO tick.
- * Medido em Chromium na `/gise/[id]`: 3 retornos de foco produziam 6
+ * Medido em Chromium na `/operacoes/gise/[id]`: 3 retornos de foco produziam 6
  * requisições, aos pares `(sem query)` + `?giseId=N`.
  *
  * As duas não são idênticas — e é por isso que descartar a segunda seria

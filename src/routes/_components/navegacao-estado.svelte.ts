@@ -53,7 +53,7 @@ export function criarNavegacaoEstado() {
 
 	// Em qual nível a gaveta está: a raiz ou dentro de "Escala extra". Fixado ao
 	// ABRIR, pela rota, e não mantido entre aberturas: abrir o menu estando em
-	// `/produtividade` e cair na raiz esconderia justamente onde a pessoa está.
+	// `/operacoes/produtividade` e cair na raiz esconderia justamente onde a pessoa está.
 	let nivel = $state<'raiz' | 'extra'>('raiz');
 
 	let restaurarFocoAposNavegar = false;
@@ -76,8 +76,8 @@ export function criarNavegacaoEstado() {
 
 	/**
 	 * Os filhos do menu "Escala extra", já filtrados pelo que este usuário vê —
-	 * inclusive o realce das duas abas de `/res-gise` (`?status=finalizadas`) e
-	 * o par `/gise` × `/gise/finalizadas` do Admin Geral.
+	 * inclusive o realce das duas abas de `/operacoes/presenca` (`?status=finalizadas`) e
+	 * o par `/operacoes/gise` × `/operacoes/gise/finalizadas` do Admin Geral.
 	 */
 	const filhosExtra = $derived(itensExtraDoMenu(flags, page.url));
 

@@ -253,7 +253,7 @@ type TentarLoginResult =
 	  };
 
 function adminDestino(modulo: AdminModuloPreferencia): string {
-	if (modulo === 'gise') return '/gise';
+	if (modulo === 'gise') return '/operacoes/gise';
 	if (modulo === 'escalas') return '/recebidos';
 	return '/painel';
 }

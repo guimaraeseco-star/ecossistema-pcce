@@ -78,7 +78,7 @@ function supervisorNoBanco(): number | null | undefined {
  * `Concluir Edição` no rótulo é a confirmação de que o modo entrou.
  */
 async function abrirQuadroEmEdicao(page: Page) {
-	await page.goto(`/gise/${GISE_EDICAO}`);
+	await page.goto(`/operacoes/gise/${GISE_EDICAO}`);
 	await page.getByRole('button', { name: 'Editar escala' }).click();
 	await expect(page.getByRole('button', { name: 'Concluir Edição' })).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Editar DPC de supervisão' })).toBeVisible();

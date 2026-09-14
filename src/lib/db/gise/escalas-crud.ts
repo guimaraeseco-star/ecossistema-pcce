@@ -53,7 +53,7 @@ export async function buscarGiseEscala(
 
 /**
  * Cria a escala VAZIA e devolve o id — sem seccionais, sem equipes. Montar a
- * árvore é do chamador (`/gise` cria as seccionais em seguida no modo
+ * árvore é do chamador (`/operacoes/gise` cria as seccionais em seguida no modo
  * "completa"), ou de `clonarGiseParaData`, que faz as duas coisas.
  *
  * `feriado` é `boolean` na API e `0|1` na coluna; a conversão fica aqui para

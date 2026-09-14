@@ -4,7 +4,7 @@
 	 *
 	 * As duas telas serializam o recorte na query string (`<form method="GET">`),
 	 * então o controle é nativo (`name` + `value`/`selected`), não bind. O cromo
-	 * é o da caixa de `/produtividade`. Sem este envelope, o par De/Até copiado
+	 * é o da caixa de `/operacoes/produtividade`. Sem este envelope, o par De/Até copiado
 	 * nas duas páginas era o bloco que o guard de duplicação pegou.
 	 */
 	import type { Snippet } from 'svelte';

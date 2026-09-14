@@ -258,7 +258,7 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 	});
 
 	test('Admin Geral cria o plano, que nasce amarrado à versão vigente', async ({ request }) => {
-		const res = await request.post('/gise/planos/novo?/criar', {
+		const res = await request.post('/operacoes/planos/novo?/criar', {
 			headers: {
 				...headersFormAction(tokenAdmin!),
 				'content-type': 'application/x-www-form-urlencoded'
@@ -365,7 +365,7 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 		const IGUATU = '2305506';
 		const ACOPIARA = '2300309';
 
-		const res = await request.post('/gise/planos/novo?/criar', {
+		const res = await request.post('/operacoes/planos/novo?/criar', {
 			headers: {
 				...headersFormAction(tokenAdmin!),
 				'content-type': 'application/x-www-form-urlencoded'
@@ -425,7 +425,7 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 		expect(equipe![0].distancia_km).toBeNull();
 
 		// E a tela mede: mesma função, mesmos dados.
-		const editor = await request.get(`/gise/planos/${planoMedidoId}`, {
+		const editor = await request.get(`/operacoes/planos/${planoMedidoId}`, {
 			headers: cookieDeSessao(tokenAdmin!)
 		});
 		expect(editor.status()).toBe(200);
@@ -441,7 +441,7 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 			`SELECT id FROM plano_equipes WHERE plano_id = ${planoId} ORDER BY ordem LIMIT 1;`
 		);
 
-		const res = await request.post(`/gise/planos/${planoId}?/salvarEquipe`, {
+		const res = await request.post(`/operacoes/planos/${planoId}?/salvarEquipe`, {
 			headers: {
 				...headersFormAction(tokenAdmin!),
 				'content-type': 'application/x-www-form-urlencoded'
@@ -469,7 +469,7 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 		// Campo VAZIO volta a NULL, e não a zero: zero é a afirmação de que origem e
 		// destino são a mesma cidade, e a tela precisa distinguir "não medido" para
 		// poder avisar (ver `sugerirCusteio`).
-		const limpa = await request.post(`/gise/planos/${planoId}?/salvarEquipe`, {
+		const limpa = await request.post(`/operacoes/planos/${planoId}?/salvarEquipe`, {
 			headers: {
 				...headersFormAction(tokenAdmin!),
 				'content-type': 'application/x-www-form-urlencoded'
@@ -492,7 +492,7 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 		).toBeNull();
 
 		// Distância fora da faixa é recusada — não gravada truncada.
-		const ruim = await request.post(`/gise/planos/${planoId}?/salvarEquipe`, {
+		const ruim = await request.post(`/operacoes/planos/${planoId}?/salvarEquipe`, {
 			headers: {
 				...headersFormAction(tokenAdmin!),
 				'content-type': 'application/x-www-form-urlencoded'
@@ -517,7 +517,7 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 		// O plano vizinho é CRIADO aqui, e não procurado no banco: depender de já
 		// existir outro plano no D1 local faria este teste passar por skip na
 		// máquina limpa do CI, que é onde ele mais precisa rodar.
-		const criacao = await request.post('/gise/planos/novo?/criar', {
+		const criacao = await request.post('/operacoes/planos/novo?/criar', {
 			headers: {
 				...headersFormAction(tokenAdmin!),
 				'content-type': 'application/x-www-form-urlencoded'
@@ -547,7 +547,7 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 		);
 
 		for (const acao of ['definirOpcaoPadrao', 'removerOpcao']) {
-			const res = await request.post(`/gise/planos/${planoId}?/${acao}`, {
+			const res = await request.post(`/operacoes/planos/${planoId}?/${acao}`, {
 				headers: {
 					...headersFormAction(tokenAdmin!),
 					'content-type': 'application/x-www-form-urlencoded'
@@ -573,7 +573,7 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 		execD1Local(
 			`UPDATE plano_equipes SET tipo_custo = 'hora_extra', horas_plus = 6 WHERE id = ${equipe};`
 		);
-		const add = await request.post(`/gise/planos/${planoId}?/adicionarMembro`, {
+		const add = await request.post(`/operacoes/planos/${planoId}?/adicionarMembro`, {
 			headers: {
 				...headersFormAction(tokenAdmin!),
 				'content-type': 'application/x-www-form-urlencoded'
@@ -605,7 +605,7 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 		const membro = idDe(
 			`SELECT id FROM plano_equipe_membros WHERE plano_id = ${planoId} AND policial_id = ${semClasse};`
 		);
-		const rem = await request.post(`/gise/planos/${planoId}?/removerMembro`, {
+		const rem = await request.post(`/operacoes/planos/${planoId}?/removerMembro`, {
 			headers: {
 				...headersFormAction(tokenAdmin!),
 				'content-type': 'application/x-www-form-urlencoded'
@@ -614,7 +614,7 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 		});
 		expect(rem.status()).toBe(200);
 
-		const add = await request.post(`/gise/planos/${planoId}?/adicionarMembro`, {
+		const add = await request.post(`/operacoes/planos/${planoId}?/adicionarMembro`, {
 			headers: {
 				...headersFormAction(tokenAdmin!),
 				'content-type': 'application/x-www-form-urlencoded'

@@ -86,7 +86,7 @@ test('setas movem e renumeram os rótulos', async ({ page }) => {
 	await silenciar(page);
 	const ok = await autenticarPagina(page, FIXTURE.adminGeral.id, 'admin');
 	test.skip(!ok, 'D1 local indisponível');
-	await page.goto('/res-gise');
+	await page.goto('/operacoes/presenca');
 	await expect(page.getByRole('heading', { name: 'Configurar Formulário' })).toBeVisible();
 
 	expect(await ordem(page)).toEqual(['1. Primeira', '2. Segunda', '3. Terceira']);
@@ -118,7 +118,7 @@ test('arrastar o card reordena e renumera', async ({ page }) => {
 	await silenciar(page);
 	const ok = await autenticarPagina(page, FIXTURE.adminGeral.id, 'admin');
 	test.skip(!ok, 'D1 local indisponível');
-	await page.goto('/res-gise');
+	await page.goto('/operacoes/presenca');
 	await expect(page.getByRole('heading', { name: 'Configurar Formulário' })).toBeVisible();
 	expect(await ordem(page)).toEqual(['1. Primeira', '2. Segunda', '3. Terceira']);
 
@@ -145,7 +145,7 @@ test('salvar persiste a nova ordem já renumerada', async ({ page }) => {
 	await silenciar(page);
 	const ok = await autenticarPagina(page, FIXTURE.adminGeral.id, 'admin');
 	test.skip(!ok, 'D1 local indisponível');
-	await page.goto('/res-gise');
+	await page.goto('/operacoes/presenca');
 	await page.getByRole('button', { name: 'Mover a pergunta 3 para cima' }).click();
 	expect(await ordem(page)).toEqual(['1. Primeira', '2. Terceira', '3. Segunda']);
 

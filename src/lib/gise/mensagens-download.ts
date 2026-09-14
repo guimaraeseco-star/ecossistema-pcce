@@ -1,7 +1,7 @@
 /**
  * O texto dos diálogos de DOWNLOAD da listagem GISE, em um lugar só.
  *
- * A tela `/gise` oferece o mesmo par de diálogos para dois documentos — a
+ * A tela `/operacoes/gise` oferece o mesmo par de diálogos para dois documentos — a
  * escala e o relatório de serviço extraordinário —, e o "assinado" ainda se
  * divide por permissão. Isso montava SEIS objetos de diálogo à mão em
  * `gise/+page.svelte`: três da via assinada (escala, supervisão extra,

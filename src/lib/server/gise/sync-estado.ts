@@ -137,7 +137,7 @@ export async function carimboGise(db: Database, giseId: number): Promise<string 
 	].join('|');
 }
 
-/** Lista `/gise` — ativas + histórico resumido. */
+/** Lista `/operacoes/gise` — ativas + histórico resumido. */
 export async function carimboGiseList(db: Database): Promise<string> {
 	const [[tot], [ativas]] = await db.batch([
 		db
@@ -158,7 +158,7 @@ export async function carimboGiseList(db: Database): Promise<string> {
 }
 
 /**
- * Carimbo de `/res-gise`: presença/relatório do policial, ou modelo (admin).
+ * Carimbo de `/operacoes/presenca`: presença/relatório do policial, ou modelo (admin).
  */
 export async function carimboResGise(db: Database, policialId: number | null): Promise<string> {
 	if (policialId == null) {

@@ -1,9 +1,9 @@
 /**
  * Tokens visuais das barras de filtro do projeto.
  *
- * A régua é a caixa de `/produtividade`: contorno 1px `surface-200`, fundo da
+ * A régua é a caixa de `/operacoes/produtividade`: contorno 1px `surface-200`, fundo da
  * folha, rótulo `text-3xs` e campo `text-xs` / `py-2.5`. A busca detalhada do
- * histórico GISE (`/res-gise`, `/gise/finalizadas`) e as listagens reusam estes
+ * histórico GISE (`/operacoes/presenca`, `/operacoes/gise/finalizadas`) e as listagens reusam estes
  * tokens para não voltar o drift de `h-11` / `text-sm` / fundo cinza.
  */
 
@@ -29,7 +29,7 @@ export const CLASSE_TITULO_FILTRO =
 export const CLASSE_ROTULO_FILTRO =
 	'text-3xs font-black uppercase tracking-widest text-surface-400 dark:text-surface-500 pl-0.5';
 
-/** Contorno e fundo da caixa — sem padding, para o slide de `/produtividade`. */
+/** Contorno e fundo da caixa — sem padding, para o slide de `/operacoes/produtividade`. */
 export const CLASSE_CAIXA_FILTRO_CROMO =
 	'rounded-2xl sm:rounded-3xl border border-surface-200 bg-white dark:border-surface-800 dark:bg-surface-900';
 

@@ -219,7 +219,7 @@ test.describe('Chave de assinatura — GISE, extra e presença', () => {
 			);
 			expect(presencaPrep.status()).toBe(403);
 
-			const presencaUmTiro = await request.post('/res-gise?/salvarEntrada', {
+			const presencaUmTiro = await request.post('/operacoes/presenca?/salvarEntrada', {
 				headers: headersFormAction(tokenMembro!),
 				form: { giseId: String(FIXTURE.gise.id) }
 			});

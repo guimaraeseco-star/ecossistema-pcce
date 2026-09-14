@@ -58,7 +58,7 @@ interface Operacao {
 	tipo: 'api' | 'action';
 }
 
-/** `src/routes/gise/[id]/_actions/x.ts` → `/gise/[id]` (a action é da rota pai). */
+/** `src/routes/operacoes/gise/[id]/_actions/x.ts` → `/operacoes/gise/[id]` (a action é da rota pai). */
 function urlDaRota(dirArquivo: string): string {
 	const rel = relative(DIR_ROTAS, dirArquivo).replaceAll('\\', '/');
 	const semActions = rel.replace(/\/?_actions$/, '');
@@ -122,7 +122,7 @@ function comIdsDeFixture(padrao: string): string {
 			// de chegar à permissão, e o teste passava mesmo com a checagem de lotação
 			// REMOVIDA do servidor. Alvo protegido por outro motivo não testa este.
 			.replace('/escalas/[id]', `/escalas/${FIXTURE.escalaAssinavel.id}`)
-			.replace('/gise/[id]', `/gise/${FIXTURE.gise.id}`)
+			.replace('/operacoes/gise/[id]', `/operacoes/gise/${FIXTURE.gise.id}`)
 			.replace('/servidores/[id]', `/servidores/${FIXTURE.policialA.id}`)
 			.replace('[giseId]', String(FIXTURE.gise.id))
 			.replace('[seccionalId]', String(FIXTURE.seccional.id))
@@ -154,22 +154,25 @@ function url(o: Operacao): string {
  * fixture, para que o que sobre seja exatamente a decisão de permissão.
  */
 const CORPO_MINIMO: Record<string, Record<string, string>> = {
-	'/gise/[id]?/adicionarMembro': {
+	'/operacoes/gise/[id]?/adicionarMembro': {
 		secId: String(FIXTURE.giseSeccional.id),
 		equipe_id: String(FIXTURE.giseEquipe.id),
 		policial_id: String(FIXTURE.policialB.id)
 	},
 	// Id REAL do membro semeado: com um id inexistente a action pararia no
 	// "não encontrado" e o teste não chegaria a exercer a permissão.
-	'/gise/[id]?/removerMembro': { memId: idDoMembroFixture() },
-	'/gise/[id]?/finalizarSeccional': { secId: String(FIXTURE.giseSeccional.id) },
-	'/gise/[id]?/salvarHorariosSec': {
+	'/operacoes/gise/[id]?/removerMembro': { memId: idDoMembroFixture() },
+	'/operacoes/gise/[id]?/finalizarSeccional': { secId: String(FIXTURE.giseSeccional.id) },
+	'/operacoes/gise/[id]?/salvarHorariosSec': {
 		secId: String(FIXTURE.giseSeccional.id),
 		hora_entrada: '08:00',
 		hora_saida: '16:00'
 	},
-	'/gise/[id]?/selecionarUnidade': { slotId: '1', unidadeId: String(FIXTURE.unidadeB.id) },
-	'/res-gise/relatorio/[giseId]?/salvarResposta': { respostas: '{}' }
+	'/operacoes/gise/[id]?/selecionarUnidade': {
+		slotId: '1',
+		unidadeId: String(FIXTURE.unidadeB.id)
+	},
+	'/operacoes/presenca/relatorio/[giseId]?/salvarResposta': { respostas: '{}' }
 };
 
 /** Id da linha `gise_membros` semeada pelo global-setup ('0' se o D1 falhar). */

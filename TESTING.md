@@ -59,7 +59,7 @@ Roteiro de regressão manual dos fluxos de negócio. **Papel deste arquivo: exce
 - [ ] E-mail repetido (mesmo com caixa diferente) → "Já existe um colaborador com este e-mail"; CPF inválido → "CPF inválido"
 - [ ] `/login` → "Sou colaborador(a)" → campo vira E-mail, some o certificado e "Esqueceu a senha?"; "Voltar" restaura o alternador
 - [ ] Login com a senha provisória → **pede o código por e-mail mesmo sendo primeiro acesso** → código certo → `/alterar-senha` sem pedir e-mail pessoal → senha nova → `/aceitar-termo` → `/colaborador` (área com "Nenhuma função designada")
-- [ ] Sidebar do colaborador tem só "Boas-vindas" e "Sair"; digitar `/escalas`, `/perfil`, `/res-gise` ou `/painel` na URL volta para `/colaborador`; `fetch` de `/api/sync/estado` responde 403
+- [ ] Sidebar do colaborador tem só "Boas-vindas" e "Sair"; digitar `/escalas`, `/perfil`, `/operacoes/presenca` ou `/painel` na URL volta para `/colaborador`; `fetch` de `/api/sync/estado` responde 403
 - [ ] Admin Geral → "Nova senha" → nova provisória; a sessão aberta do colaborador cai no próximo request; o próximo login exige troca de novo
 - [ ] "Desativar" → o login responde "E-mail ou senha inválidos" (mesma mensagem de senha errada); "Reativar" restaura
 - [ ] Policial e admin: login, 2FA, primeiro acesso e assinatura **inalterados**
@@ -139,7 +139,7 @@ Roteiro de regressão manual dos fluxos de negócio. **Papel deste arquivo: exce
 
 ---
 
-## 4. Escala extra (`/gise`)
+## 4. Escala extra (`/operacoes/gise`)
 
 ### 4.1 Listagem
 
@@ -152,11 +152,11 @@ Roteiro de regressão manual dos fluxos de negócio. **Papel deste arquivo: exce
       um deles deixa só as escalas daquela operação, e a paginação volta à
       página 1
 - [ ] Cada card mostra o selo da operação (sigla, ou nome se não houver sigla)
-- [ ] `/gise` lista só as escalas ativas; o histórico não aparece nesta página
+- [ ] `/operacoes/gise` lista só as escalas ativas; o histórico não aparece nesta página
 - [ ] Admin Geral vê a aba **Finalizadas** no submenu, entre Ativas e Produtividade
-- [ ] `/gise/finalizadas` mostra a busca detalhada das escalas encerradas
+- [ ] `/operacoes/gise/finalizadas` mostra a busca detalhada das escalas encerradas
 - [ ] Supervisor / admin seccional / policial não vê a aba Finalizadas; abrir a
-      URL redireciona para `/gise`
+      URL redireciona para `/operacoes/gise`
 
 ### 4.2 Criar escala extra
 
@@ -173,7 +173,7 @@ Roteiro de regressão manual dos fluxos de negócio. **Papel deste arquivo: exce
       operação do original (clonar uma escala da CRAJUBAR não pode gerar uma do
       GISE)
 
-### 4.4 Gerenciar Seccional (`/gise/[id]`)
+### 4.4 Gerenciar Seccional (`/operacoes/gise/[id]`)
 
 - [ ] Adicionar seccional à GISE
 - [ ] Atualizar dados da seccional (horário, unidade operacional)
@@ -241,7 +241,7 @@ Verificar cada transição de status:
 - [ ] Finalizar GISE no status correto → status `finalizada`
 - [ ] Tentar finalizar GISE em status incorreto → erro
 
-### 4.10 Operações (`/gise/operacoes`, Admin Geral)
+### 4.10 Operações (`/operacoes/gise/operacoes`, Admin Geral)
 
 - [ ] A tela lista `GISE` e `OPERAÇÃO CRAJUBAR` (semeadas pelas migrações), com a
       contagem de escalas de cada uma
@@ -254,9 +254,9 @@ Verificar cada transição de status:
       mas ela continua aparecendo no cadastro
 - [ ] **Excluir** aparece só na operação sem escala nenhuma; na `GISE` e na
       `CRAJUBAR` só há "Desativar"
-- [ ] Policial comum abrindo `/gise/operacoes` → redirecionado
+- [ ] Policial comum abrindo `/operacoes/gise/operacoes` → redirecionado
 
-### 4.11 Formulário da operação (`/gise/operacoes`)
+### 4.11 Formulário da operação (`/operacoes/gise/operacoes`)
 
 > `[E2E: operacoes-formulario.spec.ts]` prova o formulário único de criação e
 > edição (identidade + configuração gravadas juntas), o preenchimento na
@@ -334,7 +334,7 @@ Verificar cada transição de status:
 **Os itens da RAIZ (Admin Geral):**
 
 - [ ] "Operações" e "Plano Op." aparecem lado a lado, e a rota atual acende só um
-      dos dois — estar em `/gise/planos` **não** pode acender "Ativas"
+      dos dois — estar em `/operacoes/planos` **não** pode acender "Ativas"
 - [ ] "Valores de custo" NÃO aparece para o Admin Geral: é aba do Super Admin
 - [ ] O Início (`/`) mostra os quatro cartões grandes (cor #104862) sem rolagem
       em 1366×720; o subtítulo de cada um lista TODOS os módulos do grupo para o
@@ -358,14 +358,14 @@ Verificar cada transição de status:
 
 **Herdado dos ciclos anteriores:**
 
-- [ ] `/res-gise` (Admin Geral) mostra "VOLTAR ÀS OPERAÇÕES" acima do título
+- [ ] `/operacoes/presenca` (Admin Geral) mostra "VOLTAR ÀS OPERAÇÕES" acima do título
 - [ ] Admin de unidade fora de qualquer escala → **não** vê "Dados base"
 - [ ] Desativar a operação → o item some do menu do admin daquela unidade em até
       1 minuto (cache de 60s)
 
 ### 4.13 Indicadores e linha de base
 
-**Configurar o indicador** (`/res-gise`, Admin Geral):
+**Configurar o indicador** (`/operacoes/presenca`, Admin Geral):
 
 - [ ] O seletor de operação troca o formulário mostrado
 - [ ] Numa pergunta do tipo Número, marcar "usar como indicador de meta",
@@ -374,22 +374,22 @@ Verificar cada transição de status:
 - [ ] Em pergunta que não seja de cobertura, a opção "Cobertura — % do total
       atendido" do **Tipo de meta** aparece desabilitada, com a explicação abaixo
 
-**Informar a base** (`/dados-base/<operação>`, admin de unidade/seccional):
+**Informar a base** (`/operacoes/dados-base/<operação>`, admin de unidade/seccional):
 
 > `[E2E: operacoes-linha-base.spec.ts]` prova a tela sem seletor de operação, o
 > 404 de id inexistente, o redirecionamento direto quando há uma pendência só e
-> a ausência de "Voltar" nesse caso, o retorno do Admin Geral a `/gise/operacoes`,
+> a ausência de "Voltar" nesse caso, o retorno do Admin Geral a `/operacoes/gise/operacoes`,
 > o recorte às unidades administradas, a gravação da base própria e a recusa do
 > POST direto na base de outra unidade.
 
-- [ ] Com MAIS DE UMA pendência, `/dados-base` mostra a lista para escolher (e
+- [ ] Com MAIS DE UMA pendência, `/operacoes/dados-base` mostra a lista para escolher (e
       nenhum campo)
 - [ ] Sem pendência nenhuma → texto explicando as duas condições (meta percentual
       **e** unidade escalada)
 - [ ] Informado o valor e salvo, o card passa a "Todos informados"
 - [ ] Campo deixado em branco não grava nada (em branco é "ainda não sei", não zero)
 
-**Escape pelo formulário** (`/res-gise/relatorio/[giseId]`, policial):
+**Escape pelo formulário** (`/operacoes/presenca/relatorio/[giseId]`, policial):
 
 - [ ] Com a base NÃO informada, o campo "valor antes da operação" aparece na
       etapa em que a pergunta está, e o valor é gravado ao enviar o relatório
@@ -406,10 +406,10 @@ Verificar cada transição de status:
 
 - [ ] No PDF do relatório de produtividade, a pergunta sai como "9 de 12 (75%)"
       numa linha só
-- [ ] Em `/dados-base`, o indicador de cobertura **não** aparece — ele não pede
+- [ ] Em `/operacoes/dados-base`, o indicador de cobertura **não** aparece — ele não pede
       valor inicial a ninguém
 
-**Gráficos** (`/produtividade`):
+**Gráficos** (`/operacoes/produtividade`):
 
 - [ ] O filtro de operação troca os indicadores mostrados
 - [ ] O card de um indicador de cobertura mostra UMA série em porcentagem, com o
@@ -461,7 +461,7 @@ Verificar cada transição de status:
       produtividade"**
 - [ ] Com o campo vazio, o placeholder mostra o que vai sair — o texto da
       pergunta, ou "Drogas"/"Armas" nas duas de identidade própria
-- [ ] Preencher, salvar e abrir `/produtividade` → o card usa o título curto, nas
+- [ ] Preencher, salvar e abrir `/operacoes/produtividade` → o card usa o título curto, nas
       **colunas, no ranking e no detalhamento** (era só o ranking que respeitava
       "Drogas"; as colunas mostravam o enunciado inteiro)
 - [ ] Marcar a mesma pergunta como indicador → o card da seção "Indicadores e
@@ -474,7 +474,7 @@ Verificar cada transição de status:
 - [ ] Gerar o relatório assinado da escala → o PDF continua com o **enunciado**
       da pergunta, não com o título do painel
 
-**Rodapé de salvar do editor** (`/res-gise`, Admin Geral):
+**Rodapé de salvar do editor** (`/operacoes/presenca`, Admin Geral):
 
 - [ ] Abrir o editor → o botão "Salvar Modelo" está visível **sem rolar**, no pé
       da tela, e o status diz **"Tudo salvo"**
@@ -502,7 +502,7 @@ Verificar cada transição de status:
 
 ---
 
-## 5. Plano operacional (`/gise/planos` e `/valores`)
+## 5. Plano operacional (`/operacoes/planos` e `/valores`)
 
 > Módulo de ago/2026 — a operação COM deslocamento de equipes. Cobertura
 > automatizada: `src/lib/planos/__tests__/` (faixa de custo, janela de horas,
@@ -530,9 +530,9 @@ Verificar cada transição de status:
 - [ ] **Signatário**: o nome é buscado no cadastro (como o coordenador) e o cargo é um `<select>` com três opções geradas do departamento cadastrado — Diretor Titular do Departamento de Polícia do Interior Sul, Diretor Adjunto do Departamento de Polícia do Interior Sul, Delegado de Polícia
 - [ ] Sem escolher signatário, o plano nasce sem ele e o PDF imprime a linha de assinatura em branco (não há padrão global — `/valores` é só sobre dinheiro)
 
-- [ ] `/gise/operacoes` → "Nova operação" pergunta **Operação** ou **Plano operacional**
+- [ ] `/operacoes/gise/operacoes` → "Nova operação" pergunta **Operação** ou **Plano operacional**
 - [ ] Escolher _Operação_ → abre o painel de sempre, sem nenhuma mudança de comportamento
-- [ ] Escolher _Plano operacional_ → `/gise/planos/novo`
+- [ ] Escolher _Plano operacional_ → `/operacoes/planos/novo`
 - [ ] Sem tabela de valores gravada, a tela avisa que o Anexo II sairia zerado — e ainda assim deixa criar o plano
 - [ ] Criar → redireciona para o editor, com o número `N/ANO` sequencial do ano corrente
 - [ ] Dois planos criados no mesmo ano recebem números diferentes `[Vitest: planos.test.ts]` (o `UNIQUE (ano, numero)` é a tranca real, não a consulta prévia)
@@ -855,7 +855,7 @@ Verificar cada transição de status:
 
 ---
 
-## 12. Produtividade (`/produtividade`)
+## 12. Produtividade (`/operacoes/produtividade`)
 
 > `[E2E: produtividade.spec.ts]` cobre o acesso: Admin Geral entra e vê o dashboard; policial → 403; anônimo → `/login`. `[E2E: produtividade-visualizacao.spec.ts]` cobre o eixo: os controles da barra (a linha de quantidade/ordem/período atrás de "Mais filtros"), o total que não muda ao alternar delegacias × seccionais, a equipe sem slot como linha própria, ordem/Top-N e o tipo de equipe desabilitado. A agregação tem cobertura unitária em `produtividade/__tests__/{stats,agrupamento}`. Manual: gráficos com dados reais e o PNG exportado.
 
@@ -979,13 +979,13 @@ Verificar cada transição de status:
 
 ---
 
-## 14. Resultados GISE (`/res-gise`)
+## 14. Resultados GISE (`/operacoes/presenca`)
 
 - [ ] Membro GISE acessa seus resultados e formulários
 - [ ] Formulários de produtividade preenchidos exibidos corretamente
 - [ ] Sem GISE atribuída → estado vazio com mensagem
 
-### 14.1 Wizard do relatório (`/res-gise/relatorio/[giseId]`)
+### 14.1 Wizard do relatório (`/operacoes/presenca/relatorio/[giseId]`)
 
 > O gate de entrada, a navegação entre etapas, o autosave e o envio têm
 > cobertura E2E. Manual: o rascunho em condições que o navegador headless não
@@ -1029,7 +1029,7 @@ Verificar cada transição de status:
 
 - [ ] Preencher a cobertura e **baixar o PDF de produtividade** → a pergunta sai numa linha só, no formato "9 de 12 (75%)"
 - [ ] Duas perguntas de cobertura no mesmo formulário → cada uma com o seu par de números no PDF
-- [ ] Em `/produtividade`, o card do indicador de cobertura mostra UMA série em porcentagem e o tique da meta no mesmo ponto em todas as unidades
+- [ ] Em `/operacoes/produtividade`, o card do indicador de cobertura mostra UMA série em porcentagem e o tique da meta no mesmo ponto em todas as unidades
 - [ ] Unidade sem ocorrência no período → "sem ocorrências" na tabela, e fora do contador "N/M unidades na meta"
 - [ ] Trocar uma pergunta de cobertura já respondida para outro tipo → os dois números somem do relatório (é esperado: as chaves mudaram)
 
@@ -1052,8 +1052,8 @@ Verificar cada transição de status:
 | Admin Geral        | Operação global (escalas, GISE, LGPD, `/painel`)                                                     | Gestão de policiais/unidades, `/conf-ass`, promoção de admins |
 | Admin Seccional    | Escalas/policiais da seccional                                                                       | `/painel`                                                     |
 | Admin Unidade      | Escalas/policiais da unidade                                                                         | `/painel`, dados de outras unidades                           |
-| Supervisor GISE    | `/gise/[id]` da sua GISE                                                                             | Outras GISE                                                   |
-| Membro GISE        | `/res-gise`                                                                                          | `/gise/[id]` (visão admin)                                    |
+| Supervisor GISE    | `/operacoes/gise/[id]` da sua GISE                                                                   | Outras GISE                                                   |
+| Membro GISE        | `/operacoes/presenca`                                                                                | `/operacoes/gise/[id]` (visão admin)                          |
 | Policial sem papel | Suas escalas                                                                                         | Qualquer gestão                                               |
 
 > A matriz completa de capacidades está em [`DEPLOY.md`](DEPLOY.md#papéis-e-privilégios-de-administrador).

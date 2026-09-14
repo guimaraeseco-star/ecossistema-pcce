@@ -571,10 +571,10 @@ Gestão do ciclo de vida de escalas de plantão, expediente e finais de semana (
 ### Escala extra (operações)
 
 Gerenciamento das escalas extraordinárias. A GISE deixou de ser a única: a aba
-`/gise` chama-se **Escala extra** e lista as escalas de TODAS as operações, com
+`/operacoes/gise` chama-se **Escala extra** e lista as escalas de TODAS as operações, com
 filtro por operação na própria página.
 
-**Operação** (`/gise/operacoes`, Admin Geral) é cadastro: nome, sigla, ciclo, e
+**Operação** (`/operacoes/gise/operacoes`, Admin Geral) é cadastro: nome, sigla, ciclo, e
 quais tipos de equipe usa — uma operação pode ter só equipe operacional, só de
 inteligência, ou as duas. Cada operação é dona dos SEUS formulários de
 produtividade (um por tipo de equipe habilitado), e criar uma nova pede em qual
@@ -588,10 +588,10 @@ dela. Quem recusa é a action, recontando as escalas no servidor: a contagem que
 tela mostrou pode ter envelhecido, e o botão escondido nunca foi autorização.
 
 A tela é um **slider de dois painéis**, no mesmo desenho do fluxo de presença de
-`/res-gise`: a lista à esquerda, o formulário à direita. O painel aberto vive na
+`/operacoes/presenca`: a lista à esquerda, o formulário à direita. O painel aberto vive na
 URL (`?form=nova` ou `?form=<id>`), e não num estado local — é o que faz o
 "voltar" do navegador desfazer a abertura e o que permite ao endereço antigo
-`/gise/operacoes/[id]/config` redirecionar para o painel certo.
+`/operacoes/gise/operacoes/[id]/config` redirecionar para o painel certo.
 
 A LISTA não tem botão de voltar: Operações tem entrada própria na barra lateral,
 e botão de voltar é de tela de DETALHE, alcançada de dentro de outra. O único
@@ -615,7 +615,7 @@ colunas de gise_escalas → colunas de operacoes → configuracoes → constante
 ```
 
 **Como se chega a cada coisa.** O editor do formulário de produtividade
-(`/res-gise`) saiu da barra lateral do Admin Geral: formulário é DE uma operação,
+(`/operacoes/presenca`) saiu da barra lateral do Admin Geral: formulário é DE uma operação,
 e o item solto obrigava a escolher a operação depois de entrar. O caminho é o
 botão **Formulário** de cada linha, e a tela tem o "voltar às operações" acima do
 título.
@@ -633,12 +633,12 @@ Três decisões registradas:
 - **substitui, não expande.** Cinco itens indentados sob um pai devolveriam a
   lista comprida que o agrupamento veio desfazer;
 - **o nível é decidido ao ABRIR, pela rota** (`openSidebar`). Abrir o menu em
-  `/produtividade` e cair na raiz esconderia justamente onde a pessoa está;
-- **`/gise/operacoes` fica na RAIZ.** É cadastro, não operação do dia a dia, e
+  `/operacoes/produtividade` e cair na raiz esconderia justamente onde a pessoa está;
+- **`/operacoes/gise/operacoes` fica na RAIZ.** É cadastro, não operação do dia a dia, e
   acompanha os outros itens de gestão do Admin Geral.
 
-O filho que leva a `/gise` chama-se **"Ativas"** (as que estão em andamento).
-O arquivo das já encerradas é a aba **"Finalizadas"** (`/gise/finalizadas`), só
+O filho que leva a `/operacoes/gise` chama-se **"Ativas"** (as que estão em andamento).
+O arquivo das já encerradas é a aba **"Finalizadas"** (`/operacoes/gise/finalizadas`), só
 do Admin Geral, imediatamente abaixo de Ativas e acima de Produtividade.
 
 Quem vê cada filho é `filhosExtra` (`+layout.svelte`), com as MESMAS condições de
@@ -646,18 +646,18 @@ antes do agrupamento, uma por uma. O pai só aparece se a lista não estiver vaz
 para nunca abrir num submenu vazio. E agrupar é apresentação: o recorte de verdade
 segue no servidor — esconder item de menu nunca foi autorização.
 
-**`/dados-base` na barra lateral** aparece só para admin de unidade/seccional que
+**`/operacoes/dados-base` na barra lateral** aparece só para admin de unidade/seccional que
 tenha efetivamente base a informar — unidade escalada em operação ativa com
 indicador percentual (`temLinhaBaseAPreencher`). Antes aparecia para todo admin de
 unidade, inclusive os de delegacias fora de qualquer operação, que abriam uma
 tela vazia. Para o Admin Geral, o acesso é o botão **Dados base** na linha da
-operação em `/gise/operacoes` — e ele só existe na operação que PEDE base
+operação em `/operacoes/gise/operacoes` — e ele só existe na operação que PEDE base
 (`operacoesComLinhaBase`, o mesmo critério da flag do menu). Nada disso é
 autorização: quem recusa continua sendo `unidadesLinhaBaseAdministradas`, no
 servidor.
 
 **A operação vai no CAMINHO, não num seletor.** O preenchimento vive em
-`/dados-base/[operacaoId]`; `/dados-base` é só o índice, que redireciona quando há
+`/operacoes/dados-base/[operacaoId]`; `/operacoes/dados-base` é só o índice, que redireciona quando há
 uma pendência só e oferece a lista quando há mais. Até ago/2026 a operação vinha
 de `?operacaoId=` e a tela trazia um `<select>` ao lado dos campos — e o valor
 digitado ali é o denominador de um percentual divulgado: gravá-lo sob a operação
@@ -666,19 +666,19 @@ operação no caminho não há controle a errar, e a escolha acontece antes de
 qualquer campo aparecer.
 
 O **destino do "Voltar"** dessa tela vem do `load`, não é fixo: Admin Geral volta
-a `/gise/operacoes`, que é a porta por onde ele entrou; admin de unidade volta ao
+a `/operacoes/gise/operacoes`, que é a porta por onde ele entrou; admin de unidade volta ao
 índice **só quando há mais de uma** pendência. Com uma só não há botão — o índice
 redirecionaria de volta para a mesma tela, e um "Voltar" que não sai do lugar é
 pior que nenhum.
 
-Sobre a rota ser `/dados-base` e não `/gise/dados-base`: `/gise` é o prefixo
+Sobre a rota ser `/operacoes/dados-base` e não `/operacoes/gise/dados-base`: `/operacoes/gise` é o prefixo
 LEGADO — a GISE virou uma operação entre várias, e aninhar telas novas sob ele
 espalharia um nome que o domínio já superou. Não há `+layout` compartilhado sob
-`/gise`, então o aninhamento também não compraria autorização nem dados comuns. Se
+`/operacoes/gise`, então o aninhamento também não compraria autorização nem dados comuns. Se
 um dia a coerência de prefixo for perseguida, o caminho é renomear o módulo
 inteiro, não estender o nome antigo.
 
-**Indicadores e metas.** No editor do formulário (`/res-gise`), uma pergunta
+**Indicadores e metas.** No editor do formulário (`/operacoes/presenca`), uma pergunta
 contável pode ser marcada como indicador. São **três tipos de meta**, e é o
 `metaTipo` que discrimina a união `IndicadorConfig` (`src/lib/types.ts`):
 
@@ -689,7 +689,7 @@ contável pode ser marcada como indicador. São **três tipos de meta**, e é o
 | `proporcao`  | cobertura: % do total atendido (100%) | **não tem**         | não usa       |
 
 A meta percentual exige uma **linha de base** — o valor de partida da unidade —,
-informada pelo admin de unidade/seccional em **`/dados-base`**; se ela não foi
+informada pelo admin de unidade/seccional em **`/operacoes/dados-base`**; se ela não foi
 informada, o valor é pedido dentro do próprio formulário de produtividade.
 
 `proporcao` é o tipo de **cobertura**, e anda junto com o tipo de campo
@@ -700,13 +700,13 @@ atendida), gravados em `${key}__total` e `${key}__parte`. Existe porque "atender
 (cobrir um todo não é aumentar nem diminuir) e não pede base: o denominador vem
 no mesmo relatório. Só o tipo de campo `proporcao` aceita esta meta.
 
-`/produtividade` mostra base × realizado × meta por unidade, com filtro por
+`/operacoes/produtividade` mostra base × realizado × meta por unidade, com filtro por
 operação — e, nos indicadores de cobertura, a **porcentagem coberta** com a meta
 como limiar constante, porque contagem e porcentagem não compartilham eixo.
 
 ### O que entra no painel, e em que forma
 
-Tudo em `/produtividade` sai do MODELO do formulário, e cada seção entra por um
+Tudo em `/operacoes/produtividade` sai do MODELO do formulário, e cada seção entra por um
 critério diferente. Confundi-los foi a origem dos bugs corrigidos em ago/2026.
 
 | Seção                 | Entra quando…                                            |
@@ -797,7 +797,7 @@ TOPO da página, porque a faixa dos rankings vem acima da das colunas.
 
 A ordem passa a ser um dado próprio da operação (`gise_modelo_formulario.painel_ordem`,
 migração **0064**): um array JSON de ids de card, montado pelo Admin Geral no
-botão **"Organizar painel"** da própria `/produtividade`. Organizar na aba de
+botão **"Organizar painel"** da própria `/operacoes/produtividade`. Organizar na aba de
 verdade, e não numa lista de nomes em outra tela, porque o que se arruma é a
 leitura e a leitura é visual — o card ganha uma faixa com a posição, a alça e as
 setas ↑/↓, e o conteúdo dele fica inerte para o arraste não esbarrar na caixinha
@@ -862,7 +862,7 @@ diz isso na tela.
 Quem organiza é o **Admin Geral**, e só ele: a ordem é única e vale para todos
 que abrem a operação, então é configuração — do mesmo tipo que o editor do
 formulário. Admin de unidade e de seccional entram no painel para LER o resultado
-do que informam em `/dados-base`, com os dados recortados; esconder o botão não é
+do que informam em `/operacoes/dados-base`, com os dados recortados; esconder o botão não é
 a autorização, quem recusa o PUT direto é `requireAdmin` em
 `/api/produtividade/ordem`.
 
@@ -881,7 +881,7 @@ formulário e a recusa ao admin de unidade).
 
 ### O eixo do painel: delegacias ou seccionais
 
-A barra de filtros de `/produtividade` tem **duas linhas**. A de baixo
+A barra de filtros de `/operacoes/produtividade` tem **duas linhas**. A de baixo
 (quantidade, ordem, período) começa **recolhida** atrás de "Mais filtros" — é o
 que se mexe enquanto se lê. Em cima fica o que se escolhe ao abrir o painel
 (operação, "Visualizar por", tipo de equipe). A divisão já foi semântica ("só
@@ -958,7 +958,7 @@ atendimentos em fins de semana para cobertura de 100%, que é o que o plano pede
 
 ### O quadro da seccional: uma ABA por unidade participante
 
-Dentro do card de cada seccional em `/gise/[id]`, as delegacias participantes são
+Dentro do card de cada seccional em `/operacoes/gise/[id]`, as delegacias participantes são
 **abas**: o painel abaixo mostra as equipes da aba aberta, e trocar de aba troca
 o painel inteiro. Até ago/2026 cada unidade era uma CAIXA empilhada — faixa com
 o nome e o "Remover DP", moldura, e as equipes espremidas dentro. Eram três
@@ -1016,7 +1016,7 @@ projeto.
 O resto do fluxo:
 
 - Criação e configuração pelo supervisor (seccionais, equipes, questões)
-- Visão do membro em duas abas da sidebar: **Presença GISE** (só aparece com escala ativa — confirmar entrada, relatório e saída) e **Histórico GISE** (participações já encerradas). Ambas usam a rota `/res-gise`; o histórico é `?status=finalizadas`
+- Visão do membro em duas abas da sidebar: **Presença GISE** (só aparece com escala ativa — confirmar entrada, relatório e saída) e **Histórico GISE** (participações já encerradas). Ambas usam a rota `/operacoes/presenca`; o histórico é `?status=finalizadas`
 - Registro de presença (entrada/saída com GPS e selfie) — em desktop, confirmação por Token A3
 - Comprovante de presença baixável nos dois fluxos: Token A3 serve o termo qualificado do R2; presença em tela gera o comprovante avançado sob demanda
 - Preenchimento de formulários operacionais e SEINT por membros
@@ -1027,15 +1027,15 @@ O resto do fluxo:
 
 A escala extra acima é serviço **sem** deslocamento fora da circunscrição, com
 ponto de origem fixo e pagamento sempre em hora extra. O **plano operacional**
-(`/gise/planos`, Admin Geral) cobre o outro caso: uma ou mais equipes se
+(`/operacoes/planos`, Admin Geral) cobre o outro caso: uma ou mais equipes se
 deslocam para cumprir mandados demandados por uma delegacia ou seccional, e o
 pagamento passa a depender do dia e do horário.
 
-Os dois nascem no MESMO botão de `/gise/operacoes`, que pergunta qual dos dois
+Os dois nascem no MESMO botão de `/operacoes/gise/operacoes`, que pergunta qual dos dois
 se está cadastrando — mas não compartilham tabela, rota nem PDF. `operacoes` é o
 CATÁLOGO do qual as escalas GISE pendem (`gise_escalas.operacao_id`); um plano é
 evento único, com equipes próprias. Discriminar por coluna faria toda consulta
-de `/gise` passar a filtrar.
+de `/operacoes/gise` passar a filtrar.
 
 **A DIÁRIA é verificada primeiro; não sendo devida, o relógio decide**
 (`sugerirCusteio`). As duas verbas **nunca se somam** — e essa recusa é política
@@ -1373,10 +1373,10 @@ quem alcança esse conjunto é **só o Super Admin** — `podeBaixarForense`, em
 O que faltava era a régua valer para o **payload de hidratação**, que é a
 superfície fácil de esquecer: nada ali aparece na tela, então uma revisão visual
 não flagra o excesso. Duas telas devolviam ao navegador dado que a interface não
-usa — `/gise/[id]` e `/escalas/[id]` mandavam o `assinante_cpf` **completo**
+usa — `/operacoes/gise/[id]` e `/escalas/[id]` mandavam o `assinante_cpf` **completo**
 (decifrado) enquanto a API do MESMO campo,
 `/api/gise/[id]/documento-assinado/info`, mascarava para todo mundo que não é
-Super Admin; e `/gise/[id]` mandava a linha CRUA de `buscarPresencasGise` — CPF,
+Super Admin; e `/operacoes/gise/[id]` mandava a linha CRUA de `buscarPresencasGise` — CPF,
 IP, user-agent, latitude, longitude e as chaves R2 das selfies de cada
 integrante — para o Admin Geral, o admin de seccional e o **supervisor**, que é
 policial comum.
@@ -1470,14 +1470,14 @@ O aceite do termo de uso é obrigatório a cada nova versão. Qualquer mudança 
 
 ### Papéis (RBAC)
 
-| Tipo                     | Papel             | Acesso                                                                                                                                                                                                      |
-| ------------------------ | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `admin` + `isSuperAdmin` | Super Admin       | Tudo do Admin Geral **mais**: promover admins, gerenciar policiais/unidades, configurar política de assinatura, baixar o forense pelo portal `/validar`                                                     |
-| `admin`                  | Admin Geral       | Operação global (escalas, GISE, LGPD/compliance) em todas as unidades — não remodela a base; cadastra colaboradores; consoles de auditoria são do Super Admin                                               |
-| `policial`               | `admin_seccional` | Gerencia escalas da sua seccional e **solicita** correções cadastrais e atos de RH dos servidores dela; informa a linha de base dos indicadores das unidades (`/dados-base`) e vê `/produtividade` escopado |
-| `policial`               | `admin_unidade`   | O mesmo, escopado à sua unidade                                                                                                                                                                             |
-| `policial`               | —                 | Acessa apenas suas próprias escalas e GISE                                                                                                                                                                  |
-| `colaborador`            | —                 | Terceira identidade (servidora administrativa, terceirizada): entra por e-mail, sempre com 2FA; alcança SÓ a lista fechada de `colaboradorPodeAcessarRota` e o que o módulo de diárias designar             |
+| Tipo                     | Papel             | Acesso                                                                                                                                                                                                                          |
+| ------------------------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `admin` + `isSuperAdmin` | Super Admin       | Tudo do Admin Geral **mais**: promover admins, gerenciar policiais/unidades, configurar política de assinatura, baixar o forense pelo portal `/validar`                                                                         |
+| `admin`                  | Admin Geral       | Operação global (escalas, GISE, LGPD/compliance) em todas as unidades — não remodela a base; cadastra colaboradores; consoles de auditoria são do Super Admin                                                                   |
+| `policial`               | `admin_seccional` | Gerencia escalas da sua seccional e **solicita** correções cadastrais e atos de RH dos servidores dela; informa a linha de base dos indicadores das unidades (`/operacoes/dados-base`) e vê `/operacoes/produtividade` escopado |
+| `policial`               | `admin_unidade`   | O mesmo, escopado à sua unidade                                                                                                                                                                                                 |
+| `policial`               | —                 | Acessa apenas suas próprias escalas e GISE                                                                                                                                                                                      |
+| `colaborador`            | —                 | Terceira identidade (servidora administrativa, terceirizada): entra por e-mail, sempre com 2FA; alcança SÓ a lista fechada de `colaboradorPodeAcessarRota` e o que o módulo de diárias designar                                 |
 
 A matriz completa de capacidades por papel está em [`DEPLOY.md`](DEPLOY.md#papéis-e-privilégios-de-administrador). Membros de GISE têm papéis adicionais (`supervisor`, `assessor/SEINT`, `membro`) calculados dinamicamente a partir da tabela `gise_membros`.
 
@@ -1688,7 +1688,7 @@ Snippets de UI repetidos entre componentes irmãos vão para um `.svelte` própr
 são **exportados pelo `<script module>`** — só funciona se o snippet não
 referenciar nada do `<script>` de instância, então os imports de que ele depende
 também ficam no bloco `module` ([docs](https://svelte.dev/docs/svelte/snippet)).
-Exemplo: [`src/routes/res-gise/_components/BotoesAcao.svelte`](src/routes/res-gise/_components/BotoesAcao.svelte).
+Exemplo: [`src/routes/operacoes/presenca/_components/BotoesAcao.svelte`](src/routes/operacoes/presenca/_components/BotoesAcao.svelte).
 
 ### SvelteKit — Server-first
 

@@ -16,7 +16,7 @@ import type { GiseEscala } from '$lib/server/schema';
  * gravam.
  *
  * Moram aqui, e não em cada tela, porque as colunas têm dois caminhos de escrita
- * (`/gise/operacoes`, por operação, e o modal de `/gise/[id]`, por escala) e eles
+ * (`/operacoes/gise/operacoes`, por operação, e o modal de `/operacoes/gise/[id]`, por escala) e eles
  * discordavam: o primeiro limitava a 200/2000 na tela E no servidor, o segundo
  * não limitava em lugar nenhum. Número solto em cada arquivo é o que permite a
  * tela prometer um limite e o banco guardar outro.

@@ -16,10 +16,10 @@ describe('renovaSessao (LGPD A14 — aba aberta não renova sozinha)', () => {
 	it('ação de gente renova', () => {
 		for (const rota of [
 			'/escalas',
-			'/gise/12',
+			'/operacoes/gise/12',
 			'/api/policiais/search',
 			'/api/escalas/1/preparar-assinatura',
-			'/produtividade'
+			'/operacoes/produtividade'
 		]) {
 			expect(renovaSessao(rota), rota).toBe(true);
 		}

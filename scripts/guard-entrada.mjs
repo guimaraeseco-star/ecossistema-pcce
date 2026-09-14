@@ -124,7 +124,7 @@ export const LIMITADO_POR = {
 	'src/routes/servidores/[id]/+page.server.ts → toggleModuloAdmin → ativar': 'formData2Bool',
 
 	// Parser estrito do JSON de respostas: recusa o que não casa com o formulário.
-	'src/routes/res-gise/relatorio/[giseId]/+page.server.ts → salvarResposta → respostas':
+	'src/routes/operacoes/presenca/relatorio/[giseId]/+page.server.ts → salvarResposta → respostas':
 		'parseRespostasFormularioJsonStrict',
 
 	// `datas` é JSON de campo oculto — markup, não promessa. Nos três primeiros o
@@ -140,13 +140,13 @@ export const LIMITADO_POR = {
 
 	// Parser local que confere JSON, array, objeto por item, formato ISO de cada
 	// data, e ainda deduplica — limite melhor que qualquer regex de campo.
-	'src/routes/gise/+page.server.ts → criar → datas_json': 'parseDatasCriacaoGise',
+	'src/routes/operacoes/gise/+page.server.ts → criar → datas_json': 'parseDatasCriacaoGise',
 
 	// Identificador da escala de ORIGEM. Não se valida por formato e sim por
 	// existência, que é o que `clonarGiseParaData` faz ao carregar a GISE e
 	// lançar 'GISE não encontrada'. A action é só do Admin Geral, cujo escopo é
 	// global — não há posse a conferir além de a escala existir.
-	'src/routes/gise/+page.server.ts → criar → clonar_de': 'clonarGiseParaData'
+	'src/routes/operacoes/gise/+page.server.ts → criar → clonar_de': 'clonarGiseParaData'
 };
 
 /**

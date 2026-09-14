@@ -1,6 +1,6 @@
 /**
  * Resolve a participação de um policial em uma escala GISE e o horário previsto,
- * replicando a mesma lógica de papéis do `load` de `/res-gise` (membro de equipe,
+ * replicando a mesma lógica de papéis do `load` de `/operacoes/presenca` (membro de equipe,
  * assessor, SEINT, supervisor DPC). Usado para validar, no SERVIDOR, o vínculo e
  * o horário antes de registrar presença via Token A3 no desktop — o fluxo de tela
  * só checa isso na UI.

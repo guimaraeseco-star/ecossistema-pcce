@@ -46,7 +46,8 @@ const CATALOGO = 'docs/HISTORICO.md';
  */
 const SEM_DOCUMENTO = {
 	'M-6': 'e2e/auth.spec.ts — /api/health público virou binário {status}',
-	'M-8': 'src/lib/server/termo/__tests__/sanitize.test.ts — href protocol-relative e teto anti-ReDoS',
+	'M-8':
+		'src/lib/server/termo/__tests__/sanitize.test.ts — href protocol-relative e teto anti-ReDoS',
 	'M-10': 'src/lib/db/lgpd/retencao.ts — audit_log crescia sem limite de retenção',
 	'I-6': 'src/lib/schemas/__tests__/schemas.test.ts — expansão da blocklist de senha'
 };

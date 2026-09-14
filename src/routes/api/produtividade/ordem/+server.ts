@@ -1,15 +1,15 @@
 /**
  * Grava a ORDEM dos cards do painel de produtividade — o que o Admin Geral
- * acabou de arrastar em `/produtividade`.
+ * acabou de arrastar em `/operacoes/produtividade`.
  *
- * Endpoint próprio, e não uma form action de `/produtividade`, por duas razões:
+ * Endpoint próprio, e não uma form action de `/operacoes/produtividade`, por duas razões:
  * a tela é um `load` sem `<form>` nenhum, e o corpo é uma lista de ids montada
  * pelo JavaScript do arraste. É o caso que o `CLAUDE.md` reserva para
  * `apiFetch` — form action existe para POST de `FormData`.
  *
  * ## Quem pode
  *
- * `/produtividade` é visível para Admin Geral, admin de seccional e admin de
+ * `/operacoes/produtividade` é visível para Admin Geral, admin de seccional e admin de
  * unidade (estes dois com os dados recortados às unidades que administram —
  * eles informam a linha de base dos indicadores). ORGANIZAR o painel é outra
  * coisa: a ordem é única, vale para todo mundo que abre a operação, e é

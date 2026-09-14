@@ -76,7 +76,7 @@ export function destinosDoMenu(usuario: UsuarioDeTeste, flags: FlagsMenu): strin
 	if (flags.showGrupo2) {
 		const extra = itensExtraDoMenu(flags, new URL('http://x/')).map((i) => i.href);
 		destinos.push(...extra);
-		if (flags.showGise && ehAdmin) destinos.push('/gise/operacoes', '/gise/planos');
+		if (flags.showGise && ehAdmin) destinos.push('/operacoes/gise/operacoes', '/operacoes/planos');
 	}
 	// Gestão de unidade
 	if (flags.showUnidade) destinos.push('/unidade');

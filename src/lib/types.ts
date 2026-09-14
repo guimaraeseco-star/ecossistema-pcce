@@ -5,7 +5,7 @@
  * `Unidade`…), para que componente não importe de `$lib/server/` e acabe
  * arrastando código de servidor para o bundle do cliente. A outra metade são as
  * formas que só existem DEPOIS da consulta: linha de listagem com os campos
- * calculados (`EscalaListagem`), a escala como o `/res-gise` a enxerga, o
+ * calculados (`EscalaListagem`), a escala como o `/operacoes/presenca` a enxerga, o
  * modelo de pergunta da produtividade.
  *
  * Por isso `EscalaListagem extends Escala` em vez de repetir os campos: o que
@@ -124,7 +124,7 @@ export interface GiseModeloPerguntaConfig {
 	obrigatoria?: boolean;
 	/**
 	 * Nome da etapa do formulário em que a pergunta aparece (o wizard de
-	 * `/res-gise/relatorio` agrupa por este valor, na ordem da primeira
+	 * `/operacoes/presenca/relatorio` agrupa por este valor, na ordem da primeira
 	 * ocorrência). Só vale em perguntas de NÍVEL 0 — filhos herdam a etapa do
 	 * pai, porque separá-los dele quebraria o gate "só aparece sob um Sim".
 	 *
@@ -207,7 +207,7 @@ export interface GiseModeloPerguntaConfig {
 	subtexto_parte?: string;
 }
 
-/** Linha da lista "minhas escalas" em `/res-gise` (+page.server). */
+/** Linha da lista "minhas escalas" em `/operacoes/presenca` (+page.server). */
 export type ResGiseMinhaEscalaLinha = {
 	id: number;
 	data_inicio: string;
@@ -230,7 +230,7 @@ export type ResGiseMinhaEscalaLinha = {
 };
 
 /**
- * Linha da visão admin em `/res-gise`. Só compõe a união `ResGiseEscalaSelecionavel`
+ * Linha da visão admin em `/operacoes/presenca`. Só compõe a união `ResGiseEscalaSelecionavel`
  * (o load não devolve mais uma lista admin separada), por isso não é exportada.
  */
 type ResGiseListaAdminLinha = {
@@ -249,7 +249,7 @@ type ResGiseListaAdminLinha = {
 	horarioPrevisto?: { inicio: string; fim: string };
 };
 
-/** Shape de `data` em `src/routes/res-gise/+page.svelte` (+page.server load). */
+/** Shape de `data` em `src/routes/operacoes/presenca/+page.svelte` (+page.server load). */
 export type ResGisePageData = {
 	minhasEscalas: ResGiseMinhaEscalaLinha[];
 	isSupervisorGise: boolean;

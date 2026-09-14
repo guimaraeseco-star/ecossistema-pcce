@@ -19,7 +19,7 @@ import { autenticarPagina, execD1Local, queryD1Local } from './session';
 
 const GISE = FIXTURE.gise.id;
 const EQUIPE = FIXTURE.giseEquipe.id;
-const ROTA = `/res-gise/relatorio/${GISE}?equipeId=${EQUIPE}`;
+const ROTA = `/operacoes/presenca/relatorio/${GISE}?equipeId=${EQUIPE}`;
 
 async function silenciar(page: import('@playwright/test').Page) {}
 
@@ -101,7 +101,7 @@ test('tipo reutilizável: quantidade + detalhamento, e duas perguntas não se mi
 	await expect(cartao1.getByPlaceholder('Nome Completo')).toHaveCount(2);
 
 	await page.getByRole('button', { name: 'Finalizar entrega' }).click();
-	await expect(page).toHaveURL(/\/res-gise\?giseId=/);
+	await expect(page).toHaveURL(/\/operacoes\/presenca\?giseId=/);
 
 	// O blob gravado tem as DUAS listas, cada uma na sua chave.
 	const linhas = queryD1Local<{ respostas: string }>(
@@ -117,7 +117,7 @@ test('editor: o novo tipo aparece e abre os campos de rótulo', async ({ page })
 	await silenciar(page);
 	const ok = await autenticarPagina(page, FIXTURE.adminGeral.id, 'admin');
 	test.skip(!ok, 'D1 local indisponível');
-	await page.goto('/res-gise');
+	await page.goto('/operacoes/presenca');
 	await expect(page.getByRole('heading', { name: 'Configurar Formulário' })).toBeVisible();
 
 	// Pelo id da pergunta, e não `select.first()`: o editor ganhou o seletor de

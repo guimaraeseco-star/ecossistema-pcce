@@ -43,7 +43,7 @@ test('mudança feita fora da aba aparece ao voltar o foco, sem reload', async ({
 	const ok = await autenticarPagina(page, FIXTURE.adminGeral.id, 'admin');
 	test.skip(!ok, 'D1 local indisponível');
 
-	await page.goto(`/gise/${GISE}`);
+	await page.goto(`/operacoes/gise/${GISE}`);
 	await expect(page.getByText('GISE em operação').first()).toBeVisible();
 
 	// Marca a instância da página: se houver reload, o marcador some — é assim
@@ -69,7 +69,7 @@ test('os dois pollers da tela fazem UMA requisição por retorno de foco', async
 		if (r.url().includes('/api/sync/estado')) chamadas.push(new URL(r.url()).search);
 	});
 
-	await page.goto(`/gise/${GISE}`);
+	await page.goto(`/operacoes/gise/${GISE}`);
 	await page.waitForLoadState('networkidle');
 	chamadas.length = 0;
 

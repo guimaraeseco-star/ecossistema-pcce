@@ -10,7 +10,7 @@
  * user-agent e GPS: omitidos — desnecessários para validação pública e permitem
  * rastreamento individual").
  *
- * O `load` de `/gise/[id]` devolvia essa linha INTEIRA ao cliente. Ela descia no
+ * O `load` de `/operacoes/gise/[id]` devolvia essa linha INTEIRA ao cliente. Ela descia no
  * payload de hidratação — CPF, IP, GPS e chave de selfie de cada integrante da
  * operação — para o Admin Geral, para o admin de seccional participante e para o
  * SUPERVISOR, que é policial comum. Nada disso aparecia na interface, e é o que

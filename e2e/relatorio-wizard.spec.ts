@@ -3,8 +3,8 @@ import { FIXTURE } from './global-setup';
 import { autenticarPagina, execD1Local } from './session';
 
 /**
- * Wizard do relatório de produtividade (`/res-gise/relatorio/[giseId]`) — o
- * formulário que saiu do modal de `/res-gise` e virou rota com etapas.
+ * Wizard do relatório de produtividade (`/operacoes/presenca/relatorio/[giseId]`) — o
+ * formulário que saiu do modal de `/operacoes/presenca` e virou rota com etapas.
  *
  * Cobre o que só o navegador prova: o gate de entrada do `load`, o fatiamento
  * do modelo em etapas (as 4 do padrão operacional), a resposta sobrevivendo à
@@ -18,7 +18,7 @@ import { autenticarPagina, execD1Local } from './session';
 
 const GISE = FIXTURE.gise.id;
 const EQUIPE = FIXTURE.giseEquipe.id;
-const ROTA = `/res-gise/relatorio/${GISE}?equipeId=${EQUIPE}`;
+const ROTA = `/operacoes/presenca/relatorio/${GISE}?equipeId=${EQUIPE}`;
 
 /** Entrada confirmada é o pré-requisito da rota; o global-setup limpa presenças. */
 function confirmarEntrada() {
@@ -48,7 +48,7 @@ test.describe('Wizard do relatório de produtividade', () => {
 		test.skip(!ok, 'D1 local indisponível');
 
 		await page.goto(ROTA);
-		await expect(page).toHaveURL(/\/res-gise\?giseId=/);
+		await expect(page).toHaveURL(/\/operacoes\/presenca\?giseId=/);
 	});
 
 	test('etapas, navegação, autosave e envio', async ({ page }) => {
@@ -93,7 +93,7 @@ test.describe('Wizard do relatório de produtividade', () => {
 		// Volta para a escala SELECIONADA, com o card do passo já atualizado: a
 		// Produtividade entra em estado "concluído" (carimbo de envio + botão de
 		// retificar), agora dentro do card único da etapa.
-		await expect(page).toHaveURL(/\/res-gise\?giseId=/);
+		await expect(page).toHaveURL(/\/operacoes\/presenca\?giseId=/);
 		await expect(page.getByText(/Enviado em/)).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Retificar dados' })).toBeVisible();
 	});
@@ -161,7 +161,7 @@ test.describe('Wizard do relatório de produtividade', () => {
 	test('editor do Admin Geral: campo Etapa por pergunta e prévia ao vivo', async ({ page }) => {
 		const ok = await autenticarPagina(page, FIXTURE.adminGeral.id, 'admin');
 		test.skip(!ok, 'D1 local indisponível');
-		await page.goto('/res-gise');
+		await page.goto('/operacoes/presenca');
 		await expect(page.getByRole('heading', { name: 'Configurar Formulário' })).toBeVisible();
 
 		// A prévia usa a MESMA `agruparPorEtapa` do wizard: o que o admin vê aqui é
@@ -179,7 +179,7 @@ test.describe('Wizard do relatório de produtividade', () => {
 	test('editor: o rodapé de salvar fica FIXO e diz se há alteração pendente', async ({ page }) => {
 		const ok = await autenticarPagina(page, FIXTURE.adminGeral.id, 'admin');
 		test.skip(!ok, 'D1 local indisponível');
-		await page.goto('/res-gise');
+		await page.goto('/operacoes/presenca');
 		await expect(page.getByRole('heading', { name: 'Configurar Formulário' })).toBeVisible();
 
 		const salvar = page.getByRole('button', { name: /Salvar Modelo/ });

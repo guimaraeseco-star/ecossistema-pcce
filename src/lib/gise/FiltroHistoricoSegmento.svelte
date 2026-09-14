@@ -2,7 +2,7 @@
 	/**
 	 * Segmento rotulado da busca detalhada do histórico GISE.
 	 *
-	 * Consumido por `/gise/finalizadas` (admin) e `/res-gise?status=finalizadas` (policial).
+	 * Consumido por `/operacoes/gise/finalizadas` (admin) e `/operacoes/presenca?status=finalizadas` (policial).
 	 * O admin só acrescenta o seletor de seccional ao lado; o controle em si
 	 * é o mesmo — extrair evita o drift que o guard de duplicação pegou quando
 	 * o snippet e as classes do SegmentedControl estavam copiados nas duas telas.

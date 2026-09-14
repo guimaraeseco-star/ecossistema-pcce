@@ -4,7 +4,7 @@
  * Existe separada de `tiposEquipeDaOperacao` (`$lib/db/operacoes/crud`) porque
  * aquela importa `$lib/server/schema` e não pode atravessar para o navegador. A
  * regra em si é a mesma, e ela tem dois call sites de tela: o editor de
- * formulário em `/res-gise` e o filtro de tipo de equipe em `/produtividade`.
+ * formulário em `/operacoes/presenca` e o filtro de tipo de equipe em `/operacoes/produtividade`.
  *
  * O fallback quando a operação não habilita nada NÃO é lista vazia: o banco
  * aceita `(0,0)` e a aplicação não — operação sem tipo de equipe não escala
@@ -28,7 +28,7 @@ export type TipoEquipe = 'operacional' | 'seint';
  * que decide a alocação ATOMICAMENTE (FLW-GISE-009) — com `slots_dpc=999999` por
  * POST direto o controle de lotação deixava de existir, e com `-1` a equipe
  * passava a recusar todo mundo respondendo "vagas esgotadas" para uma equipe
- * vazia. O nível equivalente em `/gise/operacoes` (vagas padrão da operação) JÁ
+ * vazia. O nível equivalente em `/operacoes/gise/operacoes` (vagas padrão da operação) JÁ
  * validava 0..999 no servidor; era este que não validava.
  */
 export const MAX_VAGAS_EQUIPE = 20;

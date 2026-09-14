@@ -9,7 +9,7 @@ import {
 } from './session';
 
 /**
- * O formulário único da operação e o slider de `/gise/operacoes`.
+ * O formulário único da operação e o slider de `/operacoes/gise/operacoes`.
  *
  * O que este spec protege é a UNIFICAÇÃO: até ago/2026 criar uma operação
  * preenchia só a identidade, e as vagas, horários e textos do PDF ficavam atrás
@@ -79,12 +79,12 @@ test('criar pede identificação E configuração no mesmo formulário, e grava 
 	const ok = await autenticarPagina(page, FIXTURE.adminGeral.id, 'admin');
 	test.skip(!ok, 'D1 local indisponível');
 
-	await page.goto('/gise/operacoes');
+	await page.goto('/operacoes/gise/operacoes');
 	await page.getByRole('button', { name: 'Nova operação' }).click();
 
 	// Desde ago/2026 o botão PERGUNTA o tipo antes de abrir: operação (este
 	// fluxo, o catálogo de que as escalas extras dependem) ou plano operacional
-	// (a operação com deslocamento, que vai para /gise/planos/novo). Escolher
+	// (a operação com deslocamento, que vai para /operacoes/planos/novo). Escolher
 	// "Operação" tem de cair exatamente no painel de sempre — é o que este
 	// clique a mais garante que a bifurcação não mudou.
 	await expect(page.getByText('O que você vai cadastrar?')).toBeVisible();
@@ -134,7 +134,7 @@ test('editar abre o MESMO formulário, já preenchido com identidade e configura
 	const op = operacaoGravada();
 	test.skip(op == null, 'operação do cenário não foi criada');
 
-	await page.goto('/gise/operacoes');
+	await page.goto('/operacoes/gise/operacoes');
 	// Só a linha desta operação — a lista tem GISE e CRAJUBAR junto.
 	const linha = page.locator('li').filter({ hasText: NOME });
 	await linha.getByRole('button', { name: 'Editar' }).click();
@@ -162,8 +162,8 @@ test('o endereço antigo de configurações redireciona para o painel de ediçã
 	const op = operacaoGravada();
 	test.skip(op == null, 'operação do cenário não foi criada');
 
-	await page.goto(`/gise/operacoes/${op!.id}/config`);
-	await expect(page).toHaveURL(new RegExp(`/gise/operacoes\\?form=${op!.id}`));
+	await page.goto(`/operacoes/gise/operacoes/${op!.id}/config`);
+	await expect(page).toHaveURL(new RegExp(`/operacoes/gise/operacoes\\?form=${op!.id}`));
 	await expect(page.locator('#op_dpc')).toHaveValue('2');
 });
 
@@ -171,7 +171,7 @@ test('a linha traz Formulário e Editar, e NÃO traz mais "Configurações"', as
 	const ok = await autenticarPagina(page, FIXTURE.adminGeral.id, 'admin');
 	test.skip(!ok, 'D1 local indisponível');
 
-	await page.goto('/gise/operacoes');
+	await page.goto('/operacoes/gise/operacoes');
 
 	const linha = page.locator('li').filter({ hasText: NOME });
 	await expect(linha.getByRole('link', { name: 'Formulário' })).toBeVisible();
@@ -187,12 +187,12 @@ test('o editor de formulário tem o voltar para as operações', async ({ page }
 	const ok = await autenticarPagina(page, FIXTURE.adminGeral.id, 'admin');
 	test.skip(!ok, 'D1 local indisponível');
 
-	await page.goto('/res-gise');
+	await page.goto('/operacoes/presenca');
 	// Acima do título, como nas demais telas de detalhe.
 	const voltar = page.getByRole('link', { name: 'Voltar às operações' });
 	await expect(voltar).toBeVisible();
 	await voltar.click();
-	await expect(page).toHaveURL(/\/gise\/operacoes/);
+	await expect(page).toHaveURL(/\/operacoes\/gise\/operacoes/);
 });
 
 /** A GISE do cenário compartilhado — é a operação COM escalas do teste negativo. */
@@ -210,7 +210,7 @@ test('"Excluir" só na operação sem escala nenhuma', async ({ page }) => {
 	const com = operacaoComEscalas();
 	test.skip(com == null || com.escalas === 0, 'a GISE do cenário está sem escalas');
 
-	await page.goto('/gise/operacoes');
+	await page.goto('/operacoes/gise/operacoes');
 
 	// A criada por este spec nunca recebeu escala: some de vez.
 	const nova = page.locator('li').filter({ hasText: NOME });
@@ -231,7 +231,7 @@ test('POST direto de exclusão numa operação COM escala é recusado', async ({
 
 	// Esconder o botão não é autorização: quem recusa é a action, recontando as
 	// escalas no servidor. A contagem que a tela mostrou pode ter envelhecido.
-	const res = await request.post('/gise/operacoes?/excluir', {
+	const res = await request.post('/operacoes/gise/operacoes?/excluir', {
 		headers: headersFormAction(token!),
 		form: { id: String(com!.id) }
 	});
@@ -257,7 +257,7 @@ test('excluir apaga a operação e o formulário dela', async ({ page }) => {
 	);
 	expect(modelosDaOperacao(Number(op!.id))).toBe(1);
 
-	await page.goto('/gise/operacoes');
+	await page.goto('/operacoes/gise/operacoes');
 	const linha = page.locator('li').filter({ hasText: NOME });
 	await linha.getByRole('button', { name: 'Excluir', exact: true }).click();
 

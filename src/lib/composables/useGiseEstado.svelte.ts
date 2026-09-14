@@ -90,7 +90,7 @@ export function useGiseEstado({ getData }: GiseEstadoParams) {
 	//
 	// Havia uma TERCEIRA cópia, em `gise/+page.svelte`, que sobreviveu àquela
 	// unificação por não estar no escopo dela: a listagem emitia `?via=token`
-	// por largura enquanto `/gise/[id]` consumia o param caindo neste `isMobile`
+	// por largura enquanto `/operacoes/gise/[id]` consumia o param caindo neste `isMobile`
 	// quando ele faltava. Resolvida em ago/2026 — a listagem passou a ler
 	// `useMobile()` para o fluxo e `useLarguraDesktop()` para o layout do card,
 	// que são perguntas diferentes.

@@ -12,7 +12,7 @@ import { seedSession, cookieDeSessao, execD1Local } from './session';
  * `policial_id:data:horário` de cada escalado. Um endpoint só com
  * `requireAuth` deixaria qualquer autenticado enumerar `?giseId=1..N` e montar
  * o calendário de operações e a escala de trabalho de terceiros — exatamente o
- * que `/gise/[id]` e `/escalas/[id]` recusam.
+ * que `/operacoes/gise/[id]` e `/escalas/[id]` recusam.
  *
  * Recurso sem permissão vem AUSENTE do corpo, não como 403: um erro distinto
  * revelaria a existência, que é o que se quer esconder. Daí as asserções serem

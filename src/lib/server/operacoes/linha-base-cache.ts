@@ -12,7 +12,7 @@
  * escala nova inclui a unidade numa operação ou quando um indicador percentual é
  * criado no editor — eventos raros, e em nenhum deles um minuto de menu
  * desatualizado tem consequência. A tela em si nunca depende deste cache: quem
- * autoriza `/dados-base` é `unidadesLinhaBaseAdministradas`, consultado ao vivo.
+ * autoriza `/operacoes/dados-base` é `unidadesLinhaBaseAdministradas`, consultado ao vivo.
  */
 
 import { temLinhaBaseAPreencher } from './permissao';

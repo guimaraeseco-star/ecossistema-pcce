@@ -224,39 +224,39 @@ export const HELPERS_OBRIGATORIOS = {
 	],
 
 	// FLW-AUT-010 — GISE `finalizada` não muta pela porta dos fundos
-	'src/routes/gise/[id]/_actions/actions-escala.ts': ['carregarGiseEditavel'],
-	'src/routes/gise/[id]/_actions/actions-escala.ts → reabrirEscala': ['exigirAdminGeral'],
-	'src/routes/gise/[id]/_actions/actions-escala.ts → excluirGise': ['exigirAdminGeral'],
-	'src/routes/gise/[id]/_actions/actions-escala.ts → reenviarBaseEquipePlanilha': [
+	'src/routes/operacoes/gise/[id]/_actions/actions-escala.ts': ['carregarGiseEditavel'],
+	'src/routes/operacoes/gise/[id]/_actions/actions-escala.ts → reabrirEscala': ['exigirAdminGeral'],
+	'src/routes/operacoes/gise/[id]/_actions/actions-escala.ts → excluirGise': ['exigirAdminGeral'],
+	'src/routes/operacoes/gise/[id]/_actions/actions-escala.ts → reenviarBaseEquipePlanilha': [
 		'exigirAdminGeral'
 	],
-	'src/routes/gise/[id]/_actions/actions-seccional.ts': ['carregarGiseEditavel'],
-	'src/routes/gise/[id]/_actions/actions-membros.ts': [
+	'src/routes/operacoes/gise/[id]/_actions/actions-seccional.ts': ['carregarGiseEditavel'],
+	'src/routes/operacoes/gise/[id]/_actions/actions-membros.ts': [
 		'carregarGiseEditavel',
 		'carregarMembroDaGise',
 		'carregarSeccionalDaGise',
 		'carregarEquipeDaGise'
 	],
-	'src/routes/gise/[id]/_actions/actions-equipe.ts': [
+	'src/routes/operacoes/gise/[id]/_actions/actions-equipe.ts': [
 		'carregarEquipeDaGise',
 		'carregarSeccionalDaGise'
 	],
-	'src/routes/gise/[id]/_actions/actions-unidade.ts': ['carregarSeccionalDaGise'],
+	'src/routes/operacoes/gise/[id]/_actions/actions-unidade.ts': ['carregarSeccionalDaGise'],
 
 	// PLANO OPERACIONAL: um portão só (`carregarPlanoParaEdicao`) decide quem
 	// mexe no plano, e as duas conferências de posse provam que o id vindo do
 	// FORMULÁRIO pertence ao plano da URL. Exigir o nome aqui é o que impede uma
 	// action nova de se contentar com `isAdminGeral` e aceitar equipe de outro
 	// plano por POST direto — a classe do FLW-ESC-002.
-	'src/routes/gise/planos/+page.server.ts': ['carregarPlanoParaEdicao'],
+	'src/routes/operacoes/planos/+page.server.ts': ['carregarPlanoParaEdicao'],
 
 	// O editor: cada action entra pelo preâmbulo do seu assunto. As que recebem
 	// um id de equipe ou de membro pelo FORMULÁRIO usam o preâmbulo que PROVA a
 	// posse — `planoDaRota` sozinho autorizaria o plano e deixaria a equipe de
 	// outro plano passar.
-	'src/routes/gise/planos/[id]/_actions/actions-plano.ts': ['planoDaRota'],
-	'src/routes/gise/planos/[id]/_actions/actions-equipe.ts': ['planoDaRota', 'equipeDaRota'],
-	'src/routes/gise/planos/[id]/_actions/actions-membros.ts': ['equipeDaRota', 'membroDaRota'],
+	'src/routes/operacoes/planos/[id]/_actions/actions-plano.ts': ['planoDaRota'],
+	'src/routes/operacoes/planos/[id]/_actions/actions-equipe.ts': ['planoDaRota', 'equipeDaRota'],
+	'src/routes/operacoes/planos/[id]/_actions/actions-membros.ts': ['equipeDaRota', 'membroDaRota'],
 
 	// FLW-AUT-002 / 009 — lotação do FormData no escopo administrado
 	'src/routes/escalas/+page.server.ts → criarComBase': ['lotacaoNoEscopo'],
@@ -280,14 +280,16 @@ export const HELPERS_OBRIGATORIOS = {
 	'src/routes/servidores/[id]/+page.server.ts → solicitarAlteracao': ['carregarFichaDoPolicial'],
 	'src/routes/servidores/[id]/+page.server.ts → registrarMovimentacao': ['carregarFichaDoPolicial'],
 	'src/routes/servidores/[id]/+page.server.ts → registrarAfastamento': ['carregarFichaDoPolicial'],
-	'src/routes/servidores/[id]/+page.server.ts → registrarDesvinculacao': ['carregarFichaDoPolicial'],
+	'src/routes/servidores/[id]/+page.server.ts → registrarDesvinculacao': [
+		'carregarFichaDoPolicial'
+	],
 
 	// FLW-AUT-006 / 007 — presença: janela de horário + GISE não finalizada.
 	// `gateDePresenca` mora dentro de `prepararConfirmacaoPresenca` (preparo
 	// comum extraído de salvarEntrada/salvarSaida em ago/2026) — o corpo das
 	// duas actions chama o preparo, não o gate direto.
-	'src/routes/res-gise/+page.server.ts → salvarEntrada': ['prepararConfirmacaoPresenca'],
-	'src/routes/res-gise/+page.server.ts → salvarSaida': ['prepararConfirmacaoPresenca'],
+	'src/routes/operacoes/presenca/+page.server.ts → salvarEntrada': ['prepararConfirmacaoPresenca'],
+	'src/routes/operacoes/presenca/+page.server.ts → salvarSaida': ['prepararConfirmacaoPresenca'],
 	'src/routes/api/gise/[id]/presenca/preparar-assinatura/+server.ts': ['gateDePresenca'],
 	'src/routes/api/gise/[id]/presenca/finalizar-assinatura/+server.ts': ['gateDePresenca']
 };
@@ -321,7 +323,7 @@ function helpersDaOperacao(arquivo, nome) {
 // servidor.
 //
 // `planoDaRota` / `equipeDaRota` / `membroDaRota` são os PREÂMBULOS do editor
-// (`/gise/planos/[id]/_actions/shared.ts`): cada um chama o portão acima e, nos
+// (`/operacoes/planos/[id]/_actions/shared.ts`): cada um chama o portão acima e, nos
 // dois últimos, ainda amarra o id vindo do FORMULÁRIO ao plano da URL. É por
 // eles que as nove actions do editor entram, e é o nome deles que
 // `HELPERS_OBRIGATORIOS` exige no corpo de cada uma — exigir só

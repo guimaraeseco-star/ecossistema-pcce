@@ -211,54 +211,57 @@ describe('itens do submenu "Escala extra"', () => {
 		const flags = visibilidadeDoMenu(
 			entrada({ usuario: { tipo: 'admin' }, adminModulo: 'escalas' })
 		);
-		expect(itensExtraDoMenu(flags, url('/produtividade'))).toEqual([]);
+		expect(itensExtraDoMenu(flags, url('/operacoes/produtividade'))).toEqual([]);
 	});
 
 	it('lista só o que o usuário vê', () => {
 		const flags = visibilidadeDoMenu(entrada({ isSupervisorGise: true }));
-		const hrefs = itensExtraDoMenu(flags, url('/gise')).map((i) => i.href);
-		expect(hrefs).toEqual(['/gise']);
+		const hrefs = itensExtraDoMenu(flags, url('/operacoes/gise')).map((i) => i.href);
+		expect(hrefs).toEqual(['/operacoes/gise']);
 	});
 
-	it('/gise acende na lista e na escala, mas não em /gise/operacoes nem /gise/bem-vindo nem /gise/finalizadas', () => {
+	it('/operacoes/gise acende na lista e na escala, mas não em /operacoes/gise/operacoes nem /operacoes/gise/finalizadas', () => {
 		const flags = visibilidadeDoMenu(entrada({ isSupervisorGise: true }));
 		const ativoEm = (p: string) =>
-			itensExtraDoMenu(flags, url(p)).find((i) => i.href === '/gise')?.ativo;
+			itensExtraDoMenu(flags, url(p)).find((i) => i.href === '/operacoes/gise')?.ativo;
 
-		expect(ativoEm('/gise')).toBe(true);
-		expect(ativoEm('/gise/42')).toBe(true);
-		expect(ativoEm('/gise/operacoes')).toBe(false);
-		expect(ativoEm('/gise/bem-vindo')).toBe(false);
-		expect(ativoEm('/gise/finalizadas')).toBe(false);
+		expect(ativoEm('/operacoes/gise')).toBe(true);
+		expect(ativoEm('/operacoes/gise/42')).toBe(true);
+		expect(ativoEm('/operacoes/gise/operacoes')).toBe(false);
+		expect(ativoEm('/operacoes/gise/finalizadas')).toBe(false);
 	});
 
 	it('Admin Geral ganha Finalizadas entre Ativas e Produtividade', () => {
 		const flags = visibilidadeDoMenu(entrada({ usuario: { tipo: 'admin' } }));
-		const hrefs = itensExtraDoMenu(flags, url('/gise')).map((i) => i.href);
-		expect(hrefs).toEqual(['/gise', '/gise/finalizadas', '/produtividade']);
+		const hrefs = itensExtraDoMenu(flags, url('/operacoes/gise')).map((i) => i.href);
+		expect(hrefs).toEqual([
+			'/operacoes/gise',
+			'/operacoes/gise/finalizadas',
+			'/operacoes/produtividade'
+		]);
 	});
 
-	it('/gise/finalizadas acende Finalizadas, não Ativas', () => {
+	it('/operacoes/gise/finalizadas acende Finalizadas, não Ativas', () => {
 		const flags = visibilidadeDoMenu(entrada({ usuario: { tipo: 'admin' } }));
 		const ativo = (href: string, path: string) =>
 			itensExtraDoMenu(flags, url(path)).find((i) => i.href === href)?.ativo;
 
-		expect(ativo('/gise', '/gise/finalizadas')).toBe(false);
-		expect(ativo('/gise/finalizadas', '/gise/finalizadas')).toBe(true);
-		expect(ativo('/gise', '/gise/42')).toBe(true);
-		expect(ativo('/gise/finalizadas', '/gise/42')).toBe(false);
+		expect(ativo('/operacoes/gise', '/operacoes/gise/finalizadas')).toBe(false);
+		expect(ativo('/operacoes/gise/finalizadas', '/operacoes/gise/finalizadas')).toBe(true);
+		expect(ativo('/operacoes/gise', '/operacoes/gise/42')).toBe(true);
+		expect(ativo('/operacoes/gise/finalizadas', '/operacoes/gise/42')).toBe(false);
 	});
 
 	it('admin seccional não vê Finalizadas — o arquivo é do Admin Geral', () => {
 		const flags = visibilidadeDoMenu(
 			entrada({ usuario: { tipo: 'policial', papel: 'admin_seccional' } })
 		);
-		const hrefs = itensExtraDoMenu(flags, url('/gise')).map((i) => i.href);
-		expect(hrefs).not.toContain('/gise/finalizadas');
+		const hrefs = itensExtraDoMenu(flags, url('/operacoes/gise')).map((i) => i.href);
+		expect(hrefs).not.toContain('/operacoes/gise/finalizadas');
 	});
 
 	/**
-	 * As duas abas de /res-gise dividem a MESMA rota por query string. Um
+	 * As duas abas de /operacoes/presenca dividem a MESMA rota por query string. Um
 	 * `ativo` só por pathname acenderia as duas ao mesmo tempo.
 	 */
 	it('presença × histórico se distinguem pelo ?status, não pelo pathname', () => {
@@ -266,24 +269,27 @@ describe('itens do submenu "Escala extra"', () => {
 			entrada({ temPresencaGisePendente: true, temGiseHistorico: true })
 		);
 
-		const semStatus = itensExtraDoMenu(flags, url('/res-gise'));
+		const semStatus = itensExtraDoMenu(flags, url('/operacoes/presenca'));
 		expect(semStatus.find((i) => i.rotulo === 'Minha presença')?.ativo).toBe(true);
 		expect(semStatus.find((i) => i.rotulo === 'Meu histórico')?.ativo).toBe(false);
 
-		const comStatus = itensExtraDoMenu(flags, url('/res-gise?status=finalizadas'));
+		const comStatus = itensExtraDoMenu(flags, url('/operacoes/presenca?status=finalizadas'));
 		expect(comStatus.find((i) => i.rotulo === 'Minha presença')?.ativo).toBe(false);
 		expect(comStatus.find((i) => i.rotulo === 'Meu histórico')?.ativo).toBe(true);
 	});
 
-	it('a rota de relatório conta como /res-gise e carrega o status junto', () => {
+	it('a rota de relatório conta como /operacoes/presenca e carrega o status junto', () => {
 		const flags = visibilidadeDoMenu(
 			entrada({ temPresencaGisePendente: true, temGiseHistorico: true })
 		);
-		const itens = itensExtraDoMenu(flags, url('/res-gise/relatorio/7?status=finalizadas'));
+		const itens = itensExtraDoMenu(
+			flags,
+			url('/operacoes/presenca/relatorio/7?status=finalizadas')
+		);
 		expect(itens.find((i) => i.rotulo === 'Meu histórico')?.ativo).toBe(true);
 	});
 
-	it('o Admin Geral não recebe os itens de presença — para ele /res-gise é o editor', () => {
+	it('o Admin Geral não recebe os itens de presença — para ele /operacoes/presenca é o editor', () => {
 		const flags = visibilidadeDoMenu(
 			entrada({
 				usuario: { tipo: 'admin' },
@@ -291,14 +297,14 @@ describe('itens do submenu "Escala extra"', () => {
 				temGiseHistorico: true
 			})
 		);
-		const rotulos = itensExtraDoMenu(flags, url('/res-gise')).map((i) => i.rotulo);
+		const rotulos = itensExtraDoMenu(flags, url('/operacoes/presenca')).map((i) => i.rotulo);
 		expect(rotulos).not.toContain('Minha presença');
 		expect(rotulos).not.toContain('Meu histórico');
 	});
 
 	it('histórico aparece mesmo sem serviço ativo — é o que mantém a aba após finalizar tudo', () => {
 		const flags = visibilidadeDoMenu(entrada({ temGiseHistorico: true }));
-		const rotulos = itensExtraDoMenu(flags, url('/res-gise')).map((i) => i.rotulo);
+		const rotulos = itensExtraDoMenu(flags, url('/operacoes/presenca')).map((i) => i.rotulo);
 		expect(rotulos).toEqual(['Meu histórico']);
 	});
 
@@ -311,7 +317,7 @@ describe('itens do submenu "Escala extra"', () => {
 				temGiseHistorico: true
 			})
 		);
-		const itens = itensExtraDoMenu(flags, url('/gise'));
+		const itens = itensExtraDoMenu(flags, url('/operacoes/gise'));
 		expect(itens.length).toBeGreaterThan(1);
 		for (const item of itens) {
 			expect(Array.isArray(item.icone), `ícone de ${item.rotulo}`).toBe(true);

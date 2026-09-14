@@ -3,7 +3,7 @@
  *
  * ## Existe porque as DUAS saídas do plano têm de concordar
  *
- * O painel do editor (`/gise/planos/[id]`) e o PDF (`/api/planos/[id]/download`)
+ * O painel do editor (`/operacoes/planos/[id]`) e o PDF (`/api/planos/[id]/download`)
  * precisam exatamente da mesma coisa — as equipes, os membros agrupados, a
  * tabela de valores aplicada e o `custoDoPlano` sobre tudo isso. Enquanto eram
  * duas cópias, nada impedia uma de mudar: bastava alguém acrescentar um campo à

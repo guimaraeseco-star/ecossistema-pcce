@@ -136,7 +136,7 @@ function limparOrdem() {
 async function abrirPainel(page: Page) {
 	const id = operacaoId();
 	if (id == null) return false;
-	await page.goto(`/produtividade?operacaoId=${id}`);
+	await page.goto(`/operacoes/produtividade?operacaoId=${id}`);
 	await expandirMaisFiltros(page);
 	await page.locator('#f-ano').selectOption(String(ANO));
 	await expect(page.getByText('ORDEM CARD A')).toBeVisible();
@@ -384,7 +384,7 @@ test('organizar é do Admin Geral: o admin de unidade não vê o botão', async 
 	const id = operacaoId();
 	test.skip(id == null, 'operação do cenário não foi criada');
 
-	await page.goto(`/produtividade?operacaoId=${id}`);
+	await page.goto(`/operacoes/produtividade?operacaoId=${id}`);
 	// Ele ENTRA na tela — é quem informa a linha de base dos indicadores — e vê os
 	// dados recortados às unidades que administra. O que ele não faz é reordenar
 	// o painel de todo mundo.

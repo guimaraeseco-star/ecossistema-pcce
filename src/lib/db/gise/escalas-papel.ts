@@ -68,7 +68,7 @@ export async function isSupervisaoGiseAtiva(db: Database, policialId: number): P
 /**
  * O policial tem presença PENDENTE em GISE ativa: está escalado (membro,
  * supervisor ou quadro) em alguma GISE não finalizada e ainda não registrou a
- * SAÍDA. É a mesma régua de "ativas" em `/res-gise` (`isFinished` = saída ou
+ * SAÍDA. É a mesma régua de "ativas" em `/operacoes/presenca` (`isFinished` = saída ou
  * GISE finalizada) — libera a aba "Presença GISE" só enquanto há entrada ou
  * saída a confirmar.
  */
@@ -124,7 +124,7 @@ export async function temPresencaGisePendente(db: Database, policialId: number):
  * `temPresencaGisePendente` libera a aba "Presença GISE" (serviço em curso),
  * este libera a aba "Histórico GISE".
  *
- * "Encerrada para ele" é a mesma condição que a lista de `/res-gise` usa para
+ * "Encerrada para ele" é a mesma condição que a lista de `/operacoes/presenca` usa para
  * separar ativas de finalizadas (`isFinished`): ou o policial já bateu a SAÍDA
  * (mesmo que a GISE siga aberta para os demais), ou a GISE inteira foi
  * `finalizada`. As três consultas cobrem, nesta ordem: saída registrada

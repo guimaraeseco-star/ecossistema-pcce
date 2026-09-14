@@ -2,7 +2,7 @@
 	/**
 	 * Recorte temporal da busca detalhada (ciclo × mês × data).
 	 *
-	 * `/gise/finalizadas` e `/res-gise?status=finalizadas` montavam estes três
+	 * `/operacoes/gise/finalizadas` e `/operacoes/presenca?status=finalizadas` montavam estes três
 	 * campos cada um. Uma cópia recebia o teto de largura do ciclo e a outra
 	 * não — o guard de duplicação pegou o bloco de classes copiado. O recorte
 	 * mora aqui; cada tela só escolhe o modo e devolve o valor.

@@ -1,5 +1,5 @@
 /**
- * Recorte do histórico GISE — o mesmo predicado da lista `/gise/finalizadas` e do GET de
+ * Recorte do histórico GISE — o mesmo predicado da lista `/operacoes/gise/finalizadas` e do GET de
  * export. Duplicar o filtro foi o que faria o arquivo baixado trazer escalas
  * que a tela tinha escondido.
  *
