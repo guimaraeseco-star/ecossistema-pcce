@@ -68,7 +68,7 @@ export function faixaDoPolicial(
 	return null;
 }
 
-/** Rótulo da faixa para a tela de valores (`/config-custos`). */
+/** Rótulo da faixa para a tela de valores (`/valores`). */
 export const ROTULO_FAIXA: Record<FaixaCusto, string> = {
 	oip_cd: 'OIP — classes D e C',
 	oip_ab: 'OIP — classes B e A',

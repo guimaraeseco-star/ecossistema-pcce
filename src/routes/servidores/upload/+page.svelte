@@ -67,7 +67,7 @@
 </svelte:head>
 
 <div class="mb-6 space-y-3">
-	<BotaoVoltar href="/policiais" />
+	<BotaoVoltar href="/servidores" />
 	<h1 class="h1 text-2xl font-bold">Importar Planilha</h1>
 </div>
 

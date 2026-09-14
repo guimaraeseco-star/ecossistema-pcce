@@ -71,7 +71,7 @@ export async function buscarCustoParametros(
 /**
  * O histórico completo, da versão mais recente para a mais antiga.
  *
- * A tela de `/config-custos` mostra isto para o operador conseguir responder
+ * A tela de `/valores` mostra isto para o operador conseguir responder
  * "por que aquele plano de março soma diferente?" sem abrir o banco.
  */
 export async function listarCustoParametros(db: Database): Promise<CustoParametros[]> {

@@ -72,7 +72,7 @@ export const CLASSE_SELECT_NUMERO_CICLO = `${CLASSE_INPUT_FILTRO} w-full max-w-f
 
 export const CLASSE_SELETOR_SEGMENTO = 'w-full sm:w-fit';
 
-/** Trilho do segmento em largura cheia (cargo em `/policiais`). */
+/** Trilho do segmento em largura cheia (cargo em `/servidores`). */
 export const CLASSE_CONTROLE_SEGMENTO_LARGO =
 	'inline-flex items-center w-full min-w-0 overflow-hidden rounded-xl bg-surface-100 dark:bg-surface-800 p-1 gap-0.5';
 

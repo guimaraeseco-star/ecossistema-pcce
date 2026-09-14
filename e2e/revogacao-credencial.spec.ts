@@ -188,7 +188,7 @@ test.describe('RBAC-001 — desativar tira a pessoa de dentro', () => {
 		const tokenAdminGeral = seedSession(FIXTURE.adminGeral.id, 'admin');
 		test.skip(!tokenVitima || !tokenAdminGeral, 'D1 local indisponível');
 
-		const corpo = await postAction(`/policiais/${POL}?/registrarDesvinculacao`, tokenAdminGeral!, {
+		const corpo = await postAction(`/servidores/${POL}?/registrarDesvinculacao`, tokenAdminGeral!, {
 			destino: 'Aposentadoria',
 			data_evento: '2026-08-04',
 			nup: ''

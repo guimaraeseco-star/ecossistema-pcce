@@ -68,6 +68,8 @@ export interface FlagsMenu {
 	 * recorta é o servidor.
 	 */
 	showUnidade: boolean;
+	/** Atualização de valores (`/valores`) — de departamento para cima (E39): sessão de admin. */
+	showValores: boolean;
 	temPresencaGiseAtiva: boolean;
 	temGiseHistorico: boolean;
 	showGrupo1: boolean;
@@ -128,6 +130,7 @@ export function visibilidadeDoMenu(entrada: EntradaVisibilidade): FlagsMenu {
 		showSolicitacoes: ehAdmin,
 		showColaboradores: ehAdmin,
 		showUnidade: ehAdmin || temPapelComEscopo,
+		showValores: ehAdmin,
 		temPresencaGiseAtiva: temPresencaGisePendente,
 		temGiseHistorico,
 		showGrupo1,

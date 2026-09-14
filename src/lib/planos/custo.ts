@@ -339,7 +339,7 @@ export function podeEmitir(custo: CustoPlano): boolean {
 /**
  * O acréscimo de 30% que define a hora "plus", como valor SUGERIDO.
  *
- * A tela de `/config-custos` usa isto para pré-preencher os quatro campos
+ * A tela de `/valores` usa isto para pré-preencher os quatro campos
  * `_plus` a partir dos `_normal`. **Não é aplicado no cálculo**: lá o valor lido
  * é o que está gravado na versão, justamente para um reajuste futuro na
  * alíquota não reescrever documento já emitido.

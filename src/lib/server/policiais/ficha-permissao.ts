@@ -1,5 +1,5 @@
 /**
- * O portão da ficha do servidor (`/policiais` e `/policiais/[id]`): quem entra,
+ * O portão da ficha do servidor (`/servidores` e `/servidores/[id]`): quem entra,
  * sobre quem, e com que poder.
  *
  * Três respostas possíveis, e a diferença entre as duas primeiras é o assunto

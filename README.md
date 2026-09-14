@@ -443,7 +443,9 @@ escalas/
 │   │   ├── solicitacoes/           # Fila de decisão do Admin Geral (cadastro + movimentar/afastar/desvincular)
 │   │   ├── conf-ass/               # Configuração de assinatura
 │   │   ├── config-geral/           # Configurações gerais (provedor de e-mail)
-│   │   ├── config-custos/          # Valores de hora extra e diária (Super Admin) — versionados
+│   │   ├── valores/                # Atualização de valores de hora extra e diária (Admin Geral, E39) — versionados
+│   │   ├── config-custos/          # Só redireciona (301) para /valores
+│   │   ├── servidores/             # Servidores (antes /policiais, que só redireciona) — lista, ficha, upload
 │   │   ├── auditoria/              # Trilha forense + logs técnicos (/auditoria/logs)
 │   │   ├── validar/                # Validação pública de PDF assinado
 │   │   ├── termo/                  # Consulta pública do termo de uso (/termo → versão vigente)
@@ -1079,7 +1081,7 @@ discordam, é a convenção dos 100 km que concede. Daí o portão de duração:
 operação de 2h, 100 km dariam `2×2 + 2 = 6h`, e a diária deixaria de se
 justificar.
 
-**O limite é campo do Super Admin** (`/config-custos`, ao lado dos valores das
+**O limite é campo da tela de valores** (`/valores`, do Admin Geral, ao lado dos valores das
 diárias) e **congela na versão** — o plano guarda `custo_parametro_id`, então
 subir o limite para 120 km amanhã não muda a rubrica de um plano de março já
 impresso. As 4 horas seguem constante nomeada (`DURACAO_MINIMA_DIARIA_HORAS`):
@@ -1184,10 +1186,11 @@ Abaixo do limite, a janela SUGERE a quantidade de horas (`classificarJanela`);
 quem grava é o Admin Geral, porque a equipe que desloca antes é o caso normal,
 não a exceção.
 
-**Os valores são do Super Admin** (`/config-custos`): hora extra por faixa de
-cargo/classe (DPC 1ª/2ª, DPC 3ª/especial, OIP A/B, OIP C/D) e as duas diárias,
-tudo em centavos. Quem planeja escolhe QUANTAS horas; quanto vale a hora é
-decisão de outro nível.
+**Os valores são atualizados em `/valores`** (Gestão de pessoal → Atualização
+de valores, aberta ao Admin Geral desde a decisão E39; até set/2026 era
+`/config-custos`, do Super Admin): hora extra por faixa de cargo/classe (DPC
+1ª/2ª, DPC 3ª/especial, OIP A/B, OIP C/D) e as duas diárias, tudo em centavos.
+O que protege contra o mau uso é o versionamento com autor, não o papel.
 
 **A tabela é versionada e o plano guarda a versão que usou** (append-only, nunca
 `UPDATE`). Reemitir em junho o PDF de um plano de março tem de devolver os
@@ -1215,7 +1218,7 @@ plano sair em nome dele.
 quase sempre, ou leva a mudar a configuração de todos os planos seguintes para
 acertar um. Sem escolha, o documento imprime a linha de assinatura em branco —
 que é o estado honesto de um plano cujo signatário ainda não foi definido, e
-visível para quem for emitir. `/config-custos` trata só de dinheiro.
+visível para quem for emitir. `/valores` trata só de dinheiro.
 
 **Briefing, origem e destino são LISTAS do plano** (`plano_opcoes`), não campo
 livre por equipe. Numa operação com oito equipes saindo para três cidades o
@@ -1516,7 +1519,7 @@ recuperação por link — o administrador gera outra.
 
 ### Cadastro do servidor: quem pede e quem decide
 
-A ficha em `/policiais/[id]` é **uma tela só, com dois poderes**, e o portão que
+A ficha em `/servidores/[id]` é **uma tela só, com dois poderes**, e o portão que
 os separa é [`ficha-permissao.ts`](src/lib/server/policiais/ficha-permissao.ts):
 
 | modo          | quem                              | o que acontece ao submeter                      |

@@ -116,7 +116,7 @@ const POLICIAIS_SUPER: CardBemVindo = {
 	titulo: 'Policiais',
 	descricao:
 		'Gerencie o cadastro dos policiais, os papéis administrativos (RBAC) e a concessão de Admin Geral.',
-	href: '/policiais',
+	href: '/servidores',
 	cta: 'Gerenciar policiais'
 };
 
@@ -151,15 +151,15 @@ const CONFIG_GERAL: CardBemVindo = {
 };
 
 /**
- * `/config-custos` — do Super Admin, e não do Admin Geral que monta os planos:
- * é a tabela de hora extra e diária da corporação. Quem planeja a operação
- * escolhe QUANTAS horas; quanto vale a hora é decisão de outro nível.
+ * `/valores` — a tabela de hora extra e diária. Desde a decisão E39 é aberta
+ * ao Admin Geral (Gestão de pessoal → Atualização de valores); o Super Admin
+ * continua a alcançá-la pelo console dele.
  */
 const CONFIG_CUSTOS: CardBemVindo = {
 	titulo: 'Valores de custo',
 	descricao:
 		'Defina os valores de hora extra por cargo e classe e os das diárias. É a tabela que os planos operacionais aplicam — cada versão fica gravada, e um plano antigo continua com a que usou.',
-	href: '/config-custos',
+	href: '/valores',
 	cta: 'Abrir valores de custo'
 };
 

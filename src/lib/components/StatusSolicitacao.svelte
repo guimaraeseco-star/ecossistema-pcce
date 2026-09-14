@@ -3,7 +3,7 @@
 	 * O selo de estado de uma solicitação — pendente, aprovada ou rejeitada.
 	 *
 	 * Vive em `$lib/components/` porque as duas pontas do fluxo o mostram: a ficha
-	 * do servidor (`/policiais/[id]`, onde o administrador acompanha o que pediu) e
+	 * do servidor (`/servidores/[id]`, onde o administrador acompanha o que pediu) e
 	 * a fila de decisão (`/solicitacoes`, do Admin Geral). Não são rotas irmãs nem
 	 * pai e filha, então não há `_components/` que as cubra.
 	 *

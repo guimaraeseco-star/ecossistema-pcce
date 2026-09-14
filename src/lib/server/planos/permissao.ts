@@ -29,9 +29,10 @@
  * pertence ao plano da URL. Sem isso, membro de OUTRO plano viraria editável
  * por id, que é exatamente o FLW-ESC-002.
  *
- * A tela de VALORES (`/config-custos`) não passa por aqui: ela é do Super Admin
- * e usa `requireSuperAdmin` de `$lib/server/api`. São gates diferentes de
- * propósito — quem monta a operação não é quem fixa quanto vale a hora.
+ * A tela de VALORES (`/valores`) não passa por aqui: o gate dela é a
+ * sessão de admin (Admin Geral ou Super Admin — decisão E39), conferido no
+ * próprio `+page.server.ts`. São gates diferentes de propósito: este é por
+ * plano e por participação; aquele, por papel.
  */
 import { eq, and } from 'drizzle-orm';
 import { planoEquipes, planoEquipeMembros } from '../schema';

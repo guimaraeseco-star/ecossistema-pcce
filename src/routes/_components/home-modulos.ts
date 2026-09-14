@@ -17,8 +17,8 @@
  * Dois eixos que o arquivo trata de propósito:
  *
  * - **Grupo é organização de tela, não de URL.** Os cartões apontam para as
- *   rotas planas dos módulos (`/policiais`, `/gise`, `/unidade`…); quando o
- *   1.4 renomear endereços, muda-se o `href` aqui e em lugar nenhum mais.
+ *   rotas planas dos módulos (`/servidores`, `/gise`, `/unidade`…); quando um
+ *   endereço muda (1.4), muda-se o `href` aqui e em lugar nenhum mais.
  * - **Cartão PLANEJADO aparece desligado**, com o rótulo "Em breve", como no
  *   protótipo que originou o Ecossistema: a home mostra a plataforma inteira,
  *   e o que ainda não existe fica visível sem ser clicável. Só entram os que
@@ -143,7 +143,7 @@ function cardServidores(flags: FlagsMenu): CartaoHome {
 			? 'Cadastro dos servidores do departamento: ficha, lotação, afastamentos e as solicitações de alteração enviadas pelas unidades.'
 			: 'Cadastro dos servidores da sua unidade: consulte a ficha e solicite correção de dados, movimentação, afastamento ou desvinculação.',
 		icone: ICONE.pessoas,
-		href: '/policiais',
+		href: '/servidores',
 		cta: flags.isAdmGeral ? 'Gerenciar servidores' : 'Ver servidores',
 		atalhos
 	};
@@ -375,18 +375,18 @@ export function gruposHome({ usuario, flags }: EntradaHome): GrupoHome[] {
 		)
 	);
 	// De departamento para cima (E39); a restrição a Gabinete e CEFIN entra
-	// com as designações (fase 2). Liga em 1.4a, quando `/valores` abrir ao
-	// Admin Geral.
-	if (ehAdmin) {
-		pessoal.push(
-			planejado(
-				'valores',
-				'Atualização de valores',
-				'Tabela de hora extra por cargo e classe e de diárias, versionada — a base de Extras e Diárias.',
-				ICONE.barras,
-				1
-			)
-		);
+	// com as designações (fase 2).
+	if (flags.showValores) {
+		pessoal.push({
+			id: 'valores',
+			titulo: 'Atualização de valores',
+			descricao:
+				'Tabela de hora extra por cargo e classe e de diárias, versionada — a base de Extras e Diárias. Cada versão fica gravada com autor.',
+			icone: ICONE.barras,
+			href: '/valores',
+			cta: 'Atualizar valores',
+			atalhos: []
+		});
 	}
 	if (u.tipo === 'policial') pessoal.push(MEU_PERFIL);
 

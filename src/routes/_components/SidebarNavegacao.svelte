@@ -269,11 +269,11 @@
 			     hora. -->
 			{@render itemMenu('/super-admin', 'Boas-vindas', ICONE.casa)}
 			{@render itemMenu('/unidades', 'Unidades', ICONE.predio)}
-			{@render itemMenu('/policiais', 'Policiais', ICONE.pessoas)}
+			{@render itemMenu('/servidores', 'Policiais', ICONE.pessoas)}
 			{@render itemMenu('/colaboradores', 'Colaboradores', ICONE.pessoas)}
 			{@render itemMenu('/conf-ass', 'Config. Ass.', ICONE.engrenagem)}
 			{@render itemMenu('/config-geral', 'Config. Geral', ICONE.sliders)}
-			{@render itemMenu('/config-custos', 'Valores de custo', ICONE.barras)}
+			{@render itemMenu('/valores', 'Valores', ICONE.barras)}
 			{@render itemMenu('/auditoria', 'Auditoria', ICONE.documento)}
 		{:else if usuario?.tipo === 'policial' && !usuario.papel}
 			<!-- Policial sem papel: boas-vindas, o que houver de escala extra, perfil. -->
@@ -303,10 +303,13 @@
 				{@render tituloGrupo('Gestão de pessoal', 'pessoal')}
 			{/if}
 			{#if flags.showPoliciais}
-				{@render itemMenu('/policiais', 'Servidores', ICONE.pessoas)}
+				{@render itemMenu('/servidores', 'Servidores', ICONE.pessoas)}
 			{/if}
 			{#if flags.showSolicitacoes}
 				{@render itemMenu('/solicitacoes', 'Solicitações', ICONE.checkLista)}
+			{/if}
+			{#if flags.showValores}
+				{@render itemMenu('/valores', 'Atualização de valores', ICONE.barras)}
 			{/if}
 			{#if flags.showGrupo1}
 				{#if usuario?.tipo === 'admin'}

@@ -49,11 +49,11 @@ export function destinosDoMenu(usuario: UsuarioDeTeste, flags: FlagsMenu): strin
 	if (usuario.isSuperAdmin) {
 		return [
 			'/unidades',
-			'/policiais',
+			'/servidores',
 			'/colaboradores',
 			'/conf-ass',
 			'/config-geral',
-			'/config-custos',
+			'/valores',
 			'/auditoria'
 		];
 	}
@@ -65,8 +65,9 @@ export function destinosDoMenu(usuario: UsuarioDeTeste, flags: FlagsMenu): strin
 	// item de menu embaixo. O policial sem papel tem a barra plana.
 	for (const g of gruposHome({ usuario, flags })) destinos.push(g.href);
 	// Gestão de pessoal
-	if (flags.showPoliciais) destinos.push('/policiais');
+	if (flags.showPoliciais) destinos.push('/servidores');
 	if (flags.showSolicitacoes) destinos.push('/solicitacoes');
+	if (flags.showValores) destinos.push('/valores');
 	if (flags.showGrupo1) {
 		if (ehAdmin) destinos.push('/painel', '/recebidos');
 		if (flags.showEscalasPoliciais) destinos.push('/escalas');

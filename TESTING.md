@@ -353,7 +353,7 @@ Verificar cada transição de status:
 - [ ] Gestão de unidade: admin de unidade cai direto na ficha da delegacia; admin
       de seccional vê a tabela com a seccional no topo e as delegacias dela;
       Admin Geral vê o departamento, as seccionais e as delegacias em blocos, com
-      busca por qualquer parte do nome; cada número de efetivo abre `/policiais`
+      busca por qualquer parte do nome; cada número de efetivo abre `/servidores`
       filtrado; id de unidade fora do escopo na URL → 403
 
 **Herdado dos ciclos anteriores:**
@@ -502,7 +502,7 @@ Verificar cada transição de status:
 
 ---
 
-## 5. Plano operacional (`/gise/planos` e `/config-custos`)
+## 5. Plano operacional (`/gise/planos` e `/valores`)
 
 > Módulo de ago/2026 — a operação COM deslocamento de equipes. Cobertura
 > automatizada: `src/lib/planos/__tests__/` (faixa de custo, janela de horas,
@@ -515,8 +515,9 @@ Verificar cada transição de status:
 
 ### 5.1 Valores de custo (Super Admin)
 
-- [ ] `/config-custos` abre para o Super Admin e mostra a versão vigente mais o histórico — e **não** traz mais o quadro de signatário, que foi para o formulário do plano
-- [ ] **Admin Geral em `/config-custos` → sai da tela** `[E2E: plano-operacional.spec.ts]` (não é dele: quem planeja escolhe quantas horas, não quanto vale a hora)
+- [ ] `/valores` abre para o Admin Geral e para o Super Admin e mostra a versão vigente mais o histórico — e **não** traz mais o quadro de signatário, que foi para o formulário do plano
+- [ ] **Policial (com ou sem papel) em `/valores` → sai da tela** `[E2E: plano-operacional.spec.ts]` (a tela é de departamento para cima — E39)
+- [ ] `/config-custos` e `/policiais/…` redirecionam (301) para `/valores` e `/servidores/…`, preservando id e query
 - [ ] Preencher os quatro valores normais → "Aplicar +30% nos quatro" preenche os `plus` (27,30 → 35,49) e eles continuam editáveis
 - [ ] Campo de dinheiro **vazio** → erro com mensagem; zero tem de ser DIGITADO (vazio virando R$ 0 em silêncio foi bug corrigido na entrega)
 - [ ] Gravar → aparece uma VERSÃO nova no histórico; a anterior continua listada (a tabela é append-only)
@@ -527,7 +528,7 @@ Verificar cada transição de status:
 - [ ] **NUP**: digitar só números aplica a máscara `00000.000000/0000-00` conforme se digita, e para em 17 dígitos
 - [ ] Horário de apresentação, previsão de término e data de término ficam na **mesma linha**
 - [ ] **Signatário**: o nome é buscado no cadastro (como o coordenador) e o cargo é um `<select>` com três opções geradas do departamento cadastrado — Diretor Titular do Departamento de Polícia do Interior Sul, Diretor Adjunto do Departamento de Polícia do Interior Sul, Delegado de Polícia
-- [ ] Sem escolher signatário, o plano nasce sem ele e o PDF imprime a linha de assinatura em branco (não há padrão global — `/config-custos` é só sobre dinheiro)
+- [ ] Sem escolher signatário, o plano nasce sem ele e o PDF imprime a linha de assinatura em branco (não há padrão global — `/valores` é só sobre dinheiro)
 
 - [ ] `/gise/operacoes` → "Nova operação" pergunta **Operação** ou **Plano operacional**
 - [ ] Escolher _Operação_ → abre o painel de sempre, sem nenhuma mudança de comportamento
@@ -566,7 +567,7 @@ Verificar cada transição de status:
 - [ ] Operação de **2 horas** a 300 km → hora extra, com o texto "a operação tem menos de 4 horas — o percurso não alcança a jornada de 8 horas"
 - [ ] Operação de **exatamente 4 horas** a 150 km → diária; com 3 horas, hora extra `[Vitest: custeio.test.ts]`
 - [ ] Equipe **sem hora de término** a 300 km → aviso próprio ("sem a janela fechada não há como aferir"), diferente do aviso de operação curta
-- [ ] Em `/config-custos`, gravar **120 km** como distância mínima → a equipe de 110 km deixa de sugerir diária, e a de 130 km continua sugerindo
+- [ ] Em `/valores`, gravar **120 km** como distância mínima → a equipe de 110 km deixa de sugerir diária, e a de 130 km continua sugerindo
 - [ ] Campo de km vazio, com vírgula, zero ou acima de 2000 → recusa nomeando o campo, sem gravar a versão pela metade
 - [ ] A tabela **Versões gravadas** mostra a coluna "Diária a partir de" — é por ela que se explica um plano antigo com rubrica diferente
 - [ ] Plano criado ANTES da troca continua com o limite da versão dele (o `custo_parametro_id` congela) `[Vitest: planos.test.ts]`
@@ -619,7 +620,7 @@ Verificar cada transição de status:
 - [ ] **CPF não aparece em lugar nenhum do documento** (minimização LGPD — o papel circula)
 - [ ] Anexo II: os dois blocos com as colunas ALINHADAS entre si, `TOTAL GERAL` = soma dos dois, e igual à soma dos totais do Anexo I e ao painel da tela
 - [ ] O rodapé institucional aparece nas três páginas
-- [ ] **Reajustar os valores em `/config-custos` NÃO muda o PDF do plano já criado** `[E2E: plano-operacional.spec.ts]` — é a prova de que a versão ficou congelada; a linha de procedência do Anexo II segue citando a versão antiga
+- [ ] **Reajustar os valores em `/valores` NÃO muda o PDF do plano já criado** `[E2E: plano-operacional.spec.ts]` — é a prova de que a versão ficou congelada; a linha de procedência do Anexo II segue citando a versão antiga
 
 ## 6. Assinatura Digital — Escalas
 
@@ -725,7 +726,7 @@ Verificar cada transição de status:
 
 ---
 
-## 9. Gestão de Policiais (`/policiais`)
+## 9. Gestão de Policiais (`/servidores`)
 
 ### 9.1 Listagem
 
@@ -740,14 +741,14 @@ Verificar cada transição de status:
 - [ ] CPF em formato inválido → validação (se houver)
 - [ ] Atribuir papel (admin_seccional, admin_unidade) + unidade → persistido
 
-### 9.3 Editar Policial (`/policiais/[id]`)
+### 9.3 Editar Policial (`/servidores/[id]`)
 
 - [ ] Editar dados básicos (nome, telefone, cargo, lotação)
 - [ ] Alterar papel → permissões atualizadas
 - [ ] Desativar policial → flag `ativo = false`
 - [ ] Policial desativado não aparece em seleções de equipe/escala
 
-### 9.4 Upload em Lote (`/policiais/upload`)
+### 9.4 Upload em Lote (`/servidores/upload`)
 
 - [ ] Upload de CSV válido → policiais criados em lote
 - [ ] CSV com linhas inválidas → relatório de erros por linha
@@ -765,9 +766,9 @@ Verificar cada transição de status:
 - [ ] `/perfil` é somente leitura: identificação, dados cadastrais (telefone, classe, regime, lotação) e o texto que manda procurar o administrador da unidade/seccional
 - [ ] Não existe formulário nem botão de solicitar alteração; o único controle é o de e-mail pessoal (§ 8.6) e o cartão da chave de assinatura
 
-**Ficha do servidor (`/policiais/[id]`) — modo `solicitacao`**
+**Ficha do servidor (`/servidores/[id]`) — modo `solicitacao`**
 
-- [ ] Admin de unidade/seccional abre `/policiais` e vê APENAS servidores do escopo dele; "Novo Policial", "Importar Excel" e "Excluir" não aparecem
+- [ ] Admin de unidade/seccional abre `/servidores` e vê APENAS servidores do escopo dele; "Novo Policial", "Importar Excel" e "Excluir" não aparecem
 - [ ] Abrir pela URL a ficha de um servidor de OUTRA unidade → 403 ("não está sob a sua administração")
 - [ ] Editar um campo → botão "Solicitar alteração" só habilita com mudança real **e** justificativa preenchida (contador até 300)
 - [ ] Enviar → cria solicitação PENDENTE (cadastro NÃO muda) e aparece no quadro "Solicitações deste servidor"
@@ -966,13 +967,13 @@ Verificar cada transição de status:
 - [ ] Presença com a flag ligada: o `preparar-assinatura-avancada` **não** grava entrada/saída. Cancelar a biometria deixa o plantão sem presença; só o `finalizar` (após a asserção) persiste.
 - [ ] Sem chave registrada em `/perfil`, com a flag ligada → lê o documento (200) e o POST de avançada → **403** (no celular aponta Meu Perfil; no desktop, Token A3). Cadastro da chave só no celular; reposição pede os dois e-mails
 - [ ] Com a flag DESLIGADA e sem chave → nenhuma tela convida a cadastrar: assina em tela pelo caminho de um tiro, e o primeiro acesso não menciona chave nenhuma. O convite só aparece com a flag ligada, na hora de assinar
-- [ ] Com a flag DESLIGADA, o cartão "Chave de assinatura" some das DUAS telas — `/perfil` (titular) e `/policiais/[id]` (Admin Geral) — **mesmo com chave já registrada**; o resto de cada tela segue inteiro. Religar a flag traz os dois de volta `[Vitest: chave-assinatura.test.ts]`
+- [ ] Com a flag DESLIGADA, o cartão "Chave de assinatura" some das DUAS telas — `/perfil` (titular) e `/servidores/[id]` (Admin Geral) — **mesmo com chave já registrada**; o resto de cada tela segue inteiro. Religar a flag traz os dois de volta `[Vitest: chave-assinatura.test.ts]`
 - [ ] Corolário do item acima: com a flag desligada não há botão de revogar em lugar nenhum. Para revogar nesse estado, ligue `exigir_passkey_assinatura` em `/conf-ass`, revogue e desligue de novo
 - [ ] Com chave já cadastrada, o perfil mostra o recorte (igual ao manifesto), o vínculo, o último uso e explica que o sistema **não** guarda o modelo do celular — a pessoa localiza a chave no gerenciador do iPhone/Google ou tentando assinar. Avisa: mesma conta Apple/Google → **não** cadastrar de novo (assinar); só repor se trocou/perdeu o aparelho
 - [ ] Cadastro, reposição e revogação (titular ou Admin Geral) disparam aviso no **e-mail funcional** (recorte da chave, sem IP). Falha de envio **não** desfaz o ato
 - [ ] Manifesto do PDF assinado por passkey traz a linha `CHAVE DE ASSINATURA` com "biometria/PIN do titular" e o vínculo da credencial (sincronizada x deste aparelho)
 - [ ] Revogar a chave em `/perfil` e tentar assinar → recusado; recadastrar e assinar → funciona. Revogar dispara aviso no e-mail funcional
-- [ ] Admin Geral em `/policiais/[id]` vê o cartão "Chave de assinatura": chave única, cadastro só pelo próprio servidor em Meu Perfil, da função de administrador só é possível revogar. Recorte do identificador (igual ao manifesto), data e vínculo; chaves revogadas aparecem abaixo. Revogar por lá impede novas assinaturas e **não** afeta documentos já assinados
+- [ ] Admin Geral em `/servidores/[id]` vê o cartão "Chave de assinatura": chave única, cadastro só pelo próprio servidor em Meu Perfil, da função de administrador só é possível revogar. Recorte do identificador (igual ao manifesto), data e vínculo; chaves revogadas aparecem abaixo. Revogar por lá impede novas assinaturas e **não** afeta documentos já assinados
 - [ ] Após assinar com passkey, a linha de `escala_documentos` traz `webauthn_client_data`/`webauthn_assinatura` preenchidos (é o que permite reconferir a asserção depois)
 - [ ] Tentar desligar `exigir_codigo_email_assinatura` → **bloqueado** (2FA por e-mail é requisito legal mínimo; o PUT rejeita `exigirCodigoEmail=false`)
 

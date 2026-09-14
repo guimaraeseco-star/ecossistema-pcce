@@ -111,7 +111,7 @@
 			loading.hide();
 			if (result.type === 'success') {
 				toaster.create({ title: 'Policial atualizado com sucesso!', type: 'success' });
-				goto('/policiais');
+				goto('/servidores');
 			} else if (result.type === 'failure') {
 				const d = result.data as Record<string, unknown> | undefined;
 				if (d?.error) toaster.create({ title: String(d.error), type: 'error' });
@@ -179,7 +179,7 @@
 </svelte:head>
 
 <div class="mb-6 space-y-3">
-	<BotaoVoltar onclick={() => goto('/policiais')} />
+	<BotaoVoltar onclick={() => goto('/servidores')} />
 
 	<h1 class="h1 text-2xl font-bold">{solicitando ? 'Ficha do Servidor' : 'Editar Policial'}</h1>
 
@@ -365,7 +365,7 @@
 		{/if}
 
 		<div class="flex justify-end gap-2 pt-1 border-t border-surface-200 dark:border-white/5 mt-2">
-			<a href="/policiais" class="btn btn-sm preset-outlined-surface-500">Cancelar</a>
+			<a href="/servidores" class="btn btn-sm preset-outlined-surface-500">Cancelar</a>
 			<button
 				type="submit"
 				class="btn btn-sm sm:btn-md preset-filled-primary-500 flex items-center gap-2 disabled:opacity-40"
