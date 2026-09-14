@@ -428,7 +428,7 @@ escalas/
 │   │   │                           #   menu-visibilidade.ts (sidebar), home-modulos.ts (home) e
 │   │   │                           #   bem-vindo-cards.ts (quadros) — as três do MESMO par de flags
 │   │   ├── bem-vindo/              # Boas-vindas do policial sem papel (escalas/bem-vindo e gise/bem-vindo só redirecionam para /)
-│   │   ├── unidade/                # Gestão de unidade: lista por escopo e ficha ([id]) — E39
+│   │   ├── unidade/                # Gestão de unidade: lista por escopo e ficha ([id]) com contato, foto, AIS, municípios e plantão — E39
 │   │   ├── super-admin/            # Console de boas-vindas do Super Admin
 │   │   ├── escalas/                # Gestão de escalas (lista, nova, detalhe)
 │   │   ├── painel/                 # Dashboard admin

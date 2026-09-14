@@ -36,6 +36,7 @@ import {
 } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 import { TIPO_UNIDADE_VALORES } from '$lib/unidades/tipos';
+import { TIPOS_PLANTAO } from '$lib/unidades/plantao';
 
 // ---- Policiais ----
 
@@ -282,6 +283,18 @@ export const unidades = sqliteTable(
 		tem_plantao: integer('tem_plantao', { mode: 'boolean' }).default(false).notNull(),
 		tem_expediente: integer('tem_expediente', { mode: 'boolean' }).default(false).notNull(),
 		tem_fds: integer('tem_fds', { mode: 'boolean' }).default(false).notNull(),
+		// ---- A ficha (fase 2, migração 0085; decisão E39 item 3.1) ----
+		endereco: text('endereco').notNull().default(''),
+		telefone: text('telefone').notNull().default(''),
+		email: text('email').notNull().default(''),
+		/** Link de origem da foto (Google Drive, da planilha). A ficha prefere `foto_key`. */
+		foto_url: text('foto_url'),
+		/** Cópia da foto no R2 (`unidades/{id}/foto.jpg`), feita pela importação quando o link abre. */
+		foto_key: text('foto_key'),
+		/** A AIS da UNIDADE (uma só). A de cada município atendido está em `municipios_cobertura`. */
+		ais: text('ais').notNull().default(''),
+		tira_gravame: integer('tira_gravame', { mode: 'boolean' }).default(false).notNull(),
+		xadrezes: integer('xadrezes').notNull().default(0),
 		/**
 		 * Unidade DESATIVADA (`ativo = 0`) sai das listas de escolha, mas continua
 		 * existindo: escala, lotação e assinatura de relatório antigas seguem
@@ -2029,6 +2042,86 @@ export const municipios = sqliteTable(
 );
 
 /**
+ * Os municípios ATENDIDOS pelo departamento e a cobertura de cada um (fase 2,
+ * migração 0086; decisões E32 e E39). `municipios` é a lista-mãe do IBGE; esta
+ * é o recorte com o que a corporação precisa saber do município: AIS, núcleo
+ * de custódia, RISP, macrorregião e as forças coirmãs (PM, BM, PEFOCE).
+ *
+ * Quem RESPONDE pelo município está em `unidadeMunicipios` (N:N — Juazeiro do
+ * Norte tem duas delegacias) e quem faz o PLANTÃO em `plantaoCobertura`.
+ * Sem proposta de alteração (E6): só Admin Geral e Super Admin editam.
+ */
+export const municipiosCobertura = sqliteTable(
+	'municipios_cobertura',
+	{
+		ibge: text('ibge')
+			.primaryKey()
+			.references(() => municipios.ibge),
+		departamento_id: integer('departamento_id')
+			.notNull()
+			.references(() => unidades.id),
+		area_km2: real('area_km2'),
+		populacao_2022: integer('populacao_2022'),
+		ais: text('ais').notNull().default(''),
+		nucleo_custodia: text('nucleo_custodia').notNull().default(''),
+		risp: text('risp').notNull().default(''),
+		comando_pm: text('comando_pm').notNull().default(''),
+		batalhao_pm: text('batalhao_pm').notNull().default(''),
+		batalhao_bm: text('batalhao_bm').notNull().default(''),
+		companhia_bm: text('companhia_bm').notNull().default(''),
+		pefoce: text('pefoce').notNull().default(''),
+		macrorregiao: text('macrorregiao').notNull().default(''),
+		created_at: text('created_at')
+			.notNull()
+			.default(sql`(datetime('now', '-3 hours'))`),
+		updated_at: text('updated_at')
+			.notNull()
+			.default(sql`(datetime('now', '-3 hours'))`)
+	},
+	(table) => [index('idx_municipios_cobertura_departamento').on(table.departamento_id)]
+);
+
+/** Quem responde por cada município atendido — N:N (ver `municipiosCobertura`). */
+export const unidadeMunicipios = sqliteTable(
+	'unidade_municipios',
+	{
+		unidade_id: integer('unidade_id')
+			.notNull()
+			.references(() => unidades.id, { onDelete: 'cascade' }),
+		ibge: text('ibge')
+			.notNull()
+			.references(() => municipios.ibge),
+		principal: integer('principal', { mode: 'boolean' }).default(true).notNull()
+	},
+	(table) => [
+		primaryKey({ columns: [table.unidade_id, table.ibge] }),
+		index('idx_unidade_municipios_ibge').on(table.ibge)
+	]
+);
+
+/**
+ * Quem faz o plantão de cada município, por período: em quatro casos o
+ * plantonista do fim de semana não é o da semana (planilha "RESUMO DOS
+ * PLANTÕES"). Não confundir com a escala de plantão (`escalas`), que é a
+ * escala das pessoas; isto é a cobertura territorial.
+ */
+export const plantaoCobertura = sqliteTable(
+	'plantao_cobertura',
+	{
+		ibge: text('ibge')
+			.notNull()
+			.references(() => municipios.ibge),
+		periodo: text('periodo', { enum: ['semana', 'fds'] }).notNull(),
+		plantonista_unidade_id: integer('plantonista_unidade_id').references(() => unidades.id),
+		tipo: text('tipo', { enum: TIPOS_PLANTAO }).notNull()
+	},
+	(table) => [
+		primaryKey({ columns: [table.ibge, table.periodo] }),
+		index('idx_plantao_cobertura_plantonista').on(table.plantonista_unidade_id)
+	]
+);
+
+/**
  * A distância RODOVIÁRIA entre duas sedes municipais, em quilômetros.
  *
  * Uma linha por par NÃO ordenado, sempre com o menor código primeiro: ida e
@@ -2151,6 +2244,8 @@ export type PlanoEquipe = typeof planoEquipes.$inferSelect;
 export type PlanoEquipeMembro = typeof planoEquipeMembros.$inferSelect;
 export type PlanoOpcao = typeof planoOpcoes.$inferSelect;
 export type Municipio = typeof municipios.$inferSelect;
+export type MunicipioCobertura = typeof municipiosCobertura.$inferSelect;
+export type PlantaoCobertura = typeof plantaoCobertura.$inferSelect;
 export type DistanciaMunicipios = typeof distanciasMunicipios.$inferSelect;
 export type Feriado = typeof feriados.$inferSelect;
 export type Colaborador = typeof colaboradores.$inferSelect;

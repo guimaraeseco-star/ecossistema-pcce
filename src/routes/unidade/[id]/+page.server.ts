@@ -7,11 +7,11 @@
  * de quem chamou? Fora dele é 403 — a hierarquia decide o que se abre, e um id
  * chutado não abre a ficha de outra seccional.
  *
- * Hoje a ficha tem o que o banco tem: identificação, posição na árvore,
- * regimes de escala, efetivo por cargo e situação (com link para a lista de
- * servidores) e as unidades vinculadas. Endereço, telefone, foto, AIS e
- * municípios atendidos (fase 2) e veículos e armas (fase 4) aparecem como
- * campos previstos, sem valor, para a ficha já ter a forma definitiva.
+ * A ficha tem: identificação e contato (endereço, telefone, e-mail, foto —
+ * migração 0085), posição na árvore, AIS, tira-gravame, xadrezes, regimes de
+ * escala, efetivo por cargo e situação (com link para a lista de servidores),
+ * os municípios atendidos com o plantão de cada um (0086) e as unidades
+ * vinculadas. Veículos e armas (fase 4) seguem como campos previstos.
  */
 import { error, redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
@@ -19,6 +19,7 @@ import type { PageServerLoad } from './$types';
 import { getDB, ancestraisDe, type NoUnidade } from '$lib/db';
 import { unidades } from '$lib/server/schema';
 import { efetivoPorLotacao, efetivoVazio, somarEfetivos } from '$lib/db/efetivo';
+import { municipiosDaUnidade } from '$lib/db/cobertura';
 import { escopoDeUnidades, unidadeNoEscopo } from '$lib/server/unidades/escopo';
 import { nivelTipoUnidade, rotuloTipoUnidade } from '$lib/unidades/tipos';
 import { hojeBrasilISO } from '$lib/utils/datas';
@@ -38,7 +39,10 @@ export const load: PageServerLoad = async ({ locals, platform, params }) => {
 	const unidade = await db.select().from(unidades).where(eq(unidades.id, id)).get();
 	if (!unidade) error(404, 'Unidade não encontrada');
 
-	const efetivos = await efetivoPorLotacao(db, hojeBrasilISO());
+	const [efetivos, municipiosAtendidos] = await Promise.all([
+		efetivoPorLotacao(db, hojeBrasilISO()),
+		municipiosDaUnidade(db, id)
+	]);
 	const porNome = (n: NoUnidade) => efetivos.get(n.nome) ?? efetivoVazio();
 
 	const filhas = escopo.nos
@@ -72,8 +76,17 @@ export const load: PageServerLoad = async ({ locals, platform, params }) => {
 			abrangencia: unidade.abrangencia,
 			tem_plantao: unidade.tem_plantao,
 			tem_expediente: unidade.tem_expediente,
-			tem_fds: unidade.tem_fds
+			tem_fds: unidade.tem_fds,
+			endereco: unidade.endereco,
+			telefone: unidade.telefone,
+			email: unidade.email,
+			/** A foto sai por `/api/unidades/[id]/foto` (R2, ou o link de origem). */
+			temFoto: !!(unidade.foto_key || unidade.foto_url),
+			ais: unidade.ais,
+			tira_gravame: unidade.tira_gravame,
+			xadrezes: unidade.xadrezes
 		},
+		municipios: municipiosAtendidos,
 		pai: pai
 			? {
 					id: pai.id,
