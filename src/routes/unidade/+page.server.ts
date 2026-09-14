@@ -9,8 +9,8 @@
  * administra unidade nenhuma recebe 403 — esconder o cartão na home não é
  * autorização.
  *
- * Veículos, armas e municípios atendidos ainda não têm tabela (fases 2 e 4);
- * a tela mostra as colunas com "—" para a organização já ser a definitiva.
+ * Municípios atendidos vêm de `unidade_municipios` (fase 2); veículos e armas
+ * ainda não têm tabela (fase 4) — a tela mostra essas colunas com "—".
  */
 import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
@@ -21,6 +21,7 @@ import {
 	somarEfetivos,
 	type EfetivoLotacao
 } from '$lib/db/efetivo';
+import { contagemMunicipiosPorUnidade } from '$lib/db/cobertura';
 import { escopoDeUnidades } from '$lib/server/unidades/escopo';
 import { nivelTipoUnidade, rotuloTipoUnidade } from '$lib/unidades/tipos';
 import { hojeBrasilISO } from '$lib/utils/datas';
@@ -37,6 +38,10 @@ export interface LinhaUnidade {
 	subtotal: EfetivoLotacao;
 	/** Quantas unidades respondem a ela (subárvore sem ela mesma). */
 	vinculadas: number;
+	/** Municípios que a própria unidade atende. */
+	municipios: number;
+	/** Municípios atendidos pela unidade e por tudo abaixo dela (sem repetir). */
+	municipiosSubtotal: number;
 }
 
 export interface BlocoUnidade {
@@ -55,7 +60,10 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 	// Uma unidade só no escopo: a "lista" seria a própria ficha.
 	if (escopo.nos.length === 1) redirect(302, `/unidade/${escopo.raiz.id}`);
 
-	const efetivos = await efetivoPorLotacao(db, hojeBrasilISO());
+	const [efetivos, municipiosPorUnidade] = await Promise.all([
+		efetivoPorLotacao(db, hojeBrasilISO()),
+		contagemMunicipiosPorUnidade(db)
+	]);
 	const filhosDe = (id: number) =>
 		escopo.nos
 			.filter((n) => n.seccional_id === id)
@@ -81,7 +89,14 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 				proprio,
 				...desc.map((d) => efetivos.get(d.nome) ?? efetivoVazio())
 			]),
-			vinculadas: desc.length
+			vinculadas: desc.length,
+			municipios: municipiosPorUnidade.get(n.id) ?? 0,
+			// Soma simples: um município atendido por duas unidades (Juazeiro) conta
+			// duas vezes aqui; o número exato por subárvore é o da tela de Municípios.
+			municipiosSubtotal: [n, ...desc].reduce(
+				(t, d) => t + (municipiosPorUnidade.get(d.id) ?? 0),
+				0
+			)
 		};
 	};
 

@@ -13,8 +13,8 @@
 	 * própria unidade OU alguma filha casa, para a hierarquia não se perder no
 	 * filtro.
 	 *
-	 * Veículos, armas e municípios: colunas presentes, valor "—", até as fases
-	 * 2 e 4 trazerem as tabelas — a organização da tela já é a definitiva.
+	 * Veículos e armas: colunas presentes, valor "—", até a fase 4 trazer as
+	 * tabelas — a organização da tela já é a definitiva.
 	 */
 	import type { PageProps } from './$types';
 	import type { BlocoUnidade, LinhaUnidade } from './+page.server';
@@ -74,7 +74,11 @@
 				.vinculadas === 1
 				? ''
 				: 's'}
-			· {data.raiz.subtotal.total} servidor{data.raiz.subtotal.total === 1 ? '' : 'es'} no total
+			· {data.raiz.subtotal.total} servidor{data.raiz.subtotal.total === 1 ? '' : 'es'} no total · {data
+				.raiz.municipiosSubtotal} município{data.raiz.municipiosSubtotal === 1 ? '' : 's'} atendido{data
+				.raiz.municipiosSubtotal === 1
+				? ''
+				: 's'}
 		</p>
 	</div>
 	<a
@@ -126,7 +130,17 @@
 	</td>
 	<td class="{CELULA_NUM} text-surface-400" aria-label="Sem dado ainda">—</td>
 	<td class="{CELULA_NUM} text-surface-400" aria-label="Sem dado ainda">—</td>
-	<td class="{CELULA_NUM} text-surface-400" aria-label="Sem dado ainda">—</td>
+	<td class={CELULA_NUM}>
+		{#if u.municipios > 0}
+			<a
+				href="/unidade/{u.id}#municipios"
+				class={LINK_NUM}
+				title="Municípios atendidos por {u.nome}">{u.municipios}</a
+			>
+		{:else}
+			<span class="text-surface-400">0</span>
+		{/if}
+	</td>
 {/snippet}
 
 {#snippet nomeUnidade(u: LinhaUnidade, destaque: boolean, recuo: boolean)}
@@ -194,7 +208,7 @@
 							<td class="{CELULA_NUM} font-semibold">{bloco.unidade.subtotal.total}</td>
 							<td class={CELULA_NUM}>—</td>
 							<td class={CELULA_NUM}>—</td>
-							<td class={CELULA_NUM}>—</td>
+							<td class={CELULA_NUM}>{bloco.unidade.municipiosSubtotal}</td>
 						</tr>
 					{/if}
 				{/each}
@@ -207,7 +221,6 @@
 		</p>
 	{/if}
 	<p class="mt-4 text-2xs text-surface-500">
-		{totalLinhas} unidades no escopo. Veículos, armas e municípios atendidos chegam com os módulos de
-		Patrimônio e Municípios.
+		{totalLinhas} unidades no escopo. Veículos e armas chegam com o módulo de Patrimônio.
 	</p>
 </div>

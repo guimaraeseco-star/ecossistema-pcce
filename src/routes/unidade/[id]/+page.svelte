@@ -2,15 +2,15 @@
 	/**
 	 * A ficha da unidade (decisão E39, item 3.1).
 	 *
-	 * Três blocos: identificação (com a posição na árvore), efetivo por cargo e
-	 * situação (cada número leva à lista de servidores já filtrada) e as
-	 * unidades vinculadas. O quarto bloco — "dados previstos" — lista o que a
-	 * ficha vai mostrar quando as fases 2 e 4 trouxerem as tabelas (endereço,
-	 * telefone, foto, AIS, municípios, veículos, armas), para quem abre hoje
-	 * saber que a forma é esta e o que falta é dado, não tela.
+	 * Blocos: identificação e contato (foto, endereço, telefone, e-mail — fase
+	 * 2), efetivo por cargo e situação (cada número leva à lista de servidores
+	 * já filtrada), os municípios atendidos com o plantão de cada um, as
+	 * unidades vinculadas e, por fim, o que a fase 4 ainda vai trazer (veículos
+	 * e armas), para quem abre saber que o que falta é dado, não tela.
 	 */
 	import type { PageProps } from './$types';
 	import BotaoVoltar from '$lib/components/BotaoVoltar.svelte';
+	import { rotuloTipoPlantao } from '$lib/unidades/plantao';
 
 	const { data }: PageProps = $props();
 
@@ -27,13 +27,13 @@
 	const voltarPara = $derived(data.ehRaizDoEscopo && data.filhas.length === 0 ? '/' : '/unidade');
 
 	const PREVISTOS = [
-		{ campo: 'Endereço e telefone', fase: 'fase 2' },
-		{ campo: 'Foto da unidade', fase: 'fase 2' },
-		{ campo: 'AIS', fase: 'fase 2' },
-		{ campo: 'Municípios atendidos', fase: 'fase 2' },
 		{ campo: 'Veículos', fase: 'fase 4 · Patrimônio' },
 		{ campo: 'Armas e algemas', fase: 'fase 4 · Patrimônio' }
 	];
+
+	/** "Físico · DP de Iguatu" — ou "—" quando o município não tem plantão cadastrado. */
+	const plantao = (p: { tipo: string; plantonista: string } | null) =>
+		p ? `${rotuloTipoPlantao(p.tipo)}${p.plantonista ? ` · ${p.plantonista}` : ''}` : '—';
 
 	const NUM = 'text-2xl font-bold tabular-nums text-surface-900 dark:text-surface-50';
 	const ROTULO = 'text-2xs font-semibold tracking-[0.18em] text-surface-500 uppercase';
@@ -45,31 +45,73 @@
 
 <BotaoVoltar href={voltarPara} />
 
-<div class="mb-6">
-	<p
-		class="text-2xs font-semibold tracking-[0.18em] text-primary-700 uppercase dark:text-primary-400"
-	>
-		{u.tipoRotulo}{#if u.sigla}
-			· {u.sigla}{/if}
-	</p>
-	<h1 class="h1 mt-0.5 text-2xl font-bold">{u.nome}</h1>
-	<p class="mt-1 text-sm text-surface-600 dark:text-surface-400">
-		{#if u.cidade}{u.cidade} ·
-		{/if}
-		{#if data.pai}
-			Vinculada a
-			{#if data.pai.noEscopo}
-				<a href="/unidade/{data.pai.id}" class="font-medium">{data.pai.nome}</a>
-			{:else}
-				<span class="font-medium">{data.pai.nome}</span>
+<div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start">
+	{#if u.temFoto}
+		<img
+			src="/api/unidades/{u.id}/foto"
+			alt="Fachada de {u.nome}"
+			class="h-32 w-full shrink-0 rounded-xl object-cover shadow-md sm:h-28 sm:w-44"
+			loading="lazy"
+			onerror={(e) => {
+				// Link de origem fora do ar (Drive) e sem cópia no R2: some, em vez
+				// de deixar o ícone de imagem quebrada na ficha.
+				(e.currentTarget as HTMLImageElement).hidden = true;
+			}}
+		/>
+	{/if}
+	<div class="min-w-0">
+		<p
+			class="text-2xs font-semibold tracking-[0.18em] text-primary-700 uppercase dark:text-primary-400"
+		>
+			{u.tipoRotulo}{#if u.sigla}
+				· {u.sigla}{/if}{#if u.ais}
+				· {u.ais}{/if}
+		</p>
+		<h1 class="h1 mt-0.5 text-2xl font-bold">{u.nome}</h1>
+		<p class="mt-1 text-sm text-surface-600 dark:text-surface-400">
+			{#if u.cidade}{u.cidade} ·
 			{/if}
-			({data.pai.tipoRotulo})
-		{:else}
-			Sem unidade superior cadastrada
+			{#if data.pai}
+				Vinculada a
+				{#if data.pai.noEscopo}
+					<a href="/unidade/{data.pai.id}" class="font-medium">{data.pai.nome}</a>
+				{:else}
+					<span class="font-medium">{data.pai.nome}</span>
+				{/if}
+				({data.pai.tipoRotulo})
+			{:else}
+				Sem unidade superior cadastrada
+			{/if}
+			{#if u.abrangencia === 'corporativa'}
+				· abrangência corporativa{/if}
+		</p>
+		{#if u.endereco || u.telefone || u.email}
+			<dl class="mt-3 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
+				{#if u.endereco}
+					<dt class="text-2xs font-semibold tracking-[0.18em] text-surface-500 uppercase sm:pt-0.5">
+						Endereço
+					</dt>
+					<dd class="text-surface-700 dark:text-surface-300">{u.endereco}</dd>
+				{/if}
+				{#if u.telefone}
+					<dt class="text-2xs font-semibold tracking-[0.18em] text-surface-500 uppercase sm:pt-0.5">
+						Telefone
+					</dt>
+					<dd class="text-surface-700 dark:text-surface-300">
+						<a href="tel:{u.telefone.replace(/D/g, '')}">{u.telefone}</a>
+					</dd>
+				{/if}
+				{#if u.email}
+					<dt class="text-2xs font-semibold tracking-[0.18em] text-surface-500 uppercase sm:pt-0.5">
+						E-mail
+					</dt>
+					<dd class="text-surface-700 dark:text-surface-300">
+						<a href="mailto:{u.email}">{u.email}</a>
+					</dd>
+				{/if}
+			</dl>
 		{/if}
-		{#if u.abrangencia === 'corporativa'}
-			· abrangência corporativa{/if}
-	</p>
+	</div>
 </div>
 
 <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -117,6 +159,9 @@
 		{#if regimes}
 			<p class="mt-2 text-xs text-surface-500">Regimes de escala: {regimes}.</p>
 		{/if}
+		<p class="mt-2 text-xs text-surface-500">
+			Tira-gravame: {u.tira_gravame ? 'sim' : 'não'} · Xadrezes: {u.xadrezes}
+		</p>
 	</section>
 
 	<!-- Dados previstos -->
@@ -134,6 +179,47 @@
 		</ul>
 	</section>
 </div>
+
+{#if data.municipios.length > 0}
+	<section
+		class="card-elevated mt-4 rounded-2xl p-5"
+		aria-labelledby="municipios-titulo"
+		id="municipios"
+	>
+		<h2
+			id="municipios-titulo"
+			class="mb-1 text-base font-semibold text-surface-900 dark:text-surface-50"
+		>
+			Municípios atendidos
+		</h2>
+		<p class="mb-3 text-xs text-surface-500">
+			{data.municipios.length} município{data.municipios.length === 1 ? '' : 's'}; o plantão é por
+			município e pode mudar no fim de semana.
+		</p>
+		<div class="table-wrap">
+			<table class="table">
+				<thead>
+					<tr>
+						<th>Município</th>
+						<th>AIS</th>
+						<th>Plantão na semana</th>
+						<th>Plantão no fim de semana</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each data.municipios as m (m.ibge)}
+						<tr>
+							<td class="font-medium">{m.nome}</td>
+							<td class="text-sm">{m.ais || '—'}</td>
+							<td class="text-sm">{plantao(m.semana)}</td>
+							<td class="text-sm">{plantao(m.fds)}</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	</section>
+{/if}
 
 {#if data.filhas.length > 0}
 	<section class="card-elevated mt-4 rounded-2xl p-5" aria-labelledby="vinculadas">
