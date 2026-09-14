@@ -15,7 +15,7 @@
 	const { data }: PageProps = $props();
 
 	const u = $derived(data.unidade);
-	const hrefServidores = $derived(`/policiais?lotacao=${encodeURIComponent(u.nome)}`);
+	const hrefServidores = $derived(`/servidores?lotacao=${encodeURIComponent(u.nome)}`);
 
 	const regimes = $derived(
 		[u.tem_plantao && 'Plantão', u.tem_expediente && 'Expediente', u.tem_fds && 'Fim de semana']

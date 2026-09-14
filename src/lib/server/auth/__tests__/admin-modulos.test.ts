@@ -88,7 +88,7 @@ describe('moduloExigidoPelaRota', () => {
 	});
 
 	it('rotas compartilhadas não exigem módulo', () => {
-		expect(moduloExigidoPelaRota('/policiais')).toBeNull();
+		expect(moduloExigidoPelaRota('/servidores')).toBeNull();
 		expect(moduloExigidoPelaRota('/solicitacoes')).toBeNull();
 		expect(moduloExigidoPelaRota('/api/auth/logout')).toBeNull();
 		expect(moduloExigidoPelaRota('/alterar-senha')).toBeNull();
@@ -124,6 +124,6 @@ describe('adminPodeAcessarRota', () => {
 	});
 
 	it('rotas compartilhadas passam mesmo com um módulo só', () => {
-		expect(adminPodeAcessarRota(soEscalas, '/policiais/19')).toBe(true);
+		expect(adminPodeAcessarRota(soEscalas, '/servidores/19')).toBe(true);
 	});
 });

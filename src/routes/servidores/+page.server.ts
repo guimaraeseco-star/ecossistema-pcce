@@ -1,5 +1,5 @@
 /**
- * `load` e actions da lista de policiais (`/policiais`).
+ * `load` e actions da lista de policiais (`/servidores`).
  *
  * O `load` só lista — paginação, filtros e escopo por lotação. Desde ago/2026 a
  * lista também é vista pelo administrador de SECCIONAL e de UNIDADE, RECORTADA
@@ -139,7 +139,7 @@ export const actions: Actions = {
 
 		// Apenas Admin Geral pode atribuir papel administrativo. Para os demais,
 		// ignoramos silenciosamente — o caminho legítimo é o endpoint dedicado
-		// `?/salvarPapel` (em /policiais/[id], guardado por `u.tipo === 'admin'`).
+		// `?/salvarPapel` (em /servidores/[id], guardado por `u.tipo === 'admin'`).
 		const papel = isAdminGeral(u) ? papelRequisitado : null;
 		const papelUnidadeId = isAdminGeral(u) ? papelUnidadeIdRequisitado : null;
 

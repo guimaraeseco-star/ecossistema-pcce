@@ -3,7 +3,7 @@
  * alteração — quais são, como se chamam na tela e o que cada um aceita.
  *
  * Quem pede é o administrador de seccional ou de unidade, na ficha do servidor
- * (`/policiais/[id]`); quem decide é o Admin Geral, em `/solicitacoes`. O
+ * (`/servidores/[id]`); quem decide é o Admin Geral, em `/solicitacoes`. O
  * próprio servidor NÃO pede alteração do próprio cadastro — em "Meu perfil" ele
  * só troca o e-mail pessoal, que tem fluxo próprio com código de verificação.
  *

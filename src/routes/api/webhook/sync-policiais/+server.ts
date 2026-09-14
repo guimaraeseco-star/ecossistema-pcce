@@ -43,7 +43,7 @@ import { mensagemDeErro } from '$lib/utils/erro';
  * SYNC_TOKEN comprometido só consegue editar dados não-privilegiados
  * (nome, matrícula, lotação, e-mail, etc.) — não consegue promover ninguém
  * a admin_seccional/admin_unidade. O caminho legítimo permanece sendo o
- * endpoint dedicado `salvarPapel` em /policiais/[id] (Admin Geral via UI).
+ * endpoint dedicado `salvarPapel` em /servidores/[id] (Admin Geral via UI).
  */
 function papelChangesAllowed(
 	env: Pick<Env, 'WEBHOOK_ALLOW_PAPEL_CHANGES'> | null | undefined
@@ -146,7 +146,7 @@ export const POST: RequestHandler = async (event) => {
 					if (papelLower.includes('seccional')) papelMap = 'admin_seccional';
 					else if (papelLower.includes('unidade')) papelMap = 'admin_unidade';
 					// Admin Geral NÃO vem pela planilha: é uma conta vinculada em
-					// `administradores`, concedida manualmente em /policiais/[id].
+					// `administradores`, concedida manualmente em /servidores/[id].
 
 					if (papelMap) {
 						const papelUnidadeNome = String(item.papel_unidade || lotacaoMap).trim();

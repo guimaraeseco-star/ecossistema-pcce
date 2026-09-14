@@ -1,5 +1,5 @@
 /**
- * `/policiais/upload` — importação de servidores em massa por CSV (Admin Geral).
+ * `/servidores/upload` — importação de servidores em massa por CSV (Admin Geral).
  *
  * O arquivo vem preenchido à mão pelas unidades, então o processamento é
  * TOLERANTE POR LINHA: cada linha inválida vira um item na lista de erros

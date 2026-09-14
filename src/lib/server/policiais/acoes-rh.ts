@@ -2,7 +2,7 @@
  * Os três atos de RH sobre um servidor — movimentar, afastar, desvincular —,
  * escritos UMA vez para os dois caminhos que os produzem:
  *
- *   - o Admin Geral, que executa direto na ficha (`/policiais/[id]`);
+ *   - o Admin Geral, que executa direto na ficha (`/servidores/[id]`);
  *   - o administrador de seccional/unidade, que PEDE, e cuja aprovação em
  *     `/solicitacoes` executa exatamente o mesmo ato.
  *

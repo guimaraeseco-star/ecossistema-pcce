@@ -10,7 +10,7 @@
 	 * ## Por que é campo do PLANO, e não configuração global
 	 *
 	 * O signatário varia por operação: o Titular assina umas, o Adjunto outras.
-	 * Antes existia só o padrão em `/config-custos`, então trocar quem assina UM
+	 * Antes existia só o padrão em `/valores`, então trocar quem assina UM
 	 * plano exigia mudar o padrão de TODOS os seguintes. O padrão continua lá,
 	 * mas agora só pré-preenche.
 	 *

@@ -5,7 +5,7 @@
 	 * A raiz do escopo vai fixa no topo (a seccional para o admin de seccional,
 	 * o departamento para o Admin Geral); abaixo, um bloco por unidade filha
 	 * com as que respondem a ela. Todo número é link: o efetivo abre
-	 * `/policiais` já filtrado pela lotação, e o nome abre a ficha
+	 * `/servidores` já filtrado pela lotação, e o nome abre a ficha
 	 * (`/unidade/[id]`), que é onde a delegacia é vista por inteiro.
 	 *
 	 * A busca é do CLIENTE e casa com qualquer parte do nome, da sigla ou do
@@ -48,7 +48,7 @@
 
 	const titulo = $derived(data.usuario?.tipo === 'admin' ? 'Departamento' : 'Minha seccional');
 
-	const hrefServidores = (u: LinhaUnidade) => `/policiais?lotacao=${encodeURIComponent(u.nome)}`;
+	const hrefServidores = (u: LinhaUnidade) => `/servidores?lotacao=${encodeURIComponent(u.nome)}`;
 
 	const CELULA_NUM = 'text-right tabular-nums';
 	const LINK_NUM =

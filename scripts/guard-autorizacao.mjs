@@ -276,11 +276,11 @@ export const HELPERS_OBRIGATORIOS = {
 	// o nome do portão, e não um 403 qualquer, é o que impede uma das actions de
 	// remontar o gate à mão e cair no modo errado — que aqui significa um admin
 	// de unidade movimentando servidor sem passar pelo Admin Geral.
-	'src/routes/policiais/[id]/+page.server.ts → salvar': ['carregarFichaDoPolicial'],
-	'src/routes/policiais/[id]/+page.server.ts → solicitarAlteracao': ['carregarFichaDoPolicial'],
-	'src/routes/policiais/[id]/+page.server.ts → registrarMovimentacao': ['carregarFichaDoPolicial'],
-	'src/routes/policiais/[id]/+page.server.ts → registrarAfastamento': ['carregarFichaDoPolicial'],
-	'src/routes/policiais/[id]/+page.server.ts → registrarDesvinculacao': ['carregarFichaDoPolicial'],
+	'src/routes/servidores/[id]/+page.server.ts → salvar': ['carregarFichaDoPolicial'],
+	'src/routes/servidores/[id]/+page.server.ts → solicitarAlteracao': ['carregarFichaDoPolicial'],
+	'src/routes/servidores/[id]/+page.server.ts → registrarMovimentacao': ['carregarFichaDoPolicial'],
+	'src/routes/servidores/[id]/+page.server.ts → registrarAfastamento': ['carregarFichaDoPolicial'],
+	'src/routes/servidores/[id]/+page.server.ts → registrarDesvinculacao': ['carregarFichaDoPolicial'],
 
 	// FLW-AUT-006 / 007 — presença: janela de horário + GISE não finalizada.
 	// `gateDePresenca` mora dentro de `prepararConfirmacaoPresenca` (preparo

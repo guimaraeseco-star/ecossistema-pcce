@@ -32,7 +32,7 @@ describe('colaboradorPodeAcessarRota', () => {
 			'/res-gise',
 			'/gise',
 			'/painel',
-			'/policiais',
+			'/servidores',
 			'/unidades',
 			'/super-admin',
 			'/api/sync/estado',

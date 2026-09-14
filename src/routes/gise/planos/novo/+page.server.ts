@@ -30,7 +30,7 @@
  * Sem escolha, o plano nasce sem signatário e o documento imprime a linha de
  * assinatura em BRANCO — que é o estado honesto de um plano cujo signatário
  * ainda não foi definido, e visível para quem for emitir. Houve um padrão
- * global em `/config-custos`; ele saiu porque um padrão único para um dado que
+ * global em `/valores`; ele saiu porque um padrão único para um dado que
  * varia ou é ignorado quase sempre, ou leva a mudar a configuração de todos os
  * planos seguintes para acertar um.
  */

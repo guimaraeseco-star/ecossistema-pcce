@@ -1,5 +1,5 @@
 /**
- * Ficha do POLICIAL (`/policiais/[id]`) — a tela de vida funcional: dados
+ * Ficha do POLICIAL (`/servidores/[id]`) — a tela de vida funcional: dados
  * cadastrais, papel administrativo, vínculo de Admin Geral e a linha do tempo
  * de movimentações, afastamentos e desvinculação.
  *

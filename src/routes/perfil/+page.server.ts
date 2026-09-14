@@ -4,7 +4,7 @@
  *
  * O servidor não pede alteração do próprio cadastro. Telefone, classe, regime e
  * lotação são corrigidos pelo administrador da unidade ou da seccional dele, na
- * ficha em `/policiais/[id]`, e a correção ainda passa pela aprovação do Admin
+ * ficha em `/servidores/[id]`, e a correção ainda passa pela aprovação do Admin
  * Geral. Até ago/2026 o pedido saía daqui; o fluxo mudou de dono, e com ele a
  * página — o formulário e o quadro "Minhas solicitações" saíram junto com a
  * action `solicitar`.

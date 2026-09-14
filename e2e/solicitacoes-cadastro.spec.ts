@@ -47,7 +47,7 @@ test('admin de unidade solicita alteração de telefone na ficha do servidor', a
 	const ok = await autenticarPagina(page, FIXTURE.adminUnidade.id);
 	if (!ok) test.skip(true, 'D1 indisponível');
 
-	await page.goto(`/policiais/${FIXTURE.policialA.id}`);
+	await page.goto(`/servidores/${FIXTURE.policialA.id}`);
 	await expect(page.getByRole('heading', { name: 'Ficha do Servidor' })).toBeVisible();
 	// A ficha do modo solicitação avisa o que ela faz — e o que NÃO faz.
 	await expect(page.getByText('Movimentação', { exact: false }).first()).toBeVisible();

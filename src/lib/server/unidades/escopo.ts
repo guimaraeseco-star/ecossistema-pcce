@@ -14,7 +14,7 @@
  * não tem policial. Quando o sistema servir mais de um departamento com um
  * Admin Geral por departamento, é aqui que a derivação troca de fonte.
  *
- * Nada aqui é a autorização das outras telas: `/policiais` continua com
+ * Nada aqui é a autorização das outras telas: `/servidores` continua com
  * `lotacoesAdministradas`, escalas com `verificarPermissaoEscala`. Este
  * resolvedor responde só "que unidades este usuário ENXERGA na gestão de
  * unidade" — e, por `trilhaDaUnidade`, "de onde ele olha", para a barra do

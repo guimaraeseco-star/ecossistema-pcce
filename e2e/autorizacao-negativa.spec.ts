@@ -123,7 +123,7 @@ function comIdsDeFixture(padrao: string): string {
 			// REMOVIDA do servidor. Alvo protegido por outro motivo não testa este.
 			.replace('/escalas/[id]', `/escalas/${FIXTURE.escalaAssinavel.id}`)
 			.replace('/gise/[id]', `/gise/${FIXTURE.gise.id}`)
-			.replace('/policiais/[id]', `/policiais/${FIXTURE.policialA.id}`)
+			.replace('/servidores/[id]', `/servidores/${FIXTURE.policialA.id}`)
 			.replace('[giseId]', String(FIXTURE.gise.id))
 			.replace('[seccionalId]', String(FIXTURE.seccional.id))
 			.replace(/\[[^\]]+\]/g, '1')

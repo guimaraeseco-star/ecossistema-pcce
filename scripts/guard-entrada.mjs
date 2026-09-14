@@ -116,12 +116,12 @@ export const LIMITADO_POR = {
 	// (`valor === 'DPC' || valor === 'OIP'`). O `cargoAlvo` lido aqui só escolhe
 	// a regra dos outros campos, e um cargo inválido reprova no laço antes de
 	// qualquer gravação.
-	'src/routes/policiais/[id]/+page.server.ts → solicitarAlteracao → cargo':
+	'src/routes/servidores/[id]/+page.server.ts → solicitarAlteracao → cargo':
 		'motivoParaRecusarValor',
 
 	// Conversor booleano de verdade (`'1' | 'true' | 'on'`), só não é o literal
 	// que o classificador reconhece.
-	'src/routes/policiais/[id]/+page.server.ts → toggleModuloAdmin → ativar': 'formData2Bool',
+	'src/routes/servidores/[id]/+page.server.ts → toggleModuloAdmin → ativar': 'formData2Bool',
 
 	// Parser estrito do JSON de respostas: recusa o que não casa com o formulário.
 	'src/routes/res-gise/relatorio/[giseId]/+page.server.ts → salvarResposta → respostas':

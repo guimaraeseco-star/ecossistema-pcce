@@ -1,4 +1,4 @@
-import { test, expect, request as pwRequest } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import type { APIResponse } from '@playwright/test';
 import { FIXTURE } from './global-setup';
 import { cargosSignatario } from '../src/lib/planos/padroes';
@@ -7,8 +7,7 @@ import {
 	cookieDeSessao,
 	headersFormAction,
 	execD1Local,
-	queryD1Local,
-	BASE_URL
+	queryD1Local
 } from './session';
 
 /**
@@ -43,9 +42,15 @@ const NOME_VIZINHO = 'OPERACAO E2E PLANO VIZINHO';
 /** Um plano com as três cidades resolvidas, para a medição automática. */
 const NOME_MEDIDO = 'OPERACAO E2E DISTANCIA MEDIDA';
 
-let tokenSuper: string | null = null;
+/**
+ * Admin Geral grava os valores desde a decisão E39 (`/valores` é da sessão de
+ * admin). Antes era o Super Admin, e o spec dependia de `SUPER_ADMIN_LOGIN`
+ * bater com o fixture — o que nunca acontecia na máquina de um dev com o seu
+ * próprio login, e deixava metade do spec pulada.
+ */
 let tokenAdmin: string | null = null;
-let ehSuperAdmin = false;
+/** Policial comum: quem a tela de valores RECUSA. */
+let tokenPolicial: string | null = null;
 let planoId: number | null = null;
 let planoVizinhoId: number | null = null;
 let planoMedidoId: number | null = null;
@@ -110,14 +115,9 @@ function proximaVigencia(): string {
 }
 
 test.beforeAll(async () => {
-	tokenSuper = seedSession(FIXTURE.superAdmin.id, 'admin');
 	tokenAdmin = seedSession(FIXTURE.adminGeral.id, 'admin');
-	if (!tokenSuper || !tokenAdmin) return;
-
-	const ctx = await pwRequest.newContext({ baseURL: BASE_URL });
-	const probe = await ctx.get('/api/admin/audit?limit=1', { headers: cookieDeSessao(tokenSuper) });
-	ehSuperAdmin = probe.status() === 200;
-	await ctx.dispose();
+	tokenPolicial = seedSession(FIXTURE.policialA.id);
+	if (!tokenAdmin || !tokenPolicial) return;
 
 	// Dois servidores no MESMO cargo e classes diferentes: um resolve faixa de
 	// custo, o outro não. É a diferença que o gate de emissão enxerga.
@@ -146,16 +146,14 @@ test.afterAll(() => {
 });
 
 test.describe.serial('Plano operacional — valores, plano e PDF', () => {
-	test.skip(() => !tokenSuper || !tokenAdmin, 'D1 local indisponível');
+	test.skip(() => !tokenAdmin || !tokenPolicial, 'D1 local indisponível');
 
-	test('Super Admin grava a tabela de valores; Admin Geral não alcança a tela', async ({
+	test('Admin Geral grava a tabela de valores; policial não alcança a tela', async ({
 		request
 	}) => {
-		test.skip(!ehSuperAdmin, 'Super Admin fixture indisponível (SUPER_ADMIN_LOGIN)');
-
-		const res = await request.post('/config-custos?/salvarValores', {
+		const res = await request.post('/valores?/salvarValores', {
 			headers: {
-				...headersFormAction(tokenSuper!),
+				...headersFormAction(tokenAdmin!),
 				'content-type': 'application/x-www-form-urlencoded'
 			},
 			data: form({
@@ -179,10 +177,10 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 		expect(versao, 'a gravação tem de criar uma versão').not.toBeNull();
 		versoesCriadas.push(versao!);
 
-		// A tela é do Super Admin. O Admin Geral é redirecionado — o `load`
-		// recusa, não o menu.
-		const negado = await request.get('/config-custos', {
-			headers: cookieDeSessao(tokenAdmin!),
+		// A tela é da sessão de admin (Admin Geral e Super Admin — E39). O
+		// policial é redirecionado — o `load` recusa, não o menu.
+		const negado = await request.get('/valores', {
+			headers: cookieDeSessao(tokenPolicial!),
 			maxRedirects: 0
 		});
 		expect(negado.status()).toBeGreaterThanOrEqual(300);
@@ -190,8 +188,6 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 	});
 
 	test('o limite de km é GRAVADO na versão, e a versão o congela', async ({ request }) => {
-		test.skip(!ehSuperAdmin, 'Super Admin fixture indisponível (SUPER_ADMIN_LOGIN)');
-
 		const valores = {
 			oip_cd_normal: '27,30',
 			oip_ab_normal: '34,13',
@@ -207,9 +203,9 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 
 		// Km vazio é ERRO, como os valores: gravar 100 por omissão faria a versão
 		// afirmar um limite que ninguém escolheu.
-		const semKm = await request.post('/config-custos?/salvarValores', {
+		const semKm = await request.post('/valores?/salvarValores', {
 			headers: {
-				...headersFormAction(tokenSuper!),
+				...headersFormAction(tokenAdmin!),
 				'content-type': 'application/x-www-form-urlencoded'
 			},
 			data: form({ ...valores, distancia_minima_diaria_km: '', vigente_desde: proximaVigencia() })
@@ -221,9 +217,9 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 		// Fora da faixa também — inclusive o zero, que pagaria diária a quem não
 		// sai da cidade.
 		for (const km of ['0', '2001', '99,5']) {
-			const invalido = await request.post('/config-custos?/salvarValores', {
+			const invalido = await request.post('/valores?/salvarValores', {
 				headers: {
-					...headersFormAction(tokenSuper!),
+					...headersFormAction(tokenAdmin!),
 					'content-type': 'application/x-www-form-urlencoded'
 				},
 				data: form({
@@ -237,9 +233,9 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 			expect(recusa.status, `km ${km} devia ser recusado`).toBe(400);
 		}
 
-		const ok = await request.post('/config-custos?/salvarValores', {
+		const ok = await request.post('/valores?/salvarValores', {
 			headers: {
-				...headersFormAction(tokenSuper!),
+				...headersFormAction(tokenAdmin!),
 				'content-type': 'application/x-www-form-urlencoded'
 			},
 			data: form({
@@ -655,17 +651,15 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 	});
 
 	test('reajustar os valores NÃO muda o PDF do plano já criado', async ({ request }) => {
-		test.skip(!ehSuperAdmin, 'Super Admin fixture indisponível (SUPER_ADMIN_LOGIN)');
-
 		const antes = await request.get(`/api/planos/${planoId}/download`, {
 			headers: cookieDeSessao(tokenAdmin!)
 		});
 		const bytesAntes = await antes.body();
 
 		// Uma versão NOVA, com o dobro do valor da hora do OIP C.
-		const reajuste = await request.post('/config-custos?/salvarValores', {
+		const reajuste = await request.post('/valores?/salvarValores', {
 			headers: {
-				...headersFormAction(tokenSuper!),
+				...headersFormAction(tokenAdmin!),
 				'content-type': 'application/x-www-form-urlencoded'
 			},
 			data: form({

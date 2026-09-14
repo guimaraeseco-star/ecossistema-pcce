@@ -53,7 +53,7 @@ test('admin de unidade PEDE a movimentação — o servidor não sai do lugar', 
 	const ok = await autenticarPagina(page, FIXTURE.adminUnidade.id);
 	if (!ok) test.skip(true, 'D1 indisponível');
 
-	await page.goto(`/policiais/${FIXTURE.policialA.id}`);
+	await page.goto(`/servidores/${FIXTURE.policialA.id}`);
 	await expect(page.getByRole('heading', { name: 'Ficha do Servidor' })).toBeVisible();
 
 	await page.getByRole('button', { name: /Movimentação/ }).click();
@@ -92,7 +92,7 @@ test('aprovada: a lotação trocou e o evento credita quem PEDIU', async ({ page
 	const ok = await autenticarPagina(page, ADMIN_TMP, 'admin');
 	if (!ok) test.skip(true, 'D1 indisponível');
 
-	await page.goto(`/policiais/${FIXTURE.policialA.id}`);
+	await page.goto(`/servidores/${FIXTURE.policialA.id}`);
 	// Modo direto (Admin Geral): a lotação é um <select>, com a unidade nova.
 	await expect(page.getByLabel('Lotação')).toHaveValue(DESTINO);
 

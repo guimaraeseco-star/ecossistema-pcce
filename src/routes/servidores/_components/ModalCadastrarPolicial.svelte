@@ -1,12 +1,12 @@
 <script lang="ts">
 	/**
-	 * Cadastro de policial (`/policiais`).
+	 * Cadastro de policial (`/servidores`).
 	 *
 	 * O formulário PODE conceder papel administrativo já na criação — e aí
 	 * `papel_unidade_id` é obrigatório, porque papel sem alcance deixa o escopo
 	 * indefinido (`papelSemUnidade` trava o submit). A única exceção é o admin
 	 * de unidade cadastrando outro admin da própria unidade, onde o alcance é
-	 * implícito. Alterar papel depois é na tela do policial (`/policiais/[id]`).
+	 * implícito. Alterar papel depois é na tela do policial (`/servidores/[id]`).
 	 *
 	 * Formulário longo com grade de campos e blocos condicionais de papel —
 	 * cabe no ModalShell (`largura="2xl"`) sem ampliar a API do primitive.

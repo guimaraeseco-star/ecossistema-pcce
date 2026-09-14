@@ -29,7 +29,7 @@
 	 * escopo indefinido (`papelSemUnidade` trava o submit). A única exceção é o
 	 * admin de unidade cadastrando outro admin da própria unidade, onde o alcance
 	 * é implícito. Alterar papel depois é na tela do policial
-	 * (`/policiais/[id]`).
+	 * (`/servidores/[id]`).
 	 */
 	import type { PageProps } from './$types';
 	import { goto } from '$app/navigation';
@@ -226,7 +226,7 @@
 		<BotaoLimparFiltros {temFiltros} onclick={limparFiltros} />
 		{#if isAdmin}
 			<a
-				href="/policiais/upload"
+				href="/servidores/upload"
 				class="btn btn-sm preset-outlined-surface-500 hidden sm:inline-flex">Importar Excel</a
 			>
 			<button
@@ -373,7 +373,7 @@
 				</p>
 				{#if isAdmin && !filtroCargo}
 					<a
-						href="/policiais"
+						href="/servidores"
 						class="btn preset-filled-primary-500 transition-colors"
 						onclick={(e) => {
 							e.preventDefault();
@@ -425,7 +425,7 @@
 									<td>
 										<div class="flex gap-2">
 											<a
-												href="/policiais/{p.id}"
+												href="/servidores/{p.id}"
 												class="btn btn-sm preset-outlined-surface-500"
 												title="Gerenciar cadastro, movimentações e histórico">Gerenciar</a
 											>
@@ -483,7 +483,7 @@
 							</div>
 							<div class="flex gap-2 pt-3 border-t border-surface-200 dark:border-white/5">
 								<a
-									href="/policiais/{p.id}"
+									href="/servidores/{p.id}"
 									class="btn btn-sm preset-outlined-surface-500 flex-1 text-center"
 									title="Gerenciar cadastro, movimentações e histórico">Gerenciar</a
 								>
