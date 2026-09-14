@@ -17,8 +17,8 @@ Roteiro de regressão manual dos fluxos de negócio. **Papel deste arquivo: exce
 - [ ] Submeter matrícula + senha corretos → receber e-mail com código 2FA
 - [ ] Inserir código 2FA correto → redirecionar para a tela de boas-vindas conforme papel `[E2E: boas-vindas-rbac.spec.ts — exceto Super Admin, que depende de SUPER_ADMIN_LOGIN]`
   - Super Admin → `/super-admin`
-  - Admin Geral → `/escalas/bem-vindo` ou `/gise/bem-vindo` (um módulo só: o sistema escolhe; os dois: `'ambas'` e troca na sidebar)
-  - Admin Seccional / Unidade → `/escalas/bem-vindo`
+  - Admin Geral → `/` (home de módulos em quatro grupos; os cartões seguem os módulos LIGADOS na conta; a troca GISE ↔ Escalas na sidebar só filtra a barra)
+  - Admin Seccional / Unidade → `/` (home de módulos; `/escalas/bem-vindo` e `/gise/bem-vindo` redirecionam com 301)
   - Demais policiais → `/bem-vindo` (cards de atalho conforme papel/GISE)
 
 ### 1.2 Validações de Login
@@ -336,9 +336,25 @@ Verificar cada transição de status:
 - [ ] "Operações" e "Plano Op." aparecem lado a lado, e a rota atual acende só um
       dos dois — estar em `/gise/planos` **não** pode acender "Ativas"
 - [ ] "Valores de custo" NÃO aparece para o Admin Geral: é aba do Super Admin
-- [ ] A tela de boas-vindas do módulo tem um quadro para cada item do menu
-      (`__tests__/bem-vindo-cards.test.ts` reprova o esquecimento, mas a
-      conferência visual é a que pega texto trocado)
+- [ ] O Início (`/`) mostra os quatro cartões grandes (cor #104862) sem rolagem
+      em 1366×720; o subtítulo de cada um lista TODOS os módulos do grupo para o
+      perfil; clicar abre `/grupo/[id]` com os cartões detalhados, um para cada
+      item do menu (`__tests__/home-modulos.test.ts` reprova o esquecimento,
+      mas a conferência visual é a que pega texto trocado); a barra mostra os
+      mesmos quatro grupos (Gestão de pessoal · operacional · de unidade ·
+      administrativa), cada título é link para a tela do grupo, e "Início" leva
+      a `/`
+- [ ] Barra do topo: brasão + "Polícia Civil do Ceará - DPI SUL" para o Admin
+      Geral; "- seccional" para o admin de seccional; "- seccional - delegacia"
+      para o admin de unidade; só "Polícia Civil do Ceará" para o Super Admin
+- [ ] Cartão planejado (Diárias, Extras, Armamento, Veículos, Patrimônio móvel,
+      Municípios, Atualização de valores) aparece desligado com "Em breve · fase N";
+      Municípios e Atualização de valores só para o Admin Geral
+- [ ] Gestão de unidade: admin de unidade cai direto na ficha da delegacia; admin
+      de seccional vê a tabela com a seccional no topo e as delegacias dela;
+      Admin Geral vê o departamento, as seccionais e as delegacias em blocos, com
+      busca por qualquer parte do nome; cada número de efetivo abre `/policiais`
+      filtrado; id de unidade fora do escopo na URL → 403
 
 **Herdado dos ciclos anteriores:**
 

@@ -11,6 +11,7 @@
 	 * (a senha provisória e a redefinição são do Super Admin).
 	 */
 	import AlertCircle from '@lucide/svelte/icons/alert-circle';
+	import UserRound from '@lucide/svelte/icons/user-round';
 	import { enhance } from '$app/forms';
 	import { loading as loadingService } from '$lib/loading.svelte';
 	import SeletorPolicialAdmin from './SeletorPolicialAdmin.svelte';
@@ -41,16 +42,16 @@
 </script>
 
 {#if comoColaborador}
-	<p class="mb-6 text-sm text-surface-600 dark:text-surface-400 text-center">
+	<p class="mb-5 text-sm text-surface-600 dark:text-surface-400 text-center">
 		Acesso de <strong>colaborador(a)</strong> — entre com o e-mail cadastrado.
 	</p>
 {:else}
-	<div class="mb-8">
+	<div class="mb-5">
 		<SeletorPolicialAdmin bind:tipo />
 	</div>
 {/if}
 
-<form method="POST" action="?/login" use:enhance={handleLogin} class="flex flex-col gap-4 sm:gap-6">
+<form method="POST" action="?/login" use:enhance={handleLogin} class="flex flex-col gap-4">
 	<input type="hidden" name="tipo" value={comoColaborador ? 'colaborador' : tipo} />
 	<label class="label">
 		<span class="label-text"
@@ -128,36 +129,53 @@
 		</button>
 	</div>
 {:else}
-	<div class="flex items-center gap-3 my-4">
+	<div class="flex items-center gap-3 my-3">
 		<div class="flex-1 h-px bg-surface-200 dark:bg-surface-700"></div>
 		<span class="text-xs text-surface-600 dark:text-surface-400 shrink-0">ou</span>
 		<div class="flex-1 h-px bg-surface-200 dark:bg-surface-700"></div>
 	</div>
-	<button
-		type="button"
-		class="btn preset-outlined-surface-500 w-full py-3 flex items-center justify-center gap-2 text-sm"
-		disabled={loadingService.active}
-		onclick={() => fazerLoginComCertificado(tipo === 'admin')}
-	>
-		<!-- Token A3 / pendrive USB — Lucide não tem flash-drive; silhueta lateral. -->
-		<svg
-			class="w-4 h-4 shrink-0"
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="2"
-			stroke-linecap="round"
-			stroke-linejoin="round"
-			aria-hidden="true"
+	<!-- As duas portas alternativas com o MESMO peso: certificado e colaborador.
+	     "Sou colaborador(a)" era um link miúdo na linha de ajuda e ninguém o
+	     achava (pedido de 13/09/2026). -->
+	<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+		<button
+			type="button"
+			class="btn preset-outlined-surface-500 w-full py-3 flex items-center justify-center gap-2 text-sm"
+			disabled={loadingService.active}
+			onclick={() => fazerLoginComCertificado(tipo === 'admin')}
 		>
-			<!-- Conector USB-A -->
-			<path d="M2 9h5v6H2z" />
-			<path d="M4 11v2M6 11v2" />
-			<!-- Corpo do token -->
-			<rect x="7" y="7" width="15" height="10" rx="2" />
-		</svg>
-		Certificado Digital (SERPRO)
-	</button>
+			<!-- Token A3 / pendrive USB — Lucide não tem flash-drive; silhueta lateral. -->
+			<svg
+				class="w-4 h-4 shrink-0"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<!-- Conector USB-A -->
+				<path d="M2 9h5v6H2z" />
+				<path d="M4 11v2M6 11v2" />
+				<!-- Corpo do token -->
+				<rect x="7" y="7" width="15" height="10" rx="2" />
+			</svg>
+			Certificado Digital (SERPRO)
+		</button>
+		<button
+			type="button"
+			class="btn preset-outlined-surface-500 w-full py-3 flex items-center justify-center gap-2 text-sm"
+			disabled={loadingService.active}
+			onclick={() => {
+				comoColaborador = true;
+				matricula = '';
+			}}
+		>
+			<UserRound class="w-4 h-4 shrink-0" aria-hidden="true" />
+			Sou colaborador(a)
+		</button>
+	</div>
 
 	<div
 		class="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-xs text-surface-600 dark:text-surface-400 text-center"
@@ -190,19 +208,5 @@
 				Recuperar
 			</button>
 		</span>
-		<span
-			class="hidden sm:inline text-surface-300 dark:text-surface-600 select-none"
-			aria-hidden="true">·</span
-		>
-		<button
-			type="button"
-			class="shrink-0 text-primary-600 dark:text-primary-400 underline underline-offset-2 hover:opacity-80 transition-opacity"
-			onclick={() => {
-				comoColaborador = true;
-				matricula = '';
-			}}
-		>
-			Sou colaborador(a)
-		</button>
 	</div>
 {/if}

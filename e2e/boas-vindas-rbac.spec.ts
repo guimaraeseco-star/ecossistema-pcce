@@ -9,10 +9,13 @@ import { seedSession, autenticarPagina, cookieDeSessao } from './session';
  *
  * Papéis exercitados com sessões semeadas:
  *   - policial comum (fixture A)         → /bem-vindo
- *   - policial admin_unidade (fixture)   → /escalas/bem-vindo
- *   - Admin Geral standalone (fixture)   → /escalas/bem-vindo, /painel OK,
+ *   - policial admin_unidade (fixture)   → / (home de módulos, decisão E39)
+ *   - Admin Geral standalone (fixture)   → / (home de módulos), /painel OK,
  *                                          consoles de auditoria vetados
  *                                          (são exclusivos do Super Admin)
+ *
+ * Desde a fase 1 do Ecossistema os perfis administrativos entram pela home de
+ * módulos em `/`; `/escalas/bem-vindo` e `/gise/bem-vindo` só redirecionam.
  */
 
 test.describe('Boas-vindas por papel', () => {
@@ -23,18 +26,39 @@ test.describe('Boas-vindas por papel', () => {
 		await expect(page).toHaveURL(/\/bem-vindo$/);
 	});
 
-	test('admin de unidade → /escalas/bem-vindo', async ({ page }) => {
+	test('admin de unidade → home de módulos com os quatro grupos', async ({ page }) => {
 		const ok = await autenticarPagina(page, FIXTURE.adminUnidade.id);
 		test.skip(!ok, 'D1 local indisponível');
 		await page.goto('/bem-vindo');
-		await expect(page).toHaveURL(/\/escalas\/bem-vindo$/);
+		await expect(page).toHaveURL(/\/$/);
+		await expect(page.getByRole('heading', { name: 'Gestão de pessoal' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Gestão de unidade' })).toBeVisible();
+		// O cartão grande abre a tela do grupo; a delegacia vê a própria unidade, não a lista.
+		await page.getByRole('link', { name: /Gestão de unidade/ }).click();
+		await expect(page).toHaveURL(/\/grupo\/unidade$/);
+		await expect(page.getByRole('heading', { name: 'Minha delegacia' })).toBeVisible();
 	});
 
-	test('Admin Geral → /escalas/bem-vindo (módulo padrão)', async ({ page }) => {
+	test('Admin Geral → home de módulos; o endereço antigo redireciona', async ({ page }) => {
 		const ok = await autenticarPagina(page, FIXTURE.adminGeral.id, 'admin');
 		test.skip(!ok, 'D1 local indisponível');
-		await page.goto('/bem-vindo');
-		await expect(page).toHaveURL(/\/escalas\/bem-vindo$/);
+		await page.goto('/escalas/bem-vindo');
+		await expect(page).toHaveURL(/\/$/);
+		await expect(page.getByRole('heading', { name: 'Gestão administrativa' })).toBeVisible();
+		// Planejado aparece desligado, não some.
+		await page.goto('/grupo/pessoal');
+		await expect(page.getByRole('heading', { name: 'Diárias' })).toBeVisible();
+		await page.goto('/grupo/unidade');
+		await expect(page.getByRole('heading', { name: 'Departamento' })).toBeVisible();
+	});
+
+	test('policial comum não tem gestão de unidade', async ({ page }) => {
+		const ok = await autenticarPagina(page, FIXTURE.policialA.id);
+		test.skip(!ok, 'D1 local indisponível');
+		// O `+error.svelte` mostra o status com a mensagem genérica de permissão.
+		await page.goto('/unidade');
+		await expect(page.getByText('403')).toBeVisible();
+		await expect(page.getByText('não tem permissão')).toBeVisible();
 	});
 
 	test('anônimo → /login', async ({ page }) => {

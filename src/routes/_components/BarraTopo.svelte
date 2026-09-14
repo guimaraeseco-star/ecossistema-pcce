@@ -22,6 +22,17 @@
 
 	const { nav }: { nav: NavegacaoEstado } = $props();
 
+	/**
+	 * "Polícia Civil do Ceará - DPI SUL - seccional - delegacia": a corporação
+	 * fixa e, depois, a trilha da unidade de quem está logado (do departamento
+	 * até a unidade dele — `trilhaDaUnidade`, no `+layout.server.ts`). Quem
+	 * está no departamento vê só até ele; quem não tem unidade (Super Admin,
+	 * colaborador) vê só a corporação. Em tela estreita a trilha se resume ao
+	 * ÚLTIMO nível, que é o que identifica a pessoa.
+	 */
+	const trilha = $derived((page.data.trilhaUnidade as string[] | undefined) ?? []);
+	const ultimoNivel = $derived(trilha.at(-1) ?? null);
+
 	const podeAlternarParaUsuario = $derived(page.data.podeAlternarParaUsuario ?? false);
 	const podeAlternarParaAdmin = $derived(page.data.podeAlternarParaAdmin ?? false);
 
@@ -72,11 +83,26 @@
 			/>
 		</svg>
 	</button>
-	<div class="ml-3 flex items-center gap-2">
+	<div class="ml-3 flex min-w-0 items-center gap-2.5">
+		<img
+			src="/brasao-pcce.png"
+			alt=""
+			width="273"
+			height="360"
+			class="h-8 w-auto shrink-0 drop-shadow-sm"
+		/>
 		<span
-			class="font-heading font-bold text-lg text-surface-900 dark:text-surface-50 tracking-tight"
-			>DPI SUL</span
+			class="font-heading hidden min-w-0 truncate text-base font-bold tracking-tight text-surface-900 sm:block dark:text-surface-50"
 		>
+			Polícia Civil do Ceará{#each trilha as nivel (nivel)}
+				<span class="mx-1.5 font-normal text-surface-400 dark:text-surface-500">-</span
+				>{nivel}{/each}
+		</span>
+		<span
+			class="font-heading min-w-0 truncate text-base font-bold tracking-tight text-surface-900 sm:hidden dark:text-surface-50"
+		>
+			{ultimoNivel ?? 'Polícia Civil do Ceará'}
+		</span>
 	</div>
 	{#if podeAlternarParaUsuario || podeAlternarParaAdmin}
 		<button

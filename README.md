@@ -422,10 +422,13 @@ escalas/
 │   │   ├── alterar-senha/          # Troca de senha obrigatória (primeiro acesso)
 │   │   ├── redefinir-senha/        # Reset de senha via token
 │   │   ├── aceitar-termo/          # Aceite de termo de uso
+│   │   ├── +page.svelte            # INÍCIO dos perfis administrativos: 4 cartões grandes (E39)
+│   │   ├── grupo/[id]/             # Tela de um grupo da home: os cartões detalhados
 │   │   ├── _components/            # Regras de navegação compartilhadas pelas rotas:
-│   │   │                           #   menu-visibilidade.ts (sidebar) e
-│   │   │                           #   bem-vindo-cards.ts (quadros) — as duas do MESMO par de flags
-│   │   ├── bem-vindo/              # Boas-vindas pós-login (+ escalas/bem-vindo e gise/bem-vindo por módulo)
+│   │   │                           #   menu-visibilidade.ts (sidebar), home-modulos.ts (home) e
+│   │   │                           #   bem-vindo-cards.ts (quadros) — as três do MESMO par de flags
+│   │   ├── bem-vindo/              # Boas-vindas do policial sem papel (escalas/bem-vindo e gise/bem-vindo só redirecionam para /)
+│   │   ├── unidade/                # Gestão de unidade: lista por escopo e ficha ([id]) — E39
 │   │   ├── super-admin/            # Console de boas-vindas do Super Admin
 │   │   ├── escalas/                # Gestão de escalas (lista, nova, detalhe)
 │   │   ├── painel/                 # Dashboard admin
