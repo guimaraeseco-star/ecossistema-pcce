@@ -233,8 +233,8 @@ describe('temLinhaBaseAPreencher — quem vê a aba "Dados base"', () => {
 	});
 
 	it('Admin Geral não vê — para ele a conferência é por operação', async () => {
-		// Não é falta de permissão: `/dados-base` continua aberta a ele, e o acesso
-		// é pelo botão dentro de /gise/operacoes.
+		// Não é falta de permissão: `/operacoes/dados-base` continua aberta a ele, e o acesso
+		// é pelo botão dentro de /operacoes/gise/operacoes.
 		expect(await temLinhaBaseAPreencher(db, admGeral)).toBe(false);
 	});
 
@@ -313,7 +313,7 @@ describe('operacoesComLinhaBase — quais operações PEDEM base', () => {
 	});
 });
 
-describe('operacoesComLinhaBasePendente — o que o índice de /dados-base decide', () => {
+describe('operacoesComLinhaBasePendente — o que o índice de /operacoes/dados-base decide', () => {
 	it('admin da unidade escalada recebe a CRAJUBAR, e só ela', async () => {
 		const u = usuario({ papel: 'admin_unidade', papel_unidade_id: crato });
 		const pendentes = await operacoesComLinhaBasePendente(db, u);

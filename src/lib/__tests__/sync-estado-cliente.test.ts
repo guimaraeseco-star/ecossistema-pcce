@@ -3,7 +3,7 @@
  *
  * O que se protege aqui é uma medição: numa tela de detalhe existem DOIS
  * pollers (o do badge no layout e o da própria tela), ambos ouvindo
- * `visibilitychange`. Medido em Chromium na `/gise/[id]`, 3 retornos de foco
+ * `visibilitychange`. Medido em Chromium na `/operacoes/gise/[id]`, 3 retornos de foco
  * produziam 6 requisições, aos pares `(sem query)` + `?giseId=N`.
  *
  * Descartar a segunda seria errado — as duas pedem coisas diferentes, e a de

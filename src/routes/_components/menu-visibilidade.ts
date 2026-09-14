@@ -90,7 +90,7 @@ export interface FlagsMenu {
  *   quem responde é o servidor (`temLinhaBaseAPreencher`). Antes aparecia para
  *   todo admin de unidade, inclusive os de delegacias fora de qualquer operação,
  *   que abriam uma tela vazia sem entender por quê. O Admin Geral não entra:
- *   para ele a conferência é por operação, dentro de `/gise/operacoes`.
+ *   para ele a conferência é por operação, dentro de `/operacoes/gise/operacoes`.
  * - **Admin Geral não vê a aba Arquivo** (`showEscalasPoliciais`): ela é dos
  *   dois papéis de unidade.
  * - **`showPoliciais` e `showSolicitacoes` deixaram de andar juntos** (ago/2026).
@@ -158,7 +158,7 @@ export function rotaAtiva(pathname: string, path: string): boolean {
  *
  * `showGrupo2` entra aqui, e não só no markup, porque a lista também decide o
  * NÍVEL em que a gaveta abre: sem ele, o Admin Geral em módulo "escalas" que
- * caísse em `/produtividade` pela URL abriria o menu já dentro do submenu que a
+ * caísse em `/operacoes/produtividade` pela URL abriria o menu já dentro do submenu que a
  * escolha de módulo esconde dele.
  *
  * Recebe a `URL` por parâmetro em vez de ler `$app/state`: é o que mantém a
@@ -174,20 +174,19 @@ export function itensExtraDoMenu(flags: FlagsMenu, url: URL): ItemMenu[] {
 	// tem entrada própria, e sem excluir aqui o realce de "Ativas" acenderia
 	// junto com o do item certo.
 	const giseListaOuEscalaPath =
-		rotaPath === '/gise' ||
-		(rotaPath.startsWith('/gise/') &&
-			!rotaPath.startsWith('/gise/operacoes') &&
-			!rotaPath.startsWith('/gise/planos') &&
-			!rotaPath.startsWith('/gise/bem-vindo') &&
-			!rotaPath.startsWith('/gise/finalizadas'));
+		rotaPath === '/operacoes/gise' ||
+		(rotaPath.startsWith('/operacoes/gise/') &&
+			!rotaPath.startsWith('/operacoes/gise/operacoes') &&
+			!rotaPath.startsWith('/operacoes/gise/finalizadas'));
 
-	// As duas abas de /res-gise dividem a MESMA rota por query string: sem
+	// As duas abas de /operacoes/presenca dividem a MESMA rota por query string: sem
 	// `?status=finalizadas` é a "Presença GISE" (ativas), com ele é o "Histórico
 	// GISE". O realce do menu segue essa distinção — por isso o `ativo` vai
 	// explícito aos dois itens (o `rotaAtiva` padrão, só por pathname, acenderia
-	// os dois ao mesmo tempo). Inclui `/res-gise/relatorio/[giseId]`, cujo link
+	// os dois ao mesmo tempo). Inclui `/operacoes/presenca/relatorio/[giseId]`, cujo link
 	// carrega o mesmo `status` de ida e volta.
-	const naRotaResGise = rotaPath === '/res-gise' || rotaPath.startsWith('/res-gise/');
+	const naRotaResGise =
+		rotaPath === '/operacoes/presenca' || rotaPath.startsWith('/operacoes/presenca/');
 	const resGiseHistoricoSelecionado = url.searchParams.get('status') === 'finalizadas';
 
 	const naoEhAdmin = !flags.isAdmGeral;
@@ -195,46 +194,46 @@ export function itensExtraDoMenu(flags: FlagsMenu, url: URL): ItemMenu[] {
 	const itens: Array<ItemMenu | false> = [
 		// "Ativas" é a lista do que está em andamento. O arquivo das encerradas
 		// mora na aba Finalizadas — juntar os dois no mesmo rótulo mentia depois
-		// que o histórico saiu de `/gise`.
+		// que o histórico saiu de `/operacoes/gise`.
 		flags.showGise && {
-			href: '/gise',
+			href: '/operacoes/gise',
 			rotulo: 'Ativas',
 			icone: ICONE.pranchetaLista,
 			ativo: giseListaOuEscalaPath
 		},
-		// Só o Admin Geral via o bloco Histórico em `/gise`; a aba herda esse
+		// Só o Admin Geral via o bloco Histórico em `/operacoes/gise`; a aba herda esse
 		// recorte. Supervisor e seccional continuam sem o arquivo.
 		flags.isAdmGeral &&
 			flags.showGise && {
-				href: '/gise/finalizadas',
+				href: '/operacoes/gise/finalizadas',
 				rotulo: 'Finalizadas',
 				icone: ICONE.historico,
-				ativo: rotaAtiva(rotaPath, '/gise/finalizadas')
+				ativo: rotaAtiva(rotaPath, '/operacoes/gise/finalizadas')
 			},
 		flags.showIndicadores && {
-			href: '/produtividade',
+			href: '/operacoes/produtividade',
 			rotulo: 'Produtividade',
 			icone: ICONE.barras,
-			ativo: rotaAtiva(rotaPath, '/produtividade')
+			ativo: rotaAtiva(rotaPath, '/operacoes/produtividade')
 		},
 		flags.showDadosBase && {
-			href: '/dados-base',
+			href: '/operacoes/dados-base',
 			rotulo: 'Dados base',
 			icone: ICONE.checkLista,
-			ativo: rotaAtiva(rotaPath, '/dados-base')
+			ativo: rotaAtiva(rotaPath, '/operacoes/dados-base')
 		},
-		// O Admin Geral não presta serviço: para ele o item /res-gise é o editor
+		// O Admin Geral não presta serviço: para ele o item /operacoes/presenca é o editor
 		// "Conf. Form.", tratado à parte no bloco do menu.
 		naoEhAdmin &&
 			flags.temPresencaGiseAtiva && {
-				href: '/res-gise',
+				href: '/operacoes/presenca',
 				rotulo: 'Minha presença',
 				icone: ICONE.documento,
 				ativo: naRotaResGise && !resGiseHistoricoSelecionado
 			},
 		naoEhAdmin &&
 			flags.temGiseHistorico && {
-				href: '/res-gise?status=finalizadas',
+				href: '/operacoes/presenca?status=finalizadas',
 				rotulo: 'Meu histórico',
 				icone: ICONE.historico,
 				ativo: naRotaResGise && resGiseHistoricoSelecionado

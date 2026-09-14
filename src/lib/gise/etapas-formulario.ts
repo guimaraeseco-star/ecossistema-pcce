@@ -1,7 +1,7 @@
 /**
  * Fatiamento do formulário de produtividade em ETAPAS — a regra única que o
  * editor do Admin Geral (`ConfigurarFormulario`) e o wizard do policial
- * (`/res-gise/relatorio/[giseId]`) precisam concordar.
+ * (`/operacoes/presenca/relatorio/[giseId]`) precisam concordar.
  *
  * Mora aqui, e não dentro de um dos dois, porque o editor mostra ao admin
  * exatamente o agrupamento que o policial vai ver. Duas implementações da mesma

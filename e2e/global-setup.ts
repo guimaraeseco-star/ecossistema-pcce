@@ -37,7 +37,7 @@ export const FIXTURE = {
 	/** Idem, exclusiva do spec do fluxo A3 (assinatura-qualificada-a3) — cada
 	 *  spec assina a SUA escala para não invalidar asserções do outro. */
 	escalaAssinavelA3: { id: 99003 },
-	// ── GISE ativa (telas /gise/[id] e /res-gise) ─────────────────────────
+	// ── GISE ativa (telas /operacoes/gise/[id] e /operacoes/presenca) ─────────────────────────
 	seccional: { id: 99010, nome: 'SECCIONAL E2E FIXTURE' },
 	/** cpf precisa bater com SUPERVISOR_TESTE do e2e/ca-teste/gerar-ca.ts
 	 *  (assina o relatório extraordinário via CA de teste). */
@@ -174,7 +174,7 @@ export default async function globalSetup() {
 	// ── Fixture GISE ativa ───────────────────────────────────────────────
 	// Uma GISE 'em_andamento' (= "ativa": status != finalizada) com seccional
 	// preenchida, 1 equipe operacional e 1 membro; supervisor DPC designado.
-	// Destrava as telas /gise/[id] (supervisor/admin) e /res-gise (membro).
+	// Destrava as telas /operacoes/gise/[id] (supervisor/admin) e /operacoes/presenca (membro).
 	const giseSeed = `
 		INSERT INTO unidades (id, nome, tipo) VALUES
 			(${FIXTURE.seccional.id}, '${FIXTURE.seccional.nome}', 'seccional')
@@ -192,7 +192,7 @@ export default async function globalSetup() {
 		-- a migração 0048, e o id dela depende da ordem de inserção do banco. Sem
 		-- esta coluna a fixture ficaria como uma escala pré-migração, que é
 		-- justamente o estado que o backfill eliminou em produção — e o filtro por
-		-- operação de \`/produtividade\` a deixaria de fora.
+		-- operação de \`/operacoes/produtividade\` a deixaria de fora.
 		INSERT INTO gise_escalas (id, data_inicio, status, hora_entrada, hora_saida, supervisor_id, operacao_id)
 		VALUES (${FIXTURE.gise.id}, '${FIXTURE.gise.dataInicio}', 'em_andamento', '08:00', '16:00', ${FIXTURE.supervisor.id},
 			(SELECT id FROM operacoes WHERE nome = 'GISE'))

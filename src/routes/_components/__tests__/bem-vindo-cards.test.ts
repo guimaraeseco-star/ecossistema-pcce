@@ -92,7 +92,7 @@ describe('cards de boas-vindas × navegação lateral', () => {
 		const flags = flagsDe(SUPER, 'ambas');
 		const hrefs = cardsBemVindo({ usuario: SUPER, flags }).map((c) => c.href);
 		expect(hrefs).not.toContain('/escalas');
-		expect(hrefs).not.toContain('/gise');
+		expect(hrefs).not.toContain('/operacoes/gise');
 		expect(hrefs).not.toContain('/perfil');
 	});
 

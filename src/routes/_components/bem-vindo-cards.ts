@@ -67,7 +67,7 @@ const MINHA_PRESENCA: CardBemVindo = {
 	titulo: 'Minha presença',
 	descricao:
 		'Confirme sua entrada e saída nas escalas extras em que você foi escalado e assine a folha de presença.',
-	href: '/res-gise',
+	href: '/operacoes/presenca',
 	cta: 'Registrar presença'
 };
 
@@ -75,12 +75,12 @@ const MEU_HISTORICO: CardBemVindo = {
 	titulo: 'Meu histórico',
 	descricao:
 		'Consulte suas escalas extras já encerradas: comprovantes de presença e relatórios das operações anteriores.',
-	href: '/res-gise?status=finalizadas',
+	href: '/operacoes/presenca?status=finalizadas',
 	cta: 'Ver histórico'
 };
 
 /**
- * `/dados-base` — só aparece para quem TEM base pendente (`showDadosBase`), o
+ * `/operacoes/dados-base` — só aparece para quem TEM base pendente (`showDadosBase`), o
  * que faz dele o card mais próximo de uma tarefa a fazer. O texto diz para que
  * serve o número, porque quem preenche precisa saber que ele é o denominador da
  * meta.
@@ -89,16 +89,16 @@ const DADOS_BASE: CardBemVindo = {
 	titulo: 'Dados base',
 	descricao:
 		'Informe os números iniciais da sua unidade: são eles que servem de base para as metas percentuais das operações.',
-	href: '/dados-base',
+	href: '/operacoes/dados-base',
 	cta: 'Informar dados base'
 };
 
-/** `/gise` para o supervisor de GISE ativa — o único policial sem papel que a alcança. */
+/** `/operacoes/gise` para o supervisor de GISE ativa — o único policial sem papel que a alcança. */
 const SUPERVISAO_ESCALA_EXTRA: CardBemVindo = {
 	titulo: 'Supervisão da escala extra',
 	descricao:
 		'Acompanhe a escalação e a execução das escalas extras sob sua supervisão, e assine o que for da sua responsabilidade.',
-	href: '/gise',
+	href: '/operacoes/gise',
 	cta: 'Acessar supervisão'
 };
 

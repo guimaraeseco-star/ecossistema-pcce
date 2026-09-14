@@ -1,7 +1,7 @@
 /**
  * Chaves em `configuracoes` — o nível GLOBAL da cadeia, hoje só de leitura.
  *
- * Eram escritas pela antiga `/gise/config`, que saiu do ar quando a configuração
+ * Eram escritas pela antiga `/operacoes/gise/config`, que saiu do ar quando a configuração
  * virou por operação. Continuam sendo lidas: são o valor que uma operação herda
  * enquanto não define o seu. Manter o que já estava gravado é o que faz a
  * mudança não alterar nenhum PDF existente.

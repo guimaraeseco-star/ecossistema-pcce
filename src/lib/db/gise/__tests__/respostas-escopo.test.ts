@@ -3,7 +3,7 @@
  * SQLite real.
  *
  * Não é teste de agregação: é o filtro que impede o admin de uma delegacia de
- * ver a produtividade de outra em `/produtividade`. Um `WHERE` que some devolve
+ * ver a produtividade de outra em `/operacoes/produtividade`. Um `WHERE` que some devolve
  * TUDO, e essa falha é silenciosa — a tela não fica quebrada, fica ampla demais.
  *
  * O caso mais importante aqui é o do escopo VAZIO: "nenhuma unidade permitida"

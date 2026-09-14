@@ -182,7 +182,7 @@ function operacaoId(nome: string): number | null {
 async function abrirPainel(page: import('@playwright/test').Page, nome: string) {
 	const id = operacaoId(nome);
 	if (id == null) return false;
-	await page.goto(`/produtividade?operacaoId=${id}`);
+	await page.goto(`/operacoes/produtividade?operacaoId=${id}`);
 	await expandirMaisFiltros(page);
 	await page.locator('#f-ano').selectOption(String(ANO));
 	return true;
@@ -291,7 +291,7 @@ test('a caixa "Detalhamento" fica desabilitada onde não há quebra por tipo', a
 	const id = operacaoId(C.enxuta);
 	test.skip(id == null, 'operação do cenário não foi criada');
 
-	await page.goto(`/res-gise?operacaoId=${id}`);
+	await page.goto(`/operacoes/presenca?operacaoId=${id}`);
 
 	// As duas perguntas do formulário enxuto são `numero`: um valor só, nada a
 	// quebrar. Desabilitada e não escondida — a caixa apagada é que diz por quê.
@@ -324,7 +324,7 @@ test('operação sem nada a mostrar explica o que fazer, em vez de ficar em bran
 		 WHERE operacao_id = ${id} AND tipo = 'operacional';`
 	);
 
-	await page.goto(`/produtividade?operacaoId=${id}`);
+	await page.goto(`/operacoes/produtividade?operacaoId=${id}`);
 	await expect(page.getByText('Nada a mostrar nesta operação')).toBeVisible();
 	// O conserto não está nesta página, e a tela diz onde está.
 	await expect(page.getByText('Mostrar na produtividade')).toBeVisible();
@@ -346,7 +346,7 @@ test('o editor traz a caixinha, e ela reflete o que está gravado', async ({ pag
 	const id = operacaoId(C.enxuta);
 	test.skip(id == null, 'operação do cenário não foi criada');
 
-	await page.goto(`/res-gise?operacaoId=${id}`);
+	await page.goto(`/operacoes/presenca?operacaoId=${id}`);
 
 	// Uma caixinha por pergunta graficável: as duas `numero` e a de lista — que
 	// só passou a ter caixinha quando o painel deixou de resolver a chave por
@@ -371,7 +371,7 @@ test('o tipo de lista APOSENTADO não é oferecido para pergunta nova', async ({
 	const id = operacaoId(C.enxuta);
 	test.skip(id == null, 'operação do cenário não foi criada');
 
-	await page.goto(`/res-gise?operacaoId=${id}`);
+	await page.goto(`/operacoes/presenca?operacaoId=${id}`);
 
 	// Nenhuma pergunta deste formulário usa os três, então nenhum aparece. O
 	// genérico "Quantidade + Lista" faz o mesmo e ainda se repete.
@@ -392,7 +392,7 @@ test('desmarcar no editor e salvar tira o card do painel', async ({ page }) => {
 	// A ida e volta pelo BANCO é o que este caso protege: a action grava o
 	// `config` cru, e um campo perdido na serialização faria a caixinha "salvar"
 	// sem efeito nenhum — a tela confirma, o gráfico volta no reload.
-	await page.goto(`/res-gise?operacaoId=${id}`);
+	await page.goto(`/operacoes/presenca?operacaoId=${id}`);
 	await page
 		.getByRole('checkbox', { name: /Colunas por unidade/ })
 		.nth(0)
@@ -412,7 +412,7 @@ test('desmarcar no editor e salvar tira o card do painel', async ({ page }) => {
 	// Ausente, e não `false`: a ausência já é a resposta.
 	expect(perguntas.find((q) => q.key === 'e2e_atendimentos')?.grafico).toBeUndefined();
 
-	await page.goto(`/produtividade?operacaoId=${id}`);
+	await page.goto(`/operacoes/produtividade?operacaoId=${id}`);
 	await expect(page.getByText('ATENDIMENTOS REALIZADOS')).toHaveCount(0);
 
 	// Repõe, para o spec poder rodar de novo sobre o mesmo banco local.
@@ -438,7 +438,7 @@ test('o campo de título só aparece na pergunta MARCADA', async ({ page }) => {
 	const id = operacaoId(C.enxuta);
 	test.skip(id == null, 'operação do cenário não foi criada');
 
-	await page.goto(`/res-gise?operacaoId=${id}`);
+	await page.goto(`/operacoes/presenca?operacaoId=${id}`);
 
 	// Atendimentos (colunas) e flagrante (ranking) têm card no painel, logo têm o
 	// que intitular. A quilometragem não tem — pedir um título ali seria pedir o
@@ -463,7 +463,7 @@ test('as caixas de marcação vêm DEPOIS dos rótulos do campo', async ({ page 
 	const id = operacaoId(C.enxuta);
 	test.skip(id == null, 'operação do cenário não foi criada');
 
-	await page.goto(`/res-gise?operacaoId=${id}`);
+	await page.goto(`/operacoes/presenca?operacaoId=${id}`);
 
 	// A pergunta 3 é a única com os dois blocos: é de lista (tem rótulos de
 	// quantidade e listagem) e é graficável (tem as caixas).
@@ -492,12 +492,12 @@ test('o título gravado substitui o enunciado no card do painel', async ({ page 
 
 	// A ida e volta pelo BANCO, como no caso de desmarcar: um campo perdido na
 	// serialização faria a tela confirmar e o título voltar ao enunciado no reload.
-	await page.goto(`/res-gise?operacaoId=${id}`);
+	await page.goto(`/operacoes/presenca?operacaoId=${id}`);
 	await page.locator('#rot-painel-1').fill('Atendimentos do dia');
 	await page.getByRole('button', { name: /Salvar Modelo/ }).click();
 	await expect(page.getByText(/Modelo operacional salvo com sucesso/)).toBeVisible();
 
-	await page.goto(`/produtividade?operacaoId=${id}`);
+	await page.goto(`/operacoes/produtividade?operacaoId=${id}`);
 	await expandirMaisFiltros(page);
 	await page.locator('#f-ano').selectOption(String(ANO));
 	await expect(page.getByText('Atendimentos do dia', { exact: true })).toBeVisible();

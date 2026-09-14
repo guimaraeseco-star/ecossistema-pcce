@@ -122,7 +122,7 @@ test.describe('GISE finalizada é imutável', () => {
 			const token = seedSession(FIXTURE.adminGeral.id, 'admin');
 			test.skip(!token, 'D1 local indisponível');
 
-			const corpo = await postAction(`/gise/${GISE_FINALIZADA}?/${acao}`, token!, campos);
+			const corpo = await postAction(`/operacoes/gise/${GISE_FINALIZADA}?/${acao}`, token!, campos);
 
 			expect(corpo.type, `resposta: ${JSON.stringify(corpo)}`).toBe('failure');
 			expect(corpo.status, 'estado que não pode mudar é 409, não 400').toBe(409);
@@ -145,7 +145,7 @@ test.describe('equipe de outra GISE (FLW-GISE-007)', () => {
 		// A GISE da URL está EDITÁVEL — o gate de estado deixa passar, e o que
 		// sobra é exatamente o de escopo. Com a escala finalizada este caso não
 		// testaria nada: o primeiro gate barraria antes.
-		const corpo = await postAction(`/gise/${GISE_VIZINHA}?/salvarSlotsEquipe`, token!, {
+		const corpo = await postAction(`/operacoes/gise/${GISE_VIZINHA}?/salvarSlotsEquipe`, token!, {
 			equipeId: String(EQ_FINALIZADA),
 			slots_dpc: '9',
 			slots_oip: '9'

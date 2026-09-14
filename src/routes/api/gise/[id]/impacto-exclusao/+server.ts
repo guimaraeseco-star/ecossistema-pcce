@@ -6,7 +6,7 @@
  *
  * Existe para o modal de exclusão poder mostrar o número antes da confirmação.
  * A contagem não entra no `load` da página porque varre o R2 (`r2.list`), e
- * pagar essa ida de rede em toda visita a `/gise/[id]` seria desperdício: o dado
+ * pagar essa ida de rede em toda visita a `/operacoes/gise/[id]` seria desperdício: o dado
  * só interessa a quem abriu o diálogo de excluir.
  *
  * Mesma permissão da exclusão em si (Admin Geral): saber quantos documentos

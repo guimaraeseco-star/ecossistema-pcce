@@ -13,7 +13,7 @@
  * `status|data|hora_entrada|hora_saida|supervisor_id`; o de uma escala traz
  * `policial_id:data:horário` de cada escalado. Sem os gates, qualquer
  * autenticado enumerava `?giseId=1..N` e montava o calendário de operações e a
- * escala de trabalho de terceiros — coisas que `/gise/[id]` e `/escalas/[id]`
+ * escala de trabalho de terceiros — coisas que `/operacoes/gise/[id]` e `/escalas/[id]`
  * recusam pelos helpers abaixo.
  *
  * Quem não pode ver recebe o corpo SEM aquele campo, não um 403: um erro
@@ -68,7 +68,7 @@ export const GET: RequestHandler = async ({ locals, platform, url }) => {
 		const tasks: Promise<void>[] = [];
 
 		// `giseList` carrega os ids e status de TODAS as GISEs. Só vai para quem a
-		// tela `/gise` deixaria entrar — lá, quem não tem vínculo nenhum é
+		// tela `/operacoes/gise` deixaria entrar — lá, quem não tem vínculo nenhum é
 		// redirecionado para `/`.
 		tasks.push(
 			(async () => {

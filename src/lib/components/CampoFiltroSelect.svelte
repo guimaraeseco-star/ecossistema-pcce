@@ -4,7 +4,7 @@
 	 * repetido em toda barra de filtros com dropdown de busca (painel,
 	 * recebidos: Seccional/Unidade/Ano/Mês).
 	 *
-	 * Rótulo e tamanho do input seguem a caixa de `/produtividade` (`text-3xs` /
+	 * Rótulo e tamanho do input seguem a caixa de `/operacoes/produtividade` (`text-3xs` /
 	 * `text-xs`), via tokens em `$lib/gise/filtro-historico-ui`.
 	 */
 	import SearchableSelect from './SearchableSelect.svelte';

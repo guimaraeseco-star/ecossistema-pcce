@@ -17,7 +17,7 @@
  * Dois eixos que o arquivo trata de propósito:
  *
  * - **Grupo é organização de tela, não de URL.** Os cartões apontam para as
- *   rotas planas dos módulos (`/servidores`, `/gise`, `/unidade`…); quando um
+ *   rotas planas dos módulos (`/servidores`, `/operacoes/gise`, `/unidade`…); quando um
  *   endereço muda (1.4), muda-se o `href` aqui e em lugar nenhum mais.
  * - **Cartão PLANEJADO aparece desligado**, com o rótulo "Em breve", como no
  *   protótipo que originou o Ecossistema: a home mostra a plataforma inteira,
@@ -205,7 +205,8 @@ const MEU_PERFIL: CartaoHome = {
 function cardEscalaExtra(u: UsuarioDaHome, flags: FlagsMenu): CartaoHome | null {
 	if (!flags.showGise) return null;
 	const atalhos: AtalhoHome[] = [];
-	if (flags.isAdmGeral) atalhos.push({ rotulo: 'Finalizadas', href: '/gise/finalizadas' });
+	if (flags.isAdmGeral)
+		atalhos.push({ rotulo: 'Finalizadas', href: '/operacoes/gise/finalizadas' });
 	if (flags.showEscalasPoliciais) {
 		atalhos.push({ rotulo: 'Fim de semana', href: '/escalas?tipo=fds' });
 	}
@@ -219,7 +220,7 @@ function cardEscalaExtra(u: UsuarioDaHome, flags: FlagsMenu): CartaoHome | null 
 		titulo: 'Escala extra',
 		descricao,
 		icone: ICONE.pranchetaLista,
-		href: '/gise',
+		href: '/operacoes/gise',
 		cta: 'Acessar escalas extras',
 		atalhos
 	};
@@ -234,9 +235,9 @@ function cardPlanoOperacional(flags: FlagsMenu): CartaoHome | null {
 		descricao:
 			'Crie o plano operacional com equipes, deslocamento e custos, e cadastre as operações extraordinárias.',
 		icone: ICONE.documento,
-		href: '/gise/planos',
+		href: '/operacoes/planos',
 		cta: 'Ver planos operacionais',
-		atalhos: [{ rotulo: 'Operações', href: '/gise/operacoes' }]
+		atalhos: [{ rotulo: 'Operações', href: '/operacoes/gise/operacoes' }]
 	};
 }
 
@@ -245,7 +246,7 @@ const PRODUTIVIDADE: CartaoHome = {
 	titulo: 'Produtividade',
 	descricao: 'Indicadores e metas de cada operação, em gráficos que você pode exportar.',
 	icone: ICONE.barras,
-	href: '/produtividade',
+	href: '/operacoes/produtividade',
 	cta: 'Ver produtividade',
 	atalhos: []
 };
@@ -257,7 +258,7 @@ const DADOS_BASE: CartaoHome = {
 	descricao:
 		'Informe os números iniciais da sua unidade: são a base das metas percentuais das operações.',
 	icone: ICONE.checkLista,
-	href: '/dados-base',
+	href: '/operacoes/dados-base',
 	cta: 'Informar dados base',
 	atalhos: []
 };
@@ -267,7 +268,7 @@ const MINHA_PRESENCA: CartaoHome = {
 	titulo: 'Minha presença',
 	descricao: 'Confirme sua entrada e saída nas escalas extras em que você foi escalado.',
 	icone: ICONE.documento,
-	href: '/res-gise',
+	href: '/operacoes/presenca',
 	cta: 'Registrar presença',
 	atalhos: []
 };
@@ -277,7 +278,7 @@ const MEU_HISTORICO: CartaoHome = {
 	titulo: 'Meu histórico',
 	descricao: 'Suas escalas extras já encerradas: comprovantes de presença e relatórios.',
 	icone: ICONE.historico,
-	href: '/res-gise?status=finalizadas',
+	href: '/operacoes/presenca?status=finalizadas',
 	cta: 'Ver histórico',
 	atalhos: []
 };

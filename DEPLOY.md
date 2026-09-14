@@ -301,9 +301,9 @@ esperar ao vê-las passar em staging e em produção.
 - **`0051_operacao_config.sql`** acrescenta a `operacoes` as colunas de
   configuração de escala (vagas padrão, horários e textos do breve relatório).
   Todas nascem **NULL**, que significa "herda o padrão do sistema" — as chaves em
-  `configuracoes` que a antiga `/gise/config` gravava continuam sendo lidas, e
-  nenhum PDF muda. A tela `/gise/config` sai do menu e passa a redirecionar
-  (308) para `/gise/operacoes`; o que ela editava vive agora no botão
+  `configuracoes` que a antiga `/operacoes/gise/config` gravava continuam sendo lidas, e
+  nenhum PDF muda. A tela `/operacoes/gise/config` sai do menu e passa a redirecionar
+  (308) para `/operacoes/gise/operacoes`; o que ela editava vive agora no botão
   **Configurações** de cada operação.
 
   Consequência a comunicar ao Admin Geral: **não há mais um editor do valor
@@ -327,8 +327,8 @@ esperar ao vê-las passar em staging e em produção.
   WHERE respostas LIKE '%crajubar_atendimentos_fds%';
   ```
 
-Depois do deploy, confira em `/gise/operacoes` que as duas operações aparecem
-(cada uma com os botões Formulário · Configurações · Editar), e em `/gise` que as
+Depois do deploy, confira em `/operacoes/gise/operacoes` que as duas operações aparecem
+(cada uma com os botões Formulário · Configurações · Editar), e em `/operacoes/gise` que as
 escalas antigas exibem o selo **GISE**.
 
 ## Armazenamento (R2)

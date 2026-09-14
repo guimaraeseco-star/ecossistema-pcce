@@ -494,7 +494,7 @@ export const operacaoLinhaBase = sqliteTable(
 		/** Copiado para a linha: precisa continuar dizendo quem informou depois que
 		 *  o cadastro do policial mudar ou sair. */
 		informado_por_nome: text('informado_por_nome').notNull().default(''),
-		/** 'aba' = /dados-base; 'formulario' = capturado no relatório de produtividade. */
+		/** 'aba' = /operacoes/dados-base; 'formulario' = capturado no relatório de produtividade. */
 		origem: text('origem', { enum: ['aba', 'formulario'] })
 			.notNull()
 			.default('aba'),
@@ -708,7 +708,7 @@ export const giseModeloFormulario = sqliteTable(
 		 *  primeira gravação. Ver migração 0039. */
 		config_anterior: text('config_anterior'),
 		/**
-		 * A ordem dos cards no painel de `/produtividade`, como o Admin Geral os
+		 * A ordem dos cards no painel de `/operacoes/produtividade`, como o Admin Geral os
 		 * arrastou — array JSON de ids de card (migração 0064).
 		 *
 		 * **NULL = ordem do formulário**, que é o que toda linha anterior à 0064 é.

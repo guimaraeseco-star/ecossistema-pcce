@@ -1,5 +1,5 @@
 /**
- * Linha de base dos indicadores — a aba `/dados-base` e o escopo dela.
+ * Linha de base dos indicadores — a aba `/operacoes/dados-base` e o escopo dela.
  *
  * O que este spec prova, e nenhum teste unitário prova: a `unidadeId` chega no
  * CORPO do POST. `unidadesLinhaBaseAdministradas` tem cobertura unitária, mas
@@ -114,7 +114,7 @@ test.describe('Dados base (linha de base dos indicadores)', () => {
 		const id = operacaoId();
 		test.skip(id == null, 'operação do cenário não foi criada');
 
-		const res = await page.goto(`/dados-base/${id}`);
+		const res = await page.goto(`/operacoes/dados-base/${id}`);
 		expect(res?.status()).toBe(200);
 
 		await expect(page.getByRole('heading', { name: 'Dados base' })).toBeVisible();
@@ -137,7 +137,7 @@ test.describe('Dados base (linha de base dos indicadores)', () => {
 
 		// Antes, um id inválido caía na PRIMEIRA operação ativa — mesma tela, outra
 		// operação, e o admin preencheria sem perceber a troca.
-		const res = await page.goto('/dados-base/99999999');
+		const res = await page.goto('/operacoes/dados-base/99999999');
 		expect(res?.status()).toBe(404);
 	});
 
@@ -149,8 +149,8 @@ test.describe('Dados base (linha de base dos indicadores)', () => {
 		test.skip(id == null, 'operação do cenário não foi criada');
 
 		// Com uma só, a escolha não existe — e não se pergunta.
-		await page.goto('/dados-base');
-		await expect(page).toHaveURL(new RegExp(`/dados-base/${id}`));
+		await page.goto('/operacoes/dados-base');
+		await expect(page).toHaveURL(new RegExp(`/operacoes/dados-base/${id}`));
 	});
 
 	test('com uma pendência só NÃO há botão de voltar', async ({ page }) => {
@@ -160,7 +160,7 @@ test.describe('Dados base (linha de base dos indicadores)', () => {
 		const id = operacaoId();
 		test.skip(id == null, 'operação do cenário não foi criada');
 
-		await page.goto(`/dados-base/${id}`);
+		await page.goto(`/operacoes/dados-base/${id}`);
 		// O índice redirecionaria de volta para cá: um "Voltar" que não sai do
 		// lugar é pior que nenhum. O caminho de volta é a barra lateral.
 		await expect(page.getByRole('link', { name: /^Voltar/ })).toHaveCount(0);
@@ -175,14 +175,14 @@ test.describe('Dados base (linha de base dos indicadores)', () => {
 		const id = operacaoId();
 		test.skip(id == null, 'operação do cenário não foi criada');
 
-		await page.goto(`/dados-base/${id}`);
+		await page.goto(`/operacoes/dados-base/${id}`);
 		const voltar = page.getByRole('link', { name: 'Voltar às operações' });
 		await expect(voltar).toBeVisible();
 		await voltar.click();
 
 		// E não de volta para esta mesma tela, que é o que o `href` fixo fazia.
-		await expect(page).toHaveURL(/\/gise\/operacoes/);
-		await expect(page).not.toHaveURL(/\/dados-base/);
+		await expect(page).toHaveURL(/\/operacoes\/gise\/operacoes/);
+		await expect(page).not.toHaveURL(/\/operacoes\/dados-base/);
 	});
 
 	test('grava a base da própria unidade', async ({ request }) => {
@@ -192,7 +192,7 @@ test.describe('Dados base (linha de base dos indicadores)', () => {
 		const id = operacaoId();
 		test.skip(id == null, 'operação do cenário não foi criada');
 
-		const res = await request.post(`/dados-base/${id}?/salvar`, {
+		const res = await request.post(`/operacoes/dados-base/${id}?/salvar`, {
 			headers: headersFormAction(token!),
 			form: {
 				operacaoId: String(id),
@@ -213,7 +213,7 @@ test.describe('Dados base (linha de base dos indicadores)', () => {
 		const id = operacaoId();
 		test.skip(id == null, 'operação do cenário não foi criada');
 
-		const res = await request.post(`/dados-base/${id}?/salvar`, {
+		const res = await request.post(`/operacoes/dados-base/${id}?/salvar`, {
 			headers: headersFormAction(token!),
 			form: {
 				operacaoId: String(id),
@@ -238,12 +238,12 @@ test.describe('Dados base (linha de base dos indicadores)', () => {
 		const ok = await autenticarPagina(page, FIXTURE.policialB.id);
 		test.skip(!ok, 'D1 local indisponível');
 
-		const res = await page.goto('/dados-base');
+		const res = await page.goto('/operacoes/dados-base');
 		expect(res?.status()).toBe(403);
 	});
 
 	test('anônimo → /login', async ({ page }) => {
-		await page.goto('/dados-base');
+		await page.goto('/operacoes/dados-base');
 		await expect(page).toHaveURL(/\/login/);
 	});
 });
@@ -253,7 +253,7 @@ test.describe('Cadastro de operações', () => {
 		const ok = await autenticarPagina(page, FIXTURE.adminGeral.id, 'admin');
 		test.skip(!ok, 'D1 local indisponível');
 
-		const res = await page.goto('/gise/operacoes');
+		const res = await page.goto('/operacoes/gise/operacoes');
 		expect(res?.status()).toBe(200);
 		await expect(page.getByRole('heading', { name: 'Operações', exact: true })).toBeVisible();
 		// A migração 0048/0050 semeia as duas.
@@ -268,13 +268,13 @@ test.describe('Cadastro de operações', () => {
 		const id = operacaoId();
 		test.skip(id == null, 'operação do cenário não foi criada');
 
-		await page.goto('/gise/operacoes');
+		await page.goto('/operacoes/gise/operacoes');
 
 		// A do cenário tem indicador percentual → tem o botão, apontando para ELA.
 		const doCenario = page.locator('li').filter({ hasText: CENARIO.operacao.nome });
 		const botao = doCenario.getByRole('link', { name: 'Dados base' });
 		await expect(botao).toBeVisible();
-		await expect(botao).toHaveAttribute('href', `/dados-base/${id}`);
+		await expect(botao).toHaveAttribute('href', `/operacoes/dados-base/${id}`);
 
 		// A GISE não tem indicador nenhum → não tem o que perguntar às delegacias.
 		const gise = page.locator('li').filter({ hasText: 'Grupo de Investigação' });
@@ -285,7 +285,7 @@ test.describe('Cadastro de operações', () => {
 		const ok = await autenticarPagina(page, FIXTURE.policialB.id);
 		test.skip(!ok, 'D1 local indisponível');
 
-		await page.goto('/gise/operacoes');
-		await expect(page).not.toHaveURL(/\/gise\/operacoes/);
+		await page.goto('/operacoes/gise/operacoes');
+		await expect(page).not.toHaveURL(/\/operacoes\/gise\/operacoes/);
 	});
 });

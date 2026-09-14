@@ -80,10 +80,10 @@ describe('moduloExigidoPelaRota', () => {
 		expect(moduloExigidoPelaRota('/recebidos')).toBe('escalas');
 		expect(moduloExigidoPelaRota('/escalas/123')).toBe('escalas');
 		expect(moduloExigidoPelaRota('/api/escalas/1/download')).toBe('escalas');
-		expect(moduloExigidoPelaRota('/gise')).toBe('gise');
-		expect(moduloExigidoPelaRota('/gise/operacoes')).toBe('gise');
-		expect(moduloExigidoPelaRota('/produtividade')).toBe('gise');
-		expect(moduloExigidoPelaRota('/res-gise')).toBe('gise');
+		expect(moduloExigidoPelaRota('/operacoes/gise')).toBe('gise');
+		expect(moduloExigidoPelaRota('/operacoes/gise/operacoes')).toBe('gise');
+		expect(moduloExigidoPelaRota('/operacoes/produtividade')).toBe('gise');
+		expect(moduloExigidoPelaRota('/operacoes/presenca')).toBe('gise');
 		expect(moduloExigidoPelaRota('/api/gise/1/download')).toBe('gise');
 	});
 
@@ -106,21 +106,21 @@ describe('adminPodeAcessarRota', () => {
 	};
 
 	it('barra o console que a conta não tem', () => {
-		expect(adminPodeAcessarRota(soEscalas, '/gise')).toBe(false);
+		expect(adminPodeAcessarRota(soEscalas, '/operacoes/gise')).toBe(false);
 		expect(adminPodeAcessarRota(soEscalas, '/painel')).toBe(true);
 		expect(adminPodeAcessarRota(soGise, '/painel')).toBe(false);
-		expect(adminPodeAcessarRota(soGise, '/gise')).toBe(true);
+		expect(adminPodeAcessarRota(soGise, '/operacoes/gise')).toBe(true);
 	});
 
 	it('Super Admin e não-admin passam', () => {
 		expect(
 			adminPodeAcessarRota(
 				{ tipo: 'admin', isSuperAdmin: true, modulosAdmin: soEscalas.modulosAdmin },
-				'/gise'
+				'/operacoes/gise'
 			)
 		).toBe(true);
-		expect(adminPodeAcessarRota({ tipo: 'policial' }, '/gise')).toBe(true);
-		expect(adminPodeAcessarRota(null, '/gise')).toBe(true);
+		expect(adminPodeAcessarRota({ tipo: 'policial' }, '/operacoes/gise')).toBe(true);
+		expect(adminPodeAcessarRota(null, '/operacoes/gise')).toBe(true);
 	});
 
 	it('rotas compartilhadas passam mesmo com um módulo só', () => {

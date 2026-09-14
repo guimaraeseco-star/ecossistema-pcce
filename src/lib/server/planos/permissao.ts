@@ -18,7 +18,7 @@
  *
  * ## O que este portão exige, hoje
  *
- * **Admin Geral** para tudo em `/gise/planos` — ler, criar, editar, excluir e
+ * **Admin Geral** para tudo em `/operacoes/planos` — ler, criar, editar, excluir e
  * baixar o PDF. É o que o pedido define: os dados são todos preenchidos pelo
  * Administrador Geral (GISE).
  *

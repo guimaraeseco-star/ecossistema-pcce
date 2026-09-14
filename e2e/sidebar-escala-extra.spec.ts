@@ -64,9 +64,9 @@ test.describe('Barra lateral — menu de dois níveis', () => {
 		const ok = await autenticarPagina(page, FIXTURE.adminUnidade.id);
 		test.skip(!ok, 'D1 local indisponível');
 
-		// Sem isto, abrir o menu em /produtividade mostraria a raiz e esconderia
+		// Sem isto, abrir o menu em /operacoes/produtividade mostraria a raiz e esconderia
 		// justamente onde a pessoa está.
-		await page.goto('/produtividade');
+		await page.goto('/operacoes/produtividade');
 		const nav = await abrirMenu(page);
 
 		const item = nav.getByRole('link', { name: 'Produtividade' });
@@ -90,7 +90,7 @@ test.describe('Barra lateral — menu de dois níveis', () => {
 		const ok = await autenticarPagina(page, FIXTURE.adminGeral.id, 'admin');
 		test.skip(!ok, 'D1 local indisponível');
 
-		await page.goto('/gise/operacoes');
+		await page.goto('/operacoes/gise/operacoes');
 		const nav = await abrirMenu(page);
 
 		// Cadastro de operação não é operação do dia a dia — decisão registrada.
@@ -127,7 +127,7 @@ test.describe('Barra lateral — menu de dois níveis', () => {
 		const ok = await autenticarPagina(page, FIXTURE.adminGeral.id, 'admin');
 		test.skip(!ok, 'D1 local indisponível');
 
-		await page.goto('/gise');
+		await page.goto('/operacoes/gise');
 		const nav = await abrirMenu(page);
 
 		const ativas = nav.getByRole('link', { name: 'Ativas', exact: true });
@@ -137,7 +137,7 @@ test.describe('Barra lateral — menu de dois níveis', () => {
 		await expect(ativas).toHaveClass(/bg-primary-500\/15/);
 		await expect(finalizadas).not.toHaveClass(/bg-primary-500\/15/);
 
-		await page.goto('/gise/finalizadas');
+		await page.goto('/operacoes/gise/finalizadas');
 		const navArquivo = await abrirMenu(page);
 		await expect(navArquivo.getByRole('link', { name: 'Ativas', exact: true })).not.toHaveClass(
 			/bg-primary-500\/15/

@@ -131,9 +131,7 @@ function mostrarDiff(antes, regioes) {
 		console.log('Nada mudou — a composição no repositório continua válida.');
 		return;
 	}
-	console.log(
-		`\n⚠ ${mudancas.length} mudança(s). Cada uma LIGA ou DESLIGA o alerta da vedação do`
-	);
+	console.log(`\n⚠ ${mudancas.length} mudança(s). Cada uma LIGA ou DESLIGA o alerta da vedação do`);
 	console.log('  art. 4º, §1º, II para todo plano futuro naquele município:');
 	for (const l of mudancas) console.log(l);
 }
@@ -183,7 +181,9 @@ for (const [sigla, r] of regioes) {
 	console.error(`[regioes] ${sigla}: ${r.municipios.length} municípios (${r.nome}).`);
 }
 if (regioes.size !== SIGLAS.size) {
-	console.error(`⚠ esperava ${SIGLAS.size} regiões e vieram ${regioes.size} — confira antes de usar.`);
+	console.error(
+		`⚠ esperava ${SIGLAS.size} regiões e vieram ${regioes.size} — confira antes de usar.`
+	);
 }
 
 if (modoDiff) {

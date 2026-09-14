@@ -3,7 +3,7 @@
  *
  * Guardadas como JSON numa única chave de `configuracoes` em vez de colunas
  * próprias: são um preset de UI, editado por operação em
- * `/gise/operacoes/[id]/config`, e não entram em
+ * `/operacoes/gise/operacoes/[id]/config`, e não entram em
  * consulta nenhuma. Toda leitura passa pelo parser tolerante abaixo, porque o
  * valor pode ter sido gravado por uma versão anterior ou editado à mão.
  */

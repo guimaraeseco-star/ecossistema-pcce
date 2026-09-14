@@ -20,7 +20,7 @@ let sqlite: DatabaseSync;
 let db: Database;
 let operacaoId: number;
 
-/** Grava a chave global de vagas (a que a antiga `/gise/config` editava). */
+/** Grava a chave global de vagas (a que a antiga `/operacoes/gise/config` editava). */
 function definirGlobal(json: string) {
 	sqlite
 		.prepare(

@@ -137,7 +137,7 @@ test('a barra tem os quatro controles de comparação e os dois de recorte', asy
 	const id = operacaoId();
 	test.skip(id == null, 'operação do cenário não foi criada');
 
-	await page.goto(`/produtividade?operacaoId=${id}`);
+	await page.goto(`/operacoes/produtividade?operacaoId=${id}`);
 
 	// Linha 1: o que está em foco — eixo e tipo de equipe (a operação só aparece
 	// quando há mais de uma).
@@ -164,7 +164,7 @@ test('trocar o eixo não muda o total, só a quebra', async ({ page }) => {
 	const id = operacaoId();
 	test.skip(id == null, 'operação do cenário não foi criada');
 
-	await page.goto(`/produtividade?operacaoId=${id}`);
+	await page.goto(`/operacoes/produtividade?operacaoId=${id}`);
 	await expandirMaisFiltros(page);
 	await page.locator('#f-ano').selectOption(String(ANO));
 
@@ -188,7 +188,7 @@ test('a equipe sem slot aparece como linha própria no modo Delegacias', async (
 	const id = operacaoId();
 	test.skip(id == null, 'operação do cenário não foi criada');
 
-	await page.goto(`/produtividade?operacaoId=${id}`);
+	await page.goto(`/operacoes/produtividade?operacaoId=${id}`);
 	await expandirMaisFiltros(page);
 	await page.locator('#f-ano').selectOption(String(ANO));
 	await page.getByRole('button', { name: 'Delegacias', exact: true }).click();
@@ -209,7 +209,7 @@ test('ordem e quantidade recortam o ranking', async ({ page }) => {
 	const id = operacaoId();
 	test.skip(id == null, 'operação do cenário não foi criada');
 
-	await page.goto(`/produtividade?operacaoId=${id}`);
+	await page.goto(`/operacoes/produtividade?operacaoId=${id}`);
 	await expandirMaisFiltros(page);
 	await page.locator('#f-ano').selectOption(String(ANO));
 	await page.getByRole('button', { name: 'Delegacias', exact: true }).click();
@@ -238,7 +238,7 @@ test('operação de um tipo de equipe só desabilita o outro botão', async ({ p
 	// Desabilitado, e não escondido: o botão apagado diz que a operação NÃO usa
 	// aquele tipo. Escondê-lo faria a barra parecer diferente sem explicar.
 	execD1Local(`UPDATE operacoes SET usa_equipe_seint = 0 WHERE id = ${id};`);
-	await page.goto(`/produtividade?operacaoId=${id}`);
+	await page.goto(`/operacoes/produtividade?operacaoId=${id}`);
 
 	await expect(page.getByRole('button', { name: 'Inteligência', exact: true })).toBeDisabled();
 	await expect(page.getByRole('button', { name: 'Operacional', exact: true })).toBeEnabled();

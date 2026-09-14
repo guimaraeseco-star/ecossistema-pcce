@@ -23,7 +23,9 @@
 	 * cards: "Meu perfil" existe para todo mundo e o histórico é de GISE já
 	 * encerrada — nenhum dos dois desmente o aviso.
 	 */
-	const semConvocacao = $derived(!acoes.some((a) => a.href === '/gise' || a.href === '/res-gise'));
+	const semConvocacao = $derived(
+		!acoes.some((a) => a.href === '/operacoes/gise' || a.href === '/operacoes/presenca')
+	);
 
 	/**
 	 * O cabeçalho não pode prometer plantão, presença e relatório para quem só

@@ -1,6 +1,6 @@
 /**
  * Forma da GISE **montada** — o que `buscarGiseDetalhado` devolve e a página
- * `/gise/[id]` consome.
+ * `/operacoes/gise/[id]` consome.
  *
  * São tipos de VISTA, não de tabela: cada um estende a linha do schema com os
  * campos que só existem depois dos joins e da agregação em memória

@@ -38,7 +38,7 @@ export interface LinhaBaseEntrada {
 	observacao?: string;
 	informadoPorId?: number | null;
 	informadoPorNome?: string;
-	/** 'aba' = /dados-base; 'formulario' = capturado no relatório de produtividade. */
+	/** 'aba' = /operacoes/dados-base; 'formulario' = capturado no relatório de produtividade. */
 	origem?: 'aba' | 'formulario';
 }
 

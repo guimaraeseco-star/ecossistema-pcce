@@ -184,7 +184,7 @@ export async function autenticarPagina(
 }
 
 /**
- * A linha de quantidade/ordem/período de `/produtividade` começa recolhida
+ * A linha de quantidade/ordem/período de `/operacoes/produtividade` começa recolhida
  * atrás de "Mais filtros". Specs que mexem em `#f-ano` / `#f-qtd` / `#f-ordem`
  * precisam abrir antes.
  */

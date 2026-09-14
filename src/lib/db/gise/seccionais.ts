@@ -100,7 +100,7 @@ export async function criarSlotComEquipesPadrao(
 
 /**
  * Garante que a seccional participe da GISE e devolve o id de
- * `gise_seccionais` — idempotente, é o que permite a `/gise` chamar em laço
+ * `gise_seccionais` — idempotente, é o que permite a `/operacoes/gise` chamar em laço
  * para todas as seccionais ao criar uma escala "completa".
  *
  * Assimetria importante: no INSERT a seccional ganha um slot em branco com as

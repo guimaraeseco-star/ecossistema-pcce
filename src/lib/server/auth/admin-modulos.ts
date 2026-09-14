@@ -17,14 +17,9 @@ export type AdminModuloPreferencia = 'ambas' | 'gise' | 'escalas';
 
 const PREFIXOS_ESCALAS = ['/painel', '/recebidos', '/escalas', '/api/escalas'] as const;
 
-const PREFIXOS_GISE = [
-	'/gise',
-	'/produtividade',
-	'/dados-base',
-	'/res-gise',
-	'/api/gise',
-	'/api/produtividade'
-] as const;
+// Desde o PR 1.4b todo o módulo Operações (escala extra, planos, presença,
+// produtividade, dados base) mora sob `/operacoes`; um prefixo cobre as telas.
+const PREFIXOS_GISE = ['/operacoes', '/api/gise', '/api/produtividade'] as const;
 
 /** Lê as colunas da linha (ou força os dois para Super Admin). */
 export function modulosDaContaAdmin(

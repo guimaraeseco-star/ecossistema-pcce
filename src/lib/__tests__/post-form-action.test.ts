@@ -80,12 +80,12 @@ describe('postFormAction', () => {
 
 describe('postPageAction', () => {
 	it('monta `?/nome` sobre o pathname informado', async () => {
-		await postPageAction('salvarEntrada', new FormData(), '/res-gise');
-		expect(ultimaUrl()).toBe('/res-gise?/salvarEntrada');
+		await postPageAction('salvarEntrada', new FormData(), '/operacoes/presenca');
+		expect(ultimaUrl()).toBe('/operacoes/presenca?/salvarEntrada');
 	});
 
 	it('mantém o mesmo contrato de headers do postFormAction', async () => {
-		await postPageAction('salvarEntrada', new FormData(), '/res-gise');
+		await postPageAction('salvarEntrada', new FormData(), '/operacoes/presenca');
 		const headers = ultimoInit().headers as Record<string, string>;
 		expect(headers['x-csrf-token']).toBe('tok-123');
 		expect(headers['x-sveltekit-action']).toBe('true');

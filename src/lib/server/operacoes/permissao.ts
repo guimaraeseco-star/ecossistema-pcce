@@ -114,7 +114,7 @@ function parseModelo(raw: string | null | undefined): GiseModeloPerguntaConfig[]
  * (o caso da GISE) também não.
  *
  * Existe como função porque a resposta é precisa em dois lugares que não se
- * conhecem: o BOTÃO "Dados base" na linha de cada operação em `/gise/operacoes`
+ * conhecem: o BOTÃO "Dados base" na linha de cada operação em `/operacoes/gise/operacoes`
  * e a flag do menu (`temLinhaBaseAPreencher`, logo abaixo). Se os dois critérios
  * divergissem, o botão apareceria numa operação em que a tela não tem o que
  * pedir — ou sumiria de uma que tem.
@@ -168,7 +168,7 @@ export async function operacoesComLinhaBase(
  *
  * Sem a segunda, a lista incluiria operações de delegacias que o usuário não
  * administra; sem a primeira, incluiria operações em que não há o que preencher.
- * É a resposta que o índice de `/dados-base` usa para decidir entre redirecionar
+ * É a resposta que o índice de `/operacoes/dados-base` usa para decidir entre redirecionar
  * (uma só) e oferecer a escolha (mais de uma).
  *
  * Só ATIVAS: base de operação encerrada não é trabalho pendente.
@@ -203,7 +203,7 @@ export async function operacoesComLinhaBasePendente(
  *
  * Devolve `false` para o Admin Geral — não por falta de permissão, mas porque
  * para ele a conferência é por operação e vive no botão de cada linha de
- * `/gise/operacoes`. Quem chama isto é o menu; a autorização de `/dados-base`
+ * `/operacoes/gise/operacoes`. Quem chama isto é o menu; a autorização de `/operacoes/dados-base`
  * continua sendo `unidadesLinhaBaseAdministradas`, no servidor, para todo mundo.
  */
 export async function temLinhaBaseAPreencher(

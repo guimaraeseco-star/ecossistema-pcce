@@ -152,15 +152,15 @@ describe('o módulo da home segue o que a conta admin tem ligado, não a prefer�
 		);
 		const destinosEscalas = destinosDaHome(soEscalas);
 		expect(destinosEscalas).toContain('/painel');
-		expect(destinosEscalas).not.toContain('/gise');
-		expect(destinosEscalas).not.toContain('/gise/planos');
+		expect(destinosEscalas).not.toContain('/operacoes/gise');
+		expect(destinosEscalas).not.toContain('/operacoes/planos');
 
 		const soGise = gruposHomeDaPagina(
 			{ ...ADM_GERAL, modulosAdmin: { escalas: false, gise: true } },
 			{}
 		);
 		const destinosGise = destinosDaHome(soGise);
-		expect(destinosGise).toContain('/gise');
+		expect(destinosGise).toContain('/operacoes/gise');
 		expect(destinosGise).not.toContain('/painel');
 		expect(destinosGise).not.toContain('/recebidos');
 	});
@@ -252,7 +252,7 @@ describe('a organização fixada em 13/09/2026', () => {
 		// o Admin Geral não monta escala: sem o atalho
 		const extraGeral = geral.flatMap((g) => g.cartoes).find((c) => c.id === 'escala-extra');
 		expect(extraGeral?.atalhos.map((a) => a.href)).not.toContain('/escalas?tipo=fds');
-		expect(extraGeral?.atalhos.map((a) => a.href)).toContain('/gise/finalizadas');
+		expect(extraGeral?.atalhos.map((a) => a.href)).toContain('/operacoes/gise/finalizadas');
 	});
 
 	it('o resumo do cartão grande segue o que o perfil alcança', () => {

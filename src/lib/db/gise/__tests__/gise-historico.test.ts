@@ -1,7 +1,7 @@
 /**
  * `temGiseHistorico` — o predicado que libera a aba "Histórico GISE".
  *
- * A régua tem de ser a MESMA que a lista de `/res-gise` usa para separar ativas
+ * A régua tem de ser a MESMA que a lista de `/operacoes/presenca` usa para separar ativas
  * de finalizadas (`isFinished`): o policial tem histórico quando já bateu a
  * SAÍDA (mesmo com a GISE aberta para os demais) ou quando a GISE inteira foi
  * finalizada. Participação ainda em curso, sem saída, NÃO é histórico — senão a

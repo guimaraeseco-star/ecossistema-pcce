@@ -1,5 +1,5 @@
 /**
- * Helpers PUROS da tela `/gise/[id]` — derivam da GISE já montada
+ * Helpers PUROS da tela `/operacoes/gise/[id]` — derivam da GISE já montada
  * (`GiseDetalhado`) as respostas que o markup precisa, sem tocar o banco.
  *
  * Existem fora dos componentes por dois motivos: são compartilhados por

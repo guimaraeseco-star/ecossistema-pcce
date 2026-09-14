@@ -23,7 +23,7 @@ import { autenticarPagina, execD1Local, queryD1Local } from './session';
 
 const GISE = FIXTURE.gise.id;
 const EQUIPE = FIXTURE.giseEquipe.id;
-const ROTA = `/res-gise/relatorio/${GISE}?equipeId=${EQUIPE}`;
+const ROTA = `/operacoes/presenca/relatorio/${GISE}?equipeId=${EQUIPE}`;
 
 async function silenciar(page: import('@playwright/test').Page) {}
 
@@ -121,7 +121,7 @@ test('cobertura: dois campos, a razão na tela e duas perguntas que não se mist
 	await cartao2.locator('input[type="number"]').nth(1).fill('4');
 
 	await page.getByRole('button', { name: 'Finalizar entrega' }).click();
-	await expect(page).toHaveURL(/\/res-gise\?giseId=/);
+	await expect(page).toHaveURL(/\/operacoes\/presenca\?giseId=/);
 
 	// O blob tem as QUATRO chaves derivadas, cada pergunta na sua — e nenhuma
 	// porcentagem gravada, que é o ponto: ela se recalcula, não se guarda.
@@ -143,7 +143,7 @@ test('editor: cobertura traz os rótulos dos dois campos e uma meta SEM objetivo
 	await silenciar(page);
 	const ok = await autenticarPagina(page, FIXTURE.adminGeral.id, 'admin');
 	test.skip(!ok, 'D1 local indisponível');
-	await page.goto('/res-gise');
+	await page.goto('/operacoes/presenca');
 	await expect(page.getByRole('heading', { name: 'Configurar Formulário' })).toBeVisible();
 
 	// Pelo id da pergunta, e não `select.first()`: o editor tem o seletor de
@@ -168,7 +168,7 @@ test('editor: trocar o tipo de meta reconstrói o objeto, sem deixar objetivo pe
 	await silenciar(page);
 	const ok = await autenticarPagina(page, FIXTURE.adminGeral.id, 'admin');
 	test.skip(!ok, 'D1 local indisponível');
-	await page.goto('/res-gise');
+	await page.goto('/operacoes/presenca');
 	await expect(page.getByRole('heading', { name: 'Configurar Formulário' })).toBeVisible();
 
 	// Cobertura → percentual: o Objetivo REAPARECE.

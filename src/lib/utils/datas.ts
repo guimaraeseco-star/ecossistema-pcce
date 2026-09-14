@@ -262,7 +262,7 @@ export function intervaloDeDatas(inicio: string, fim: string): string[] {
  * nenhuma linha, que é o comportamento certo para filtro: recorte vazio, não
  * erro. Quem precisa de data existente usa `new Date` e confere.
  *
- * Nasceu inline em `/res-gise` (SEC-08) e virou função no segundo call site,
+ * Nasceu inline em `/operacoes/presenca` (SEC-08) e virou função no segundo call site,
  * a janela do painel de produtividade (B-1).
  */
 export function dataISOValida(v: string | null | undefined): string | null {

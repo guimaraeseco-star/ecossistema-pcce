@@ -3,7 +3,7 @@ import { FIXTURE } from './global-setup';
 import { autenticarPagina } from './session';
 
 /**
- * Dashboard de produtividade (`/produtividade`) — console de leitura do Admin
+ * Dashboard de produtividade (`/operacoes/produtividade`) — console de leitura do Admin
  * Geral. A agregação (stats/rankings) tem cobertura unitária em
  * `produtividade/stats`; aqui garantimos o acesso e a renderização:
  * Admin Geral entra e vê o dashboard (mesmo vazio), policial recebe 403
@@ -15,7 +15,7 @@ test.describe('Dashboard de produtividade', () => {
 		const ok = await autenticarPagina(page, FIXTURE.adminGeral.id, 'admin');
 		test.skip(!ok, 'D1 local indisponível');
 
-		const res = await page.goto('/produtividade');
+		const res = await page.goto('/operacoes/produtividade');
 		expect(res?.status()).toBe(200);
 		await expect(page.getByRole('heading', { name: /Produção/ })).toBeVisible();
 	});
@@ -24,12 +24,12 @@ test.describe('Dashboard de produtividade', () => {
 		const ok = await autenticarPagina(page, FIXTURE.policialA.id);
 		test.skip(!ok, 'D1 local indisponível');
 
-		const res = await page.goto('/produtividade');
+		const res = await page.goto('/operacoes/produtividade');
 		expect(res?.status()).toBe(403);
 	});
 
 	test('anônimo → /login', async ({ page }) => {
-		await page.goto('/produtividade');
+		await page.goto('/operacoes/produtividade');
 		await expect(page).toHaveURL(/\/login/);
 	});
 });

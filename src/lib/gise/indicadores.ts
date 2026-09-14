@@ -5,7 +5,7 @@
  * Existe como módulo único porque as MESMAS três respostas são precisas em
  * quatro telas que não se conhecem — o editor do Admin Geral, a aba de dados
  * base do admin de unidade, o campo de base dentro do formulário de
- * produtividade e os gráficos de `/produtividade`. É exatamente a forma dos bugs
+ * produtividade e os gráficos de `/operacoes/produtividade`. É exatamente a forma dos bugs
  * catalogados no `CLAUDE.md`: lógica copiada, uma cópia consertada, as outras
  * não. Aqui a pior seria a das CHAVES, e ela já mordeu este projeto uma vez (ver
  * o cabeçalho de `tipos-pergunta.ts`).
@@ -91,7 +91,7 @@ export interface Indicador {
 	 * de gráfico usam. Resolver aqui também seria a mesma precedência escrita
 	 * duas vezes, uma em cada seção do painel.
 	 *
-	 * Não afeta `/dados-base`: lá o rótulo do campo é `config.rotuloBase`, que
+	 * Não afeta `/operacoes/dados-base`: lá o rótulo do campo é `config.rotuloBase`, que
 	 * pergunta outra coisa ("como pedir o valor inicial à unidade").
 	 */
 	rotulo_painel?: string;

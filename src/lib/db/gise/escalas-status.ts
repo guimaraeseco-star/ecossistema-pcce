@@ -187,7 +187,7 @@ export async function verificarSaidaCompletaSeccional(
 }
 
 /**
- * Transições após presença (entrada/saída) em `/res-gise`:
+ * Transições após presença (entrada/saída) em `/operacoes/presenca`:
  *   • `em_andamento` → `aguardando_relatorios` quando **todos confirmaram entrada**;
  *   • `aguardando_relatorios` → `aguardando_assinatura_relat` quando **todos confirmaram saída**;
  *   • `em_andamento` → `aguardando_assinatura_relat` se entrada e saída já estão completas de uma vez.

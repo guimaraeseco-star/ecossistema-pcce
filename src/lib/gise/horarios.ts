@@ -1,6 +1,6 @@
 /**
  * Helpers puros para validação e normalização de horários HH:MM.
- * Extraídos de `src/routes/gise/[id]/+page.svelte`.
+ * Extraídos de `src/routes/operacoes/gise/[id]/+page.svelte`.
  */
 
 export function normalizarHora(v: string): string | null {
