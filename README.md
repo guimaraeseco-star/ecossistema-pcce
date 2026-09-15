@@ -262,7 +262,9 @@ demandanteUnidadeId)` resolve pela unidade demandante do plano operacional;
   lê-la na fase 2 (E25/E26).
 - A tela `/unidades` mostra qualquer tipo do catálogo e trata toda unidade sem pai
   como raiz; o **cadastro pela tela ainda oferece só seccional e delegacia** — os
-  demais níveis entram por migração de semente ou pela tela da fase 2.
+  demais níveis entram por migração de semente. A **edição** (modal, fase 2-B)
+  aceita qualquer tipo e troca a unidade superior; o servidor recusa fechar
+  ciclo (`motivoParaRecusarSuperior`: a própria unidade ou uma vinculada a ela).
 
 ### Unidade é referenciada por NOME
 
@@ -1081,8 +1083,11 @@ discordam, é a convenção dos 100 km que concede. Daí o portão de duração:
 operação de 2h, 100 km dariam `2×2 + 2 = 6h`, e a diária deixaria de se
 justificar.
 
-**O limite é campo da tela de valores** (`/valores`, do Admin Geral, ao lado dos valores das
-diárias) e **congela na versão** — o plano guarda `custo_parametro_id`, então
+**O limite vale SÓ aqui, na sugestão de custeio do plano operacional** — é
+convenção do DPI SUL, pode ser aplicada à mão, e o módulo de Diárias (rito
+geral e de operação) NÃO o usa: lá decide o decreto (E44). Ele é campo da tela
+de valores (`/valores`, do Admin Geral, ao lado dos valores das diárias) e
+**congela na versão** — o plano guarda `custo_parametro_id`, então
 subir o limite para 120 km amanhã não muda a rubrica de um plano de março já
 impresso. As 4 horas seguem constante nomeada (`DURACAO_MINIMA_DIARIA_HORAS`):
 foi o km que a corporação pediu para manejar.
@@ -1813,7 +1818,7 @@ interação ou regra de domínio.
 
 **Tamanho de botão** — `.btn-sm` do tema NÃO embute padding vertical: sem `py-*` o botão fica em ~24px de altura. A escala em uso é `py-1.5` (~34px, botões de navegação como o Voltar), `py-2.5` (~40px, CTA de modal/formulário) e `py-3.5` (~48px, ação final de página). Nada de `py-4 text-lg`, que produz um bloco de ~64px destoante do resto da tela.
 
-**Voltar** — usar `$lib/components/BotaoVoltar.svelte`, sempre **acima do `<h1>`**, nunca no rodapé. `href` para mudar de rota, `onclick` para desfazer estado local. Não repetir a palavra "Voltar" em outro controle da mesma tela (o passo anterior de um wizard é "Anterior") — duas coisas diferentes com o mesmo rótulo trocam de lugar na cabeça de quem usa.
+**Voltar** — usar `$lib/components/BotaoVoltar.svelte`, sempre **acima do `<h1>`**, nunca no rodapé. `href` para mudar de rota, `onclick` para desfazer estado local. Com `href`, o clique VOLTA pelo histórico quando a tela foi aberta de dentro do app (`useOrigemDaNavegacao`, registrado no `afterNavigate` do layout raiz) e só navega para o `href` quando não há de onde voltar (URL colada, nova aba) — é o que evita o pingue-pongue lista → ficha → lista no voltar do navegador. Não repetir a palavra "Voltar" em outro controle da mesma tela (o passo anterior de um wizard é "Anterior") — duas coisas diferentes com o mesmo rótulo trocam de lugar na cabeça de quem usa.
 
 **Rodapé de ação em tela longa** — usar `$lib/components/RodapeAcoes.svelte`: status à esquerda, botões à direita, `sticky bottom-0`. É para a tela em que a ação principal é frequente e ficaria presa no fim do documento — o wizard do relatório e o editor do modelo, os dois com formulários de dezenas de campos. `sticky` e não `fixed`: `fixed` sai do fluxo, passa por cima do conteúdo e exige um `padding-bottom` de reserva que ninguém mantém quando a altura do rodapé muda. Não funciona dentro de ancestral com `overflow` — ele gruda no ancestral que ROLA, e um container `overflow-hidden` não rola.
 

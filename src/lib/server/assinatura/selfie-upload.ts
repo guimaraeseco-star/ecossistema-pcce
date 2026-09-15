@@ -42,12 +42,11 @@ type SelfieUploadResult =
  * Magic bytes mínimos para PNG e JPEG. Suficiente para barrar arquivos fora do
  * tipo — o prefixo `data:image/...` é declaração do cliente, não evidência.
  *
- * Local de novo desde ago/2026: o único importador de fora era
- * `/api/perfil/rubrica`, que saiu com a rubrica. Voltou a ser export se outro
- * upload precisar da mesma checagem — o que NÃO se faz é reescrever os magic
- * bytes numa segunda cópia (foi assim que uma delas nasceu mais fraca).
+ * Export desde set/2026: a foto da fachada da unidade (`/unidades`, editar)
+ * usa a mesma checagem — o que NÃO se faz é reescrever os magic bytes numa
+ * segunda cópia (foi assim que uma delas nasceu mais fraca).
  */
-function detectarTipo(bytes: Uint8Array): 'png' | 'jpg' | null {
+export function detectarTipoImagem(bytes: Uint8Array): 'png' | 'jpg' | null {
 	if (bytes.length < 4) return null;
 	// PNG: 89 50 4E 47 0D 0A 1A 0A
 	if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
@@ -96,7 +95,7 @@ export async function uploadSelfieDataUri(
 		return { ok: false, reason: 'too-large' };
 	}
 
-	const tipoReal = detectarTipo(bytes);
+	const tipoReal = detectarTipoImagem(bytes);
 	if (!tipoReal) {
 		return { ok: false, reason: 'magic-mismatch' };
 	}

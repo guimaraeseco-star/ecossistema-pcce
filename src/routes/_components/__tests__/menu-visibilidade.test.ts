@@ -149,6 +149,17 @@ describe('Policiais e Solicitações são perguntas diferentes', () => {
 		expect(visibilidadeDoMenu(entrada()).showValores).toBe(false);
 	});
 
+	it('Municípios é de departamento para cima — só a sessão de admin (E32)', () => {
+		expect(visibilidadeDoMenu(entrada({ usuario: { tipo: 'admin' } })).showMunicipios).toBe(true);
+		for (const papel of PAPEIS_COM_ESCOPO) {
+			expect(
+				visibilidadeDoMenu(entrada({ usuario: { tipo: 'policial', papel } })).showMunicipios,
+				papel
+			).toBe(false);
+		}
+		expect(visibilidadeDoMenu(entrada()).showMunicipios).toBe(false);
+	});
+
 	it('Gestão de unidade é dos três papéis administrativos — cada um com a própria subárvore', () => {
 		expect(visibilidadeDoMenu(entrada({ usuario: { tipo: 'admin' } })).showUnidade).toBe(true);
 		for (const papel of PAPEIS_COM_ESCOPO) {

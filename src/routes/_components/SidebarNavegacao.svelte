@@ -386,6 +386,9 @@
 			{#if flags.showColaboradores}
 				{@render itemMenu('/colaboradores', 'Colaboradores', ICONE.pessoas)}
 			{/if}
+			{#if flags.showMunicipios}
+				{@render itemMenu('/municipios', 'Municípios', ICONE.mapa)}
+			{/if}
 
 			<!-- Meu perfil (todo policial; sessão de admin não tem cadastro) -->
 			{#if usuario?.tipo === 'policial'}

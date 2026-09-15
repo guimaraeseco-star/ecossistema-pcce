@@ -97,7 +97,7 @@
 						Telefone
 					</dt>
 					<dd class="text-surface-700 dark:text-surface-300">
-						<a href="tel:{u.telefone.replace(/D/g, '')}">{u.telefone}</a>
+						<a href="tel:{u.telefone.replace(/\D/g, '')}">{u.telefone}</a>
 					</dd>
 				{/if}
 				{#if u.email}
@@ -231,8 +231,12 @@
 			Municípios atendidos
 		</h2>
 		<p class="mb-3 text-xs text-surface-500">
-			{data.municipios.length} município{data.municipios.length === 1 ? '' : 's'}; o plantão é por
-			município e pode mudar no fim de semana.
+			{data.municipios.length} município{data.municipios.length === 1
+				? ''
+				: 's'}{#if data.populacaoAtendida > 0}
+				· {new Intl.NumberFormat('pt-BR').format(data.populacaoAtendida)} habitantes{/if}{#if data.habPorPolicial != null}
+				· 1 policial para {new Intl.NumberFormat('pt-BR').format(data.habPorPolicial)} hab.{/if}; o
+			plantão é por município e pode mudar no fim de semana.
 		</p>
 		<div class="table-wrap">
 			<table class="table">
@@ -240,6 +244,7 @@
 					<tr>
 						<th>Município</th>
 						<th>AIS</th>
+						<th class="text-right">População</th>
 						<th>Plantão na semana</th>
 						<th>Plantão no fim de semana</th>
 					</tr>
@@ -249,6 +254,11 @@
 						<tr>
 							<td class="font-medium">{m.nome}</td>
 							<td class="text-sm">{m.ais || '—'}</td>
+							<td class="text-right text-sm tabular-nums"
+								>{m.populacao != null
+									? new Intl.NumberFormat('pt-BR').format(m.populacao)
+									: '—'}</td
+							>
 							<td class="text-sm">{plantao(m.semana)}</td>
 							<td class="text-sm">{plantao(m.fds)}</td>
 						</tr>

@@ -61,6 +61,7 @@
 	const hrefServidores = (u: LinhaUnidade) => `/servidores?lotacao=${encodeURIComponent(u.nome)}`;
 
 	const CELULA_NUM = 'text-right tabular-nums';
+	const fmt = new Intl.NumberFormat('pt-BR');
 	const LINK_NUM =
 		'inline-block min-w-6 rounded px-1 font-semibold text-primary-700 no-underline hover:bg-primary-500/10 dark:text-primary-400';
 </script>
@@ -97,6 +98,10 @@
 				.raiz.municipiosSubtotal === 1
 				? ''
 				: 's'}
+			{#if data.raiz.populacao > 0}
+				· {fmt.format(data.raiz.populacao)} habitantes{/if}
+			{#if data.raiz.habPorPolicial != null}
+				· 1 policial para {fmt.format(data.raiz.habPorPolicial)} hab.{/if}
 		</p>
 	</div>
 	<div class="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
@@ -160,6 +165,15 @@
 			<span class="text-surface-400">0</span>
 		{/if}
 	</td>
+	<td class={CELULA_NUM}>
+		{#if u.populacao > 0}{fmt.format(u.populacao)}{:else}<span class="text-surface-400">—</span
+			>{/if}
+	</td>
+	<td class="{CELULA_NUM} font-semibold">
+		{#if u.habPorPolicial != null}{fmt.format(u.habPorPolicial)}{:else}<span
+				class="text-surface-400">—</span
+			>{/if}
+	</td>
 {/snippet}
 
 {#snippet nomeUnidade(u: LinhaUnidade, destaque: boolean, recuo: boolean)}
@@ -210,6 +224,12 @@
 					<th rowspan="2" class="{TH_FIXO} text-right align-bottom" style:top={topoLinha1}
 						>Municípios</th
 					>
+					<th rowspan="2" class="{TH_FIXO} text-right align-bottom" style:top={topoLinha1}
+						>População</th
+					>
+					<th rowspan="2" class="{TH_FIXO} text-right align-bottom" style:top={topoLinha1}
+						>Hab./policial</th
+					>
 				</tr>
 				<tr class="text-2xs">
 					<th class="{TH_FIXO} text-right" style:top={topoLinha2}>Ativos</th>
@@ -254,6 +274,12 @@
 							<td class={CELULA_NUM}>—</td>
 							<td class={CELULA_NUM}>—</td>
 							<td class={CELULA_NUM}>{bloco.unidade.municipiosSubtotal}</td>
+							<td class={CELULA_NUM}>{fmt.format(bloco.unidade.populacao)}</td>
+							<td class="{CELULA_NUM} font-semibold"
+								>{bloco.unidade.habPorPolicial != null
+									? fmt.format(bloco.unidade.habPorPolicial)
+									: '—'}</td
+							>
 						</tr>
 					{/if}
 				{/each}

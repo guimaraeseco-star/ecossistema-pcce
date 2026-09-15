@@ -135,6 +135,7 @@ export {
 	listarTodasUnidades,
 	criarUnidade,
 	atualizarUnidade,
+	motivoParaRecusarSuperior,
 	definirUnidadeAtiva,
 	vinculosDaUnidade,
 	descreverVinculosUnidade,

@@ -28,3 +28,4 @@ export { useVerificacaoEmailPessoal } from './useVerificacaoEmailPessoal.svelte'
 export { useBuscaDebounce } from './useBuscaDebounce.svelte';
 export { useInvalidateOnFocus } from './useInvalidateOnFocus.svelte';
 export { useSamePathNavigating } from './useSamePathNavigating.svelte';
+export { useOrigemDaNavegacao, registrarNavegacao } from './useOrigemDaNavegacao.svelte';

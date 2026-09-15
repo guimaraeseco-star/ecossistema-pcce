@@ -8,7 +8,13 @@ import type { Database } from '$lib/db';
 import { bancoMigrado, drizzleSobre } from './sqlite-migrado';
 import { eq } from 'drizzle-orm';
 import { unidades } from '$lib/server/schema';
-import { arvoreUnidades, ancestraisDe, subarvoreDe, departamentoDe } from '../unidades';
+import {
+	arvoreUnidades,
+	ancestraisDe,
+	subarvoreDe,
+	departamentoDe,
+	motivoParaRecusarSuperior
+} from '../unidades';
 import { departamentoDoPlano } from '$lib/server/planos/departamento';
 
 let db: Database;
@@ -118,5 +124,21 @@ describe('árvore de unidades', () => {
 		expect((await departamentoDoPlano(db, dp)).sigla).toBe('DPI NORTE');
 		expect((await departamentoDoPlano(db)).sigla).toBe('DPI SUL');
 		expect((await departamentoDoPlano(db, 999999)).sigla).toBe('DPI SUL');
+	});
+});
+
+describe('motivoParaRecusarSuperior (trocar o pai pela tela de estrutura)', () => {
+	it('aceita raiz, pai fora da subárvore e pai desativado; recusa si mesma, descendente e inexistente', async () => {
+		const dep = await inserir('DPI Sul', 'departamento', null);
+		const sec = await inserir('1ª Seccional', 'seccional', dep);
+		const dp = await inserir('DP de Icó', 'delegacia', sec);
+		const outraSec = await inserir('2ª Seccional', 'seccional', dep, { ativo: false });
+
+		expect(await motivoParaRecusarSuperior(db, sec, null)).toBeNull();
+		expect(await motivoParaRecusarSuperior(db, dp, outraSec)).toBeNull();
+		expect(await motivoParaRecusarSuperior(db, sec, sec)).toMatch(/si mesma/);
+		expect(await motivoParaRecusarSuperior(db, sec, dp)).toMatch(/vinculada/);
+		expect(await motivoParaRecusarSuperior(db, dep, dp)).toMatch(/vinculada/);
+		expect(await motivoParaRecusarSuperior(db, dp, 999999)).toMatch(/não encontrada/);
 	});
 });

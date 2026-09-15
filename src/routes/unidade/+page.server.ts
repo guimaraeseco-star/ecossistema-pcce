@@ -21,7 +21,7 @@ import {
 	somarEfetivos,
 	type EfetivoLotacao
 } from '$lib/db/efetivo';
-import { municipiosPorUnidade } from '$lib/db/cobertura';
+import { municipiosPorUnidade, populacaoPorIbge } from '$lib/db/cobertura';
 import { escopoDeUnidades } from '$lib/server/unidades/escopo';
 import { nivelTipoUnidade, rotuloTipoUnidade } from '$lib/unidades/tipos';
 import { hojeBrasilISO } from '$lib/utils/datas';
@@ -42,6 +42,10 @@ export interface LinhaUnidade {
 	municipios: number;
 	/** Municípios DISTINTOS atendidos pela unidade e por tudo abaixo dela. */
 	municipiosSubtotal: number;
+	/** População (estimativa do IBGE ou Censo) dos municípios distintos da subárvore. */
+	populacao: number;
+	/** Habitantes por policial LOTADO na subárvore; `null` sem efetivo ou sem população. */
+	habPorPolicial: number | null;
 }
 
 export interface BlocoUnidade {
@@ -60,9 +64,10 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 	// Uma unidade só no escopo: a "lista" seria a própria ficha.
 	if (escopo.nos.length === 1) redirect(302, `/unidade/${escopo.raiz.id}`);
 
-	const [efetivos, ibgesPorUnidade] = await Promise.all([
+	const [efetivos, ibgesPorUnidade, populacaoDe] = await Promise.all([
 		efetivoPorLotacao(db, hojeBrasilISO()),
-		municipiosPorUnidade(db)
+		municipiosPorUnidade(db),
+		populacaoPorIbge(db)
 	]);
 	const filhosDe = (id: number) =>
 		escopo.nos
@@ -78,6 +83,15 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 	const linha = (n: NoUnidade): LinhaUnidade => {
 		const desc = descendentesDe(n.id);
 		const proprio = efetivos.get(n.nome) ?? efetivoVazio();
+		const subtotal = somarEfetivos([
+			proprio,
+			...desc.map((d) => efetivos.get(d.nome) ?? efetivoVazio())
+		]);
+		// Distintos: Juazeiro do Norte, atendido por duas DPs, conta uma vez —
+		// nos municípios e na população.
+		const ibgesDistintos = new Set([n, ...desc].flatMap((d) => ibgesPorUnidade.get(d.id) ?? []));
+		let populacao = 0;
+		for (const ibge of ibgesDistintos) populacao += populacaoDe.get(ibge) ?? 0;
 		return {
 			id: n.id,
 			nome: n.nome,
@@ -85,17 +99,16 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 			tipo: n.tipo,
 			tipoRotulo: rotuloTipoUnidade(n.tipo),
 			efetivo: proprio,
-			subtotal: somarEfetivos([
-				proprio,
-				...desc.map((d) => efetivos.get(d.nome) ?? efetivoVazio())
-			]),
+			subtotal,
 			// Subdepartamento (o "DPI Sul - Juazeiro") é sede administrativa, não
 			// unidade que responde ao departamento — o responsável pediu em
 			// 15/09/2026 que ele não entre na contagem.
 			vinculadas: desc.filter((d) => d.tipo !== 'sub_departamento').length,
 			municipios: ibgesPorUnidade.get(n.id)?.length ?? 0,
-			// Distintos: Juazeiro do Norte, atendido por duas DPs, conta uma vez.
-			municipiosSubtotal: new Set([n, ...desc].flatMap((d) => ibgesPorUnidade.get(d.id) ?? [])).size
+			municipiosSubtotal: ibgesDistintos.size,
+			populacao,
+			habPorPolicial:
+				subtotal.total > 0 && populacao > 0 ? Math.round(populacao / subtotal.total) : null
 		};
 	};
 

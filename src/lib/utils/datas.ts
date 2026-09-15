@@ -286,6 +286,15 @@ export function hojeBrasilISO(): string {
 }
 
 /**
+ * Agora em `YYYY-MM-DDTHH:MM:SS` no fuso de Brasília — o carimbo de "atualizado
+ * em" que o servidor grava em texto (mesma forma do `datetime('now', '-3 hours')`
+ * do SQLite, com o `T`).
+ */
+export function agoraBrasilISO(): string {
+	return getNowBR().toISOString().slice(0, 19);
+}
+
+/**
  * Diferença INCLUSIVA em dias entre duas datas ISO (`fim` >= `inicio`):
  * "2026-01-01" a "2026-01-01" = 1 dia. Retorna 0 se as datas forem inválidas
  * ou se `fim` < `inicio`.

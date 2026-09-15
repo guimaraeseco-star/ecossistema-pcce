@@ -52,7 +52,7 @@
 	import { loading } from '$lib/loading.svelte';
 	import LoadingOverlay from '$lib/components/LoadingOverlay.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
-	import { useScrollLock, useInvalidateOnFocus } from '$lib/composables';
+	import { useScrollLock, useInvalidateOnFocus, registrarNavegacao } from '$lib/composables';
 	import { fetchSyncEstado } from '$lib/sync-estado';
 	import BarraTopo from './_components/BarraTopo.svelte';
 	import SidebarNavegacao from './_components/SidebarNavegacao.svelte';
@@ -170,9 +170,11 @@
 	// Fecha o overlay global de carregamento quando QUALQUER navegação termina.
 	// Sem isto, `loading.show()` chamado antes de um goto() (ex.: /validar) ficava
 	// preso, exigindo refresh para ver o resultado já renderizado por baixo.
-	afterNavigate(() => {
+	afterNavigate((n) => {
 		loading.hide();
 		void nav.devolverFocoSePendente();
+		// Para o "← Voltar" saber se pode desfazer a entrada do histórico.
+		registrarNavegacao(n);
 	});
 
 	// Deploy novo detectado: força reload na próxima navegação (bundle fresco).

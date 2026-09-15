@@ -30,7 +30,28 @@ type DadosUnidade = {
 	tem_fds: boolean;
 	cidade: string;
 	sigla: string;
+	// A ficha (0085) — opcionais para quem só cria a estrutura (o modal de cadastro).
+	endereco?: string;
+	telefone?: string;
+	email?: string;
+	ais?: string;
+	xadrezes?: number;
+	tira_gravame?: boolean;
+	foto_url?: string | null;
 };
+
+/** As colunas da ficha, como vão ao INSERT/UPDATE (ausente = valor padrão da coluna). */
+function colunasDaFicha(data: DadosUnidade) {
+	return {
+		endereco: data.endereco ?? '',
+		telefone: data.telefone ?? '',
+		email: data.email ?? '',
+		ais: data.ais ?? '',
+		xadrezes: data.xadrezes ?? 0,
+		tira_gravame: data.tira_gravame ?? false,
+		foto_url: data.foto_url ?? null
+	};
+}
 
 /**
  * Unidades ATIVAS, em ordem alfabética — é a lista de ESCOLHA (combo de nova
@@ -67,7 +88,8 @@ export async function criarUnidade(db: Database, data: DadosUnidade) {
 		tem_fds: data.tem_fds,
 		cidade: data.cidade || '',
 		sigla: data.sigla || '',
-		seccional_id: data.seccional_id ?? null
+		seccional_id: data.seccional_id ?? null,
+		...colunasDaFicha(data)
 	});
 }
 
@@ -138,7 +160,8 @@ export async function atualizarUnidade(
 			tem_expediente: data.tem_expediente,
 			tem_fds: data.tem_fds,
 			cidade: data.cidade || '',
-			sigla: data.sigla || ''
+			sigla: data.sigla || '',
+			...colunasDaFicha(data)
 		})
 		.where(and(eq(unidades.id, id), eq(unidades.nome, nomeAntigo)));
 
@@ -164,6 +187,37 @@ export async function atualizarUnidade(
 	if (linhasAfetadas(resUnidade) === 0) throw new ConflitoDeRenomeacaoUnidade(nomeAntigo);
 
 	return { nomeAntigo };
+}
+
+/**
+ * Por que `superiorId` NÃO pode ser a unidade superior de `id` — ou `null`
+ * quando pode. Trocar o pai pela tela de estrutura é a única operação que
+ * consegue fechar um ciclo (A abaixo de B abaixo de A); `ancestraisDe` e
+ * `subarvoreDe` se protegem com `vistos`, mas um ciclo gravado faria a
+ * Gestão de unidade e a barra do topo mostrarem uma árvore sem raiz. Lê TODAS
+ * as unidades (desativadas inclusive): pai desativado continua sendo pai.
+ */
+export async function motivoParaRecusarSuperior(
+	db: Database,
+	id: number,
+	superiorId: number | null
+): Promise<string | null> {
+	if (superiorId == null) return null;
+	if (superiorId === id) return 'A unidade não pode ser superior de si mesma';
+	const linhas = await db
+		.select({ id: unidades.id, seccional_id: unidades.seccional_id })
+		.from(unidades);
+	const paiDe = new Map(linhas.map((l) => [l.id, l.seccional_id]));
+	if (!paiDe.has(superiorId)) return 'Unidade superior não encontrada';
+	// Sobe a partir do superior escolhido: se chega em `id`, ele está abaixo dela.
+	const vistos = new Set<number>();
+	let atual: number | null | undefined = superiorId;
+	while (atual != null && !vistos.has(atual)) {
+		if (atual === id) return 'A unidade superior não pode ser uma unidade vinculada a ela';
+		vistos.add(atual);
+		atual = paiDe.get(atual);
+	}
+	return null;
 }
 
 /**
