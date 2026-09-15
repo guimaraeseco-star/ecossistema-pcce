@@ -29,13 +29,10 @@ const nupSchema = z
 /** Data no formato ISO `YYYY-MM-DD` (input type="date"). */
 const dataISO = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida');
 
-export const SUBTIPOS_AFASTAMENTO = [
-	'ferias',
-	'licenca_medica',
-	'judicial',
-	'licenca_outros',
-	'outros'
-] as const;
+// O catálogo mora em `$lib/servidores/afastamentos` (fase 2-C): 19 tipos do
+// Estatuto mais os valores legados; o cadastro só oferece os cadastráveis.
+export { SUBTIPOS_AFASTAMENTO } from '$lib/servidores/afastamentos';
+import { AFASTAMENTOS, SUBTIPOS_AFASTAMENTO } from '$lib/servidores/afastamentos';
 
 export const movimentacaoSchema = z.object({
 	unidade_destino: z
@@ -66,11 +63,12 @@ export const desvinculacaoSchema = z.object({
 	nup: nupSchema
 });
 
-/** Rótulos PT-BR dos subtipos de afastamento (fonte única para UI e histórico). */
-export const LABEL_SUBTIPO_AFASTAMENTO: Record<(typeof SUBTIPOS_AFASTAMENTO)[number], string> = {
-	ferias: 'Férias',
-	licenca_medica: 'Licença Médica',
-	judicial: 'Judicial',
-	licenca_outros: 'Licença outros',
-	outros: 'Outros afastamentos'
-};
+/**
+ * Rótulos PT-BR dos subtipos de afastamento — derivados do catálogo de
+ * `$lib/servidores/afastamentos`, que é a fonte única desde a fase 2-C.
+ */
+export const LABEL_SUBTIPO_AFASTAMENTO: Record<(typeof SUBTIPOS_AFASTAMENTO)[number], string> =
+	Object.fromEntries(SUBTIPOS_AFASTAMENTO.map((s) => [s, AFASTAMENTOS[s].rotulo])) as Record<
+		(typeof SUBTIPOS_AFASTAMENTO)[number],
+		string
+	>;

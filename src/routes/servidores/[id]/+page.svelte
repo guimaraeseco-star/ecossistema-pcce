@@ -43,6 +43,8 @@
 	import CartaoAdminGeral from './_components/CartaoAdminGeral.svelte';
 	import SolicitacoesServidor from './_components/SolicitacoesServidor.svelte';
 	import BotaoVoltar from '$lib/components/BotaoVoltar.svelte';
+	import { COR_SITUACAO, rotuloAfastamento } from '$lib/servidores/afastamentos';
+	import { formatarData } from '$lib/utils/datas';
 
 	const { data }: PageProps = $props();
 
@@ -182,6 +184,22 @@
 	<BotaoVoltar onclick={() => goto('/servidores')} />
 
 	<h1 class="h1 text-2xl font-bold">{solicitando ? 'Ficha do Servidor' : 'Editar Policial'}</h1>
+	<!-- Situação de hoje ao lado do nome: férias em dourado, afastado em vermelho
+	     (pedido de 15/09/2026). Detalhe e base legal ficam na linha do tempo. -->
+	<p class="text-sm">
+		<span class="font-semibold text-surface-900 dark:text-surface-50">{data.policial.nome}</span>
+		{#if data.afastamentoAtual}
+			{@const ferias = data.afastamentoAtual.subtipo === 'ferias'}
+			<span class="ml-2 font-semibold {ferias ? COR_SITUACAO.ferias : COR_SITUACAO.afastado}"
+				>· {ferias ? 'De férias' : rotuloAfastamento(data.afastamentoAtual.subtipo)}
+				{data.afastamentoAtual.data_fim
+					? `até ${formatarData(data.afastamentoAtual.data_fim)}`
+					: `desde ${formatarData(data.afastamentoAtual.data_inicio)}`}</span
+			>
+		{:else}
+			<span class="ml-2 {COR_SITUACAO.ativo}">· Ativo</span>
+		{/if}
+	</p>
 
 	{#if solicitando}
 		<div

@@ -22,9 +22,10 @@
  * (o motivo que o tira do serviço por mais tempo prevalece). `ativos` é o que
  * sobra: lotados menos férias menos afastados.
  */
-import { and, eq, sql } from 'drizzle-orm';
-import { policiais, policialHistorico } from '../server/schema';
+import { and, eq, inArray, sql } from 'drizzle-orm';
+import { designacoes, policiais, policialHistorico } from '../server/schema';
 import type { Database } from './core';
+import type { SituacaoServidor } from '$lib/servidores/afastamentos';
 
 /** As contagens de UM cargo numa lotação. `total` = lotados (ativos + férias + afastados). */
 interface EfetivoCargo {
@@ -131,4 +132,145 @@ export function somarEfetivos(lista: EfetivoLotacao[]): EfetivoLotacao {
 		s.total += e.total;
 	}
 	return s;
+}
+
+/** Teto de parâmetros por consulta no D1 (100), com folga para os demais. */
+const FATIA_D1 = 90;
+
+/** O afastamento em curso de um servidor — o que faz dele "férias" ou "afastado" hoje. */
+export interface AfastamentoEmCurso {
+	id: number;
+	subtipo: string;
+	data_inicio: string;
+	data_fim: string | null;
+}
+
+/**
+ * O afastamento vigente de cada servidor da lista, por id. Quando há mais de
+ * um no mesmo dia, o que NÃO é férias prevalece — a mesma regra de
+ * `efetivoPorLotacao` (licença por cima de férias).
+ */
+export async function afastamentosVigentesDe(
+	db: Database,
+	policialIds: number[],
+	hojeISO: string
+): Promise<Map<number, AfastamentoEmCurso>> {
+	const mapa = new Map<number, AfastamentoEmCurso>();
+	if (policialIds.length === 0) return mapa;
+	// O D1 aceita no máximo 100 parâmetros por consulta: o departamento inteiro
+	// (700 ids) vai em fatias.
+	const linhas = [];
+	for (let i = 0; i < policialIds.length; i += FATIA_D1) {
+		linhas.push(
+			...(await db
+				.select({
+					id: policialHistorico.id,
+					policialId: policialHistorico.policial_id,
+					subtipo: policialHistorico.subtipo,
+					data_inicio: policialHistorico.data_inicio,
+					data_fim: policialHistorico.data_fim
+				})
+				.from(policialHistorico)
+				.where(
+					and(
+						inArray(policialHistorico.policial_id, policialIds.slice(i, i + FATIA_D1)),
+						eq(policialHistorico.tipo, 'afastamento'),
+						sql`${policialHistorico.data_inicio} <= ${hojeISO}`,
+						sql`(${policialHistorico.data_fim} IS NULL OR ${policialHistorico.data_fim} = '' OR ${policialHistorico.data_fim} >= ${hojeISO})`
+					)
+				))
+		);
+	}
+	for (const l of linhas) {
+		const atual = mapa.get(l.policialId);
+		const ehFerias = l.subtipo === 'ferias';
+		if (!atual || (atual.subtipo === 'ferias' && !ehFerias)) {
+			mapa.set(l.policialId, {
+				id: l.id,
+				subtipo: l.subtipo ?? 'outros',
+				data_inicio: l.data_inicio ?? '',
+				data_fim: l.data_fim || null
+			});
+		}
+	}
+	return mapa;
+}
+
+/** Situação de hoje a partir do afastamento em curso (ou da falta dele). */
+export function situacaoDe(afastamento: AfastamentoEmCurso | null | undefined): SituacaoServidor {
+	if (!afastamento) return 'ativo';
+	return afastamento.subtipo === 'ferias' ? 'ferias' : 'afastado';
+}
+
+/** Um servidor com a situação de hoje — o que o painel dos números mostra. */
+export interface ServidorSituado {
+	id: number;
+	nome: string;
+	matricula: string;
+	cargo: string;
+	lotacao: string;
+	designacao: string;
+	situacao: SituacaoServidor;
+	afastamento: AfastamentoEmCurso | null;
+}
+
+/**
+ * Os servidores ativos das lotações dadas, com a situação de hoje, filtrados
+ * por situação e/ou cargo — é o que abre ao clicar num número da Gestão de
+ * unidade. Ordem: lotação, cargo (DPC antes), nome.
+ */
+export async function servidoresPorSituacao(
+	db: Database,
+	lotacoes: string[],
+	hojeISO: string,
+	filtro: { situacao?: 'ativos' | 'ferias' | 'afastados'; cargo?: 'DPC' | 'OIP' } = {}
+): Promise<ServidorSituado[]> {
+	if (lotacoes.length === 0) return [];
+	const linhas = [];
+	for (let i = 0; i < lotacoes.length; i += FATIA_D1) {
+		linhas.push(
+			...(await db
+				.select({
+					id: policiais.id,
+					nome: policiais.nome,
+					matricula: policiais.matricula,
+					cargo: policiais.cargo,
+					lotacao: policiais.lotacao,
+					designacao: designacoes.nome
+				})
+				.from(policiais)
+				.leftJoin(designacoes, eq(designacoes.id, policiais.designacao_id))
+				.where(
+					and(
+						eq(policiais.ativo, 1),
+						inArray(policiais.lotacao, lotacoes.slice(i, i + FATIA_D1)),
+						...(filtro.cargo ? [eq(policiais.cargo, filtro.cargo)] : [])
+					)
+				))
+		);
+	}
+	linhas.sort(
+		(a, b) =>
+			a.lotacao.localeCompare(b.lotacao, 'pt-BR') ||
+			a.cargo.localeCompare(b.cargo) ||
+			a.nome.localeCompare(b.nome, 'pt-BR')
+	);
+	const vigentes = await afastamentosVigentesDe(
+		db,
+		linhas.map((l) => l.id),
+		hojeISO
+	);
+	const todos: ServidorSituado[] = linhas.map((l) => {
+		const afastamento = vigentes.get(l.id) ?? null;
+		return {
+			...l,
+			designacao: l.designacao ?? '',
+			situacao: situacaoDe(afastamento),
+			afastamento
+		};
+	});
+	if (!filtro.situacao) return todos;
+	const alvo: SituacaoServidor =
+		filtro.situacao === 'ativos' ? 'ativo' : filtro.situacao === 'ferias' ? 'ferias' : 'afastado';
+	return todos.filter((s) => s.situacao === alvo);
 }

@@ -46,6 +46,8 @@ import { lotacoesAdministradas, lotacaoNoEscopo } from '$lib/server/policial-per
 import { escopoDaFicha, podeAbrirFichaDePolicial } from '$lib/server/policiais/ficha-permissao';
 import { decifrarCpfDoDB } from '$lib/crypto/cpf-cripto';
 import { impedimentoParaExcluirPolicial } from '$lib/db/policiais';
+import { afastamentosVigentesDe, situacaoDe } from '$lib/db/efetivo';
+import { hojeBrasilISO } from '$lib/utils/datas';
 
 export const load: PageServerLoad = async ({ locals, platform, url, depends }) => {
 	depends('app:policiais');
@@ -60,6 +62,9 @@ export const load: PageServerLoad = async ({ locals, platform, url, depends }) =
 	const db = getDB(platform);
 	const lotacaoParam = url.searchParams.get('lotacao') || undefined;
 	const cargo = url.searchParams.get('cargo') || undefined;
+	const situacaoParam = url.searchParams.get('situacao') || '';
+	const situacao = (['ativos', 'ferias', 'afastados'] as const).find((s) => s === situacaoParam);
+	const hoje = hojeBrasilISO();
 	const busca = url.searchParams.get('busca') || undefined;
 	const page = url.searchParams.get('page') ? Number(url.searchParams.get('page')) : undefined;
 
@@ -75,6 +80,8 @@ export const load: PageServerLoad = async ({ locals, platform, url, depends }) =
 			cargo,
 			seccionalId,
 			escopoLotacoes: escopo ? [...escopo] : undefined,
+			situacao,
+			hojeISO: hoje,
 			page,
 			limit: 20
 		}),
@@ -85,10 +92,20 @@ export const load: PageServerLoad = async ({ locals, platform, url, depends }) =
 	// direto — o Admin Geral. Para o administrador com escopo a lista vai SEM
 	// CPF: ele pede a correção informando o número novo, e nunca precisou ler o
 	// atual para isso (minimização, LGPD art. 6º III).
+	// A situação de hoje de cada linha da página (fase 2-C): férias em dourado,
+	// afastado em vermelho, com o tipo e o fim — o que faltava para saber de
+	// quem se trata sem abrir a ficha.
+	const vigentes = await afastamentosVigentesDe(
+		db,
+		resultado.policiais.map((p) => p.id),
+		hoje
+	);
 	const policiaisComCpf = await Promise.all(
 		resultado.policiais.map(async (p) => ({
 			...p,
-			cpf: isAdminGeral(u) ? (await decifrarCpfDoDB(p.cpf, platform?.env)) || null : null
+			cpf: isAdminGeral(u) ? (await decifrarCpfDoDB(p.cpf, platform?.env)) || null : null,
+			situacao: situacaoDe(vigentes.get(p.id)),
+			afastamento: vigentes.get(p.id) ?? null
 		}))
 	);
 
@@ -105,7 +122,8 @@ export const load: PageServerLoad = async ({ locals, platform, url, depends }) =
 			lotacao: lotacaoParam ?? '',
 			cargo: cargo ?? '',
 			busca: busca ?? '',
-			seccional: seccional ?? 'todas'
+			seccional: seccional ?? 'todas',
+			situacao: situacao ?? ''
 		},
 		lotacaoUsuario: u.lotacao
 	};

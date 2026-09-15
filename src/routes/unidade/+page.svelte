@@ -20,6 +20,8 @@
 	import type { BlocoUnidade, LinhaUnidade } from './+page.server';
 	import Search from '@lucide/svelte/icons/search';
 	import { CLASSE_INPUT_FILTRO } from '$lib/gise/filtro-historico-ui';
+	import { COR_SITUACAO } from '$lib/servidores/afastamentos';
+	import ModalEfetivo, { type PedidoEfetivo } from './_components/ModalEfetivo.svelte';
 
 	const { data }: PageProps = $props();
 
@@ -61,6 +63,37 @@
 	const hrefServidores = (u: LinhaUnidade) => `/servidores?lotacao=${encodeURIComponent(u.nome)}`;
 
 	const CELULA_NUM = 'text-right tabular-nums';
+
+	// O painel "quem são" — abre ao clicar num número (pedido de 15/09/2026).
+	let painelAberto = $state(false);
+	let pedido = $state<PedidoEfetivo | null>(null);
+	function abrirPainel(
+		u: LinhaUnidade,
+		situacao: PedidoEfetivo['situacao'],
+		cargo: PedidoEfetivo['cargo'],
+		subarvore: boolean
+	) {
+		pedido = {
+			unidadeId: u.id,
+			unidadeNome: u.nome,
+			unidadeRotulo: u.sigla || u.nome,
+			situacao,
+			cargo,
+			subarvore
+		};
+		painelAberto = true;
+	}
+	/** Número clicável; férias em dourado, afastados em vermelho; zero fica apagado. */
+	const CLASSE_BOTAO =
+		'inline-block min-w-6 cursor-pointer rounded px-1 font-semibold hover:bg-surface-500/10';
+	const corDe = (situacao: PedidoEfetivo['situacao'], n: number) =>
+		n === 0
+			? 'text-surface-400'
+			: situacao === 'ativos'
+				? COR_SITUACAO.ativo
+				: situacao === 'ferias'
+					? COR_SITUACAO.ferias
+					: COR_SITUACAO.afastado;
 	const fmt = new Intl.NumberFormat('pt-BR');
 	const LINK_NUM =
 		'inline-block min-w-6 rounded px-1 font-semibold text-primary-700 no-underline hover:bg-primary-500/10 dark:text-primary-400';
@@ -126,16 +159,36 @@
 	</div>
 </div>
 
-<!-- Por cargo: ativos · férias · afastados. O número é link para a lista de
-     servidores já filtrada pela lotação e pelo cargo. -->
+<!-- Um número clicável: abre o painel com QUEM está naquela situação. -->
+{#snippet numero(
+	u: LinhaUnidade,
+	situacao: PedidoEfetivo['situacao'],
+	cargo: PedidoEfetivo['cargo'],
+	n: number,
+	subarvore: boolean
+)}
+	<td class={CELULA_NUM}>
+		<button
+			type="button"
+			class="{CLASSE_BOTAO} {corDe(situacao, n)}"
+			title="{situacao === 'ativos'
+				? 'Ativos'
+				: situacao === 'ferias'
+					? 'De férias'
+					: 'Afastados'}{cargo ? ` (${cargo})` : ''} em {u.nome}{subarvore ? ' e vinculadas' : ''}"
+			disabled={n === 0}
+			onclick={() => abrirPainel(u, situacao, cargo, subarvore)}>{n}</button
+		>
+	</td>
+{/snippet}
+
+<!-- Por cargo: ativos · férias · afastados, da própria lotação. -->
 {#snippet celulasCargo(u: LinhaUnidade, cargo: 'dpc' | 'oip')}
 	{@const c = u.efetivo[cargo]}
-	{@const href = `${hrefServidores(u)}&cargo=${cargo.toUpperCase()}`}
-	<td class={CELULA_NUM}>
-		<a {href} class={LINK_NUM} title="{cargo.toUpperCase()} ativos em {u.nome}">{c.ativos}</a>
-	</td>
-	<td class="{CELULA_NUM} text-surface-500">{c.ferias}</td>
-	<td class="{CELULA_NUM} text-surface-500">{c.afastados}</td>
+	{@const sigla = cargo === 'dpc' ? 'DPC' : 'OIP'}
+	{@render numero(u, 'ativos', sigla, c.ativos, false)}
+	{@render numero(u, 'ferias', sigla, c.ferias, false)}
+	{@render numero(u, 'afastados', sigla, c.afastados, false)}
 {/snippet}
 
 {#snippet celulasEfetivo(u: LinhaUnidade)}
@@ -189,7 +242,8 @@
 		<span class="ml-2 text-2xs text-surface-500 uppercase">{u.tipoRotulo}</span>
 		{#if u.vinculadas > 0}
 			<span class="ml-1 text-2xs text-surface-400"
-				>· {u.vinculadas} vinculada{u.vinculadas === 1 ? '' : 's'}</span
+				>· {u.vinculadas} vinculada{u.vinculadas === 1 ? '' : 's'}{#if u.id === data.raiz.id}
+					· esta linha é só a lotação do departamento{/if}</span
 			>
 		{/if}
 	</td>
@@ -241,7 +295,7 @@
 				</tr>
 			</thead>
 			<tbody>
-				<!-- A raiz, fixa: própria lotação. -->
+				<!-- A raiz, fixa: a PRÓPRIA lotação (o total com vinculadas fecha a tabela). -->
 				<tr class="bg-primary-500/5">
 					{@render nomeUnidade(data.raiz, true, false)}
 					{@render celulasEfetivo(data.raiz)}
@@ -266,9 +320,28 @@
 								>Total de {bloco.unidade.sigla || bloco.unidade.nome} com vinculadas</td
 							>
 							{#each ['dpc', 'oip'] as const as cargo (cargo)}
-								<td class={CELULA_NUM}>{bloco.unidade.subtotal[cargo].ativos}</td>
-								<td class={CELULA_NUM}>{bloco.unidade.subtotal[cargo].ferias}</td>
-								<td class={CELULA_NUM}>{bloco.unidade.subtotal[cargo].afastados}</td>
+								{@const sigla = cargo === 'dpc' ? 'DPC' : 'OIP'}
+								{@render numero(
+									bloco.unidade,
+									'ativos',
+									sigla,
+									bloco.unidade.subtotal[cargo].ativos,
+									true
+								)}
+								{@render numero(
+									bloco.unidade,
+									'ferias',
+									sigla,
+									bloco.unidade.subtotal[cargo].ferias,
+									true
+								)}
+								{@render numero(
+									bloco.unidade,
+									'afastados',
+									sigla,
+									bloco.unidade.subtotal[cargo].afastados,
+									true
+								)}
 							{/each}
 							<td class="{CELULA_NUM} font-semibold">{bloco.unidade.subtotal.total}</td>
 							<td class={CELULA_NUM}>—</td>
@@ -283,6 +356,34 @@
 						</tr>
 					{/if}
 				{/each}
+				<!-- Total do departamento com tudo abaixo — é o que o cabeçalho soma. -->
+				{#if !busca.trim()}
+					<tr
+						class="border-t-2 border-surface-300 bg-primary-500/5 text-xs font-semibold dark:border-white/20"
+					>
+						<td>Total de {data.raiz.sigla || data.raiz.nome} com vinculadas</td>
+						{#each ['dpc', 'oip'] as const as cargo (cargo)}
+							{@const sigla = cargo === 'dpc' ? 'DPC' : 'OIP'}
+							{@render numero(data.raiz, 'ativos', sigla, data.raiz.subtotal[cargo].ativos, true)}
+							{@render numero(data.raiz, 'ferias', sigla, data.raiz.subtotal[cargo].ferias, true)}
+							{@render numero(
+								data.raiz,
+								'afastados',
+								sigla,
+								data.raiz.subtotal[cargo].afastados,
+								true
+							)}
+						{/each}
+						<td class={CELULA_NUM}>{data.raiz.subtotal.total}</td>
+						<td class={CELULA_NUM}>—</td>
+						<td class={CELULA_NUM}>—</td>
+						<td class={CELULA_NUM}>{data.raiz.municipiosSubtotal}</td>
+						<td class={CELULA_NUM}>{fmt.format(data.raiz.populacao)}</td>
+						<td class={CELULA_NUM}
+							>{data.raiz.habPorPolicial != null ? fmt.format(data.raiz.habPorPolicial) : '—'}</td
+						>
+					</tr>
+				{/if}
 			</tbody>
 		</table>
 	</div>
@@ -295,3 +396,5 @@
 		{totalLinhas} unidades no escopo. Veículos e armas chegam com o módulo de Patrimônio.
 	</p>
 </div>
+
+<ModalEfetivo bind:open={painelAberto} {pedido} />

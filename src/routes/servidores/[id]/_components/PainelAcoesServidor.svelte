@@ -40,6 +40,7 @@
 	import CalendarOff from '@lucide/svelte/icons/calendar-off';
 	import UserMinus from '@lucide/svelte/icons/user-minus';
 	import type { ActionResult } from '@sveltejs/kit';
+	import { AFASTAMENTOS, SUBTIPOS_CADASTRAVEIS } from '$lib/servidores/afastamentos';
 
 	interface Props {
 		policial: { id: number; nome: string; matricula: string; lotacao: string };
@@ -349,12 +350,11 @@
 						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"
 							>Tipo de Afastamento</span
 						>
+						<!-- Os 19 tipos do Estatuto (fase 2-C); os valores legados não se cadastram. -->
 						<select class="select py-1 px-3 text-sm" name="subtipo" bind:value={subtipo} required>
-							<option value="ferias">Férias</option>
-							<option value="licenca_medica">Licença Médica</option>
-							<option value="judicial">Judicial</option>
-							<option value="licenca_outros">Licença outros</option>
-							<option value="outros">Outros afastamentos</option>
+							{#each SUBTIPOS_CADASTRAVEIS as s (s)}
+								<option value={s}>{AFASTAMENTOS[s].rotulo}</option>
+							{/each}
 						</select>
 					</label>
 					<label class="label">

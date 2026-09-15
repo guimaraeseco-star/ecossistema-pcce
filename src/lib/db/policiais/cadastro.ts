@@ -60,6 +60,9 @@ export async function listarPoliciais(
 		seccionalId?: number;
 		somentePapel?: boolean;
 		escopoLotacoes?: string[];
+		/** Situação de HOJE (`hojeISO` obrigatório junto): quem está ativo, de férias ou afastado. */
+		situacao?: 'ativos' | 'ferias' | 'afastados';
+		hojeISO?: string;
 		page?: number;
 		limit?: number;
 	}
@@ -115,6 +118,21 @@ export async function listarPoliciais(
 		baseConditions.push(sql`${policiais.papel} IS NOT NULL`);
 	}
 
+	// Situação de hoje — a MESMA régua de `afastamentoVigente`/`efetivoPorLotacao`
+	// (início ≤ hoje ≤ fim, fim vazio = aberto); licença por cima de férias:
+	// quem tem férias E outro afastamento no dia é "afastado", não "de férias".
+	if (opts?.situacao && opts.hojeISO) {
+		const hoje = opts.hojeISO;
+		const vigente = (extra: ReturnType<typeof sql>) =>
+			sql`EXISTS (SELECT 1 FROM policial_historico h WHERE h.policial_id = ${policiais.id} AND h.tipo = 'afastamento' AND h.data_inicio <= ${hoje} AND (h.data_fim IS NULL OR h.data_fim = '' OR h.data_fim >= ${hoje}) ${extra})`;
+		const qualquer = vigente(sql``);
+		const outro = vigente(sql`AND h.subtipo <> 'ferias'`);
+		const ferias = vigente(sql`AND h.subtipo = 'ferias'`);
+		if (opts.situacao === 'ativos') baseConditions.push(sql`NOT ${qualquer}`);
+		else if (opts.situacao === 'afastados') baseConditions.push(outro);
+		else baseConditions.push(sql`${ferias} AND NOT ${outro}`);
+	}
+
 	// Paginação com valores padrão
 	const page = opts?.page ?? 1;
 	const limit = opts?.limit ?? 20;
@@ -140,6 +158,10 @@ export async function listarPoliciais(
 			email: policiais.email,
 			email_pessoal: policiais.email_pessoal,
 			email_pessoal_verificado: policiais.email_pessoal_verificado,
+			cargo_anterior: policiais.cargo_anterior,
+			data_nascimento: policiais.data_nascimento,
+			data_posse: policiais.data_posse,
+			designacao_id: policiais.designacao_id,
 			created_at: policiais.created_at,
 			updated_at: policiais.updated_at,
 			total: sql<number>`count(*) OVER()`
@@ -202,6 +224,11 @@ export interface DadosPolicial {
 	email?: string | null;
 	email_pessoal?: string | null;
 	ativo?: number;
+	// ---- Fase 2-C (0088): a folha é dona; `undefined` = não mexe ----
+	cargo_anterior?: string;
+	data_nascimento?: string | null;
+	data_posse?: string | null;
+	designacao_id?: number | null;
 }
 
 /**
@@ -234,7 +261,13 @@ async function colunasDoPolicial(data: DadosPolicial, env?: CpfCriptoEnv) {
 		regime: (data.regime as 'plantao' | 'expediente') || 'plantao',
 		classe: data.classe || '',
 		papel: (data.papel as 'admin_seccional' | 'admin_unidade' | null) || null,
-		papel_unidade_id: data.papel_unidade_id ?? null
+		papel_unidade_id: data.papel_unidade_id ?? null,
+		// Só entram no SET quando a folha os mandou: o Apps Script antigo não
+		// manda, e não pode zerar o que a carga da planilha gravou.
+		...(data.cargo_anterior !== undefined ? { cargo_anterior: data.cargo_anterior } : {}),
+		...(data.data_nascimento !== undefined ? { data_nascimento: data.data_nascimento } : {}),
+		...(data.data_posse !== undefined ? { data_posse: data.data_posse } : {}),
+		...(data.designacao_id !== undefined ? { designacao_id: data.designacao_id } : {})
 	};
 
 	// FLW-AUT-005: `ativo` omitido no UPDATE deixa a coluna intocada. `?? 1`

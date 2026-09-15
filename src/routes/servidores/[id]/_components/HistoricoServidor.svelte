@@ -85,6 +85,13 @@
 			icon: ShieldCheck,
 			cor: 'text-tertiary-500',
 			ponto: 'bg-tertiary-500'
+		},
+		// Texto da planilha de histórico que não virou evento estruturado (fase 2-C).
+		observacao: {
+			label: 'Anotação (planilha de histórico)',
+			icon: CircleDot,
+			cor: 'text-surface-600 dark:text-surface-400',
+			ponto: 'bg-surface-400'
 		}
 	};
 
@@ -219,6 +226,11 @@
 								<p>
 									Destino: <span class="font-medium">{ev.descricao || ev.unidade_destino}</span>
 								</p>
+								{#if ev.data_evento}<p class="text-xs text-surface-600 dark:text-surface-400">
+										Data: {formatarData(ev.data_evento)}
+									</p>{/if}
+							{:else if ev.tipo === 'observacao'}
+								<p class="text-xs whitespace-pre-line">{ev.descricao}</p>
 								{#if ev.data_evento}<p class="text-xs text-surface-600 dark:text-surface-400">
 										Data: {formatarData(ev.data_evento)}
 									</p>{/if}

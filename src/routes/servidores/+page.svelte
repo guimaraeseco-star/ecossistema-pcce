@@ -55,6 +55,13 @@
 	} from '$lib/composables';
 	import { getSavedFilters } from '$lib/utils/localStorage';
 	import type { Policial, Unidade } from '$lib/types';
+	import {
+		COR_SITUACAO,
+		ROTULO_SITUACAO,
+		rotuloAfastamento,
+		type SituacaoServidor
+	} from '$lib/servidores/afastamentos';
+	import { formatarData } from '$lib/utils/datas';
 	import type { ActionResult } from '@sveltejs/kit';
 	import {
 		CLASSE_CAIXA_FILTRO,
@@ -75,11 +82,17 @@
 		lotacao: '',
 		cargo: '',
 		seccional: 'todas',
-		busca: ''
+		busca: '',
+		situacao: ''
 	});
 
 	const unidades = $derived(data.unidades as Unidade[]);
-	const policiais = $derived(data.policiais as Policial[]);
+	/** A linha da lista: o cadastro mais a situação de hoje (fase 2-C). */
+	type LinhaServidor = Policial & {
+		situacao: SituacaoServidor;
+		afastamento: { subtipo: string; data_inicio: string; data_fim: string | null } | null;
+	};
+	const policiais = $derived(data.policiais as LinhaServidor[]);
 
 	// Paginação
 	let paginaAtual = $state(untrack(() => data.pagination.page));
@@ -89,6 +102,9 @@
 	// Filtros
 	let filtroLotacao = $state(untrack(() => data.filtros.lotacao || savedFilters.lotacao));
 	let filtroCargo = $state(untrack(() => data.filtros.cargo || savedFilters.cargo));
+	// Situação de hoje: '' (todos) | ativos | ferias | afastados. Vem da URL
+	// quando o link parte da Gestão de unidade.
+	let filtroSituacao = $state(untrack(() => data.filtros.situacao || savedFilters.situacao));
 	let filtroSeccional = $state<number | 'todas'>(
 		untrack(() => {
 			const raw = data.filtros.seccional || savedFilters.seccional;
@@ -98,10 +114,15 @@
 	let filtroBusca = $state(untrack(() => data.filtros.busca || savedFilters.busca));
 
 	const seccionais = $derived(unidades.filter((u) => u.tipo === 'seccional'));
+	// Toda unidade ATIVA é lotação possível — departamento, subdepartamento,
+	// seccional e unidade de atendimento também têm servidores. Só delegacias
+	// aqui deixava o link vindo da Gestão de unidade (lotação = departamento)
+	// sem opção correspondente, e o filtro se perdia. Com uma seccional
+	// escolhida: ela e o que responde a ela.
 	const delegaciasDropdown = $derived(
 		filtroSeccional === 'todas'
-			? unidades.filter((u) => u.tipo === 'delegacia')
-			: unidades.filter((u) => u.tipo === 'delegacia' && u.seccional_id === filtroSeccional)
+			? unidades
+			: unidades.filter((u) => u.id === filtroSeccional || u.seccional_id === filtroSeccional)
 	);
 
 	// Dialog de confirmação
@@ -120,7 +141,8 @@
 			lotacao: filtroLotacao,
 			cargo: filtroCargo,
 			seccional: filtroSeccional,
-			busca: filtroBusca
+			busca: filtroBusca,
+			situacao: filtroSituacao
 		}),
 		query: (p) => {
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity
@@ -134,6 +156,7 @@
 				params.set('lotacao', filtroLotacao);
 			}
 			if (filtroCargo) params.set('cargo', filtroCargo);
+			if (filtroSituacao) params.set('situacao', filtroSituacao);
 			if (filtroBusca) params.set('busca', filtroBusca);
 			if (filtroSeccional && filtroSeccional !== 'todas') {
 				params.set('seccional', String(filtroSeccional));
@@ -195,6 +218,7 @@
 	function limparFiltros() {
 		filtroLotacao = filtroLotacaoBase;
 		filtroCargo = '';
+		filtroSituacao = '';
 		filtroSeccional = 'todas';
 		filtroBusca = '';
 		paginaAtual = 1;
@@ -204,6 +228,7 @@
 	const temFiltros = $derived(
 		filtroLotacao !== filtroLotacaoBase ||
 			filtroCargo !== '' ||
+			filtroSituacao !== '' ||
 			filtroSeccional !== 'todas' ||
 			filtroBusca !== ''
 	);
@@ -219,6 +244,23 @@
 <svelte:head>
 	<title>Gerenciar Policiais | Ecossistema PCCE</title>
 </svelte:head>
+
+<!-- Selo da situação de hoje: férias em dourado, afastado em vermelho, com o
+     tipo e o fim — a referência rápida que faltava (pedido de 15/09/2026). -->
+{#snippet seloSituacao(p: LinhaServidor)}
+	{#if p.situacao === 'ativo'}
+		<span class="text-xs {COR_SITUACAO.ativo}">{ROTULO_SITUACAO.ativo}</span>
+	{:else}
+		<span class="block text-xs font-semibold {COR_SITUACAO[p.situacao]}"
+			>{p.situacao === 'ferias' ? 'Férias' : rotuloAfastamento(p.afastamento?.subtipo ?? '')}</span
+		>
+		<span class="block text-3xs text-surface-500"
+			>{p.afastamento?.data_fim
+				? `até ${formatarData(p.afastamento.data_fim)}`
+				: `desde ${formatarData(p.afastamento?.data_inicio ?? '')}`}</span
+		>
+	{/if}
+{/snippet}
 
 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
 	<h1 class="h1 text-2xl font-bold">Gerenciar Policiais</h1>
@@ -277,9 +319,27 @@
 
 <div class="space-y-6 mt-2">
 	<section class="{CLASSE_CAIXA_FILTRO} space-y-4">
-		<div
-			class="flex flex-col md:flex-row md:flex-wrap xl:flex-nowrap items-stretch md:items-end gap-4"
-		>
+		<div class="flex flex-col md:flex-row md:flex-wrap items-stretch md:items-end gap-4">
+			<div class="flex flex-col gap-1.5 flex-1 min-w-[260px] lg:max-w-sm">
+				<span class={CLASSE_ROTULO_FILTRO}>Situação hoje</span>
+				<SegmentedControl
+					value={filtroSituacao || ''}
+					onValueChange={(e) => {
+						filtroSituacao = e.value ?? '';
+						navegarComFiltros();
+					}}
+					class="w-full"
+				>
+					<SegmentedControl.Control class={CLASSE_CONTROLE_SEGMENTO_LARGO}>
+						{#each [['', 'Todos'], ['ativos', 'Ativos'], ['ferias', 'Férias'], ['afastados', 'Afastados']] as [val, label] (val)}
+							<SegmentedControl.Item value={val} class={CLASSE_ITEM_SEGMENTO_LARGO}>
+								<SegmentedControl.ItemText>{label}</SegmentedControl.ItemText>
+								<SegmentedControl.ItemHiddenInput />
+							</SegmentedControl.Item>
+						{/each}
+					</SegmentedControl.Control>
+				</SegmentedControl>
+			</div>
 			<div class="flex flex-col gap-1.5 flex-1 min-w-[220px] lg:max-w-xs">
 				<span class={CLASSE_ROTULO_FILTRO}>Cargo</span>
 				<SegmentedControl
@@ -391,6 +451,7 @@
 							<th class="w-[24%]">Nome</th>
 							<th class="w-[12%] whitespace-nowrap px-4">Matrícula</th>
 							<th class="w-[9%] whitespace-nowrap px-4">Cargo</th>
+							<th class="whitespace-nowrap px-4">Situação</th>
 							<th class="w-[14%] whitespace-nowrap px-4">Telefone</th>
 							<th class="w-[20%]">Lotação</th>
 							<th>Ações</th>
@@ -420,6 +481,7 @@
 												: 'preset-filled-warning-500'}">{p.cargo}</span
 										>
 									</td>
+									<td class="px-4">{@render seloSituacao(p)}</td>
 									<td class="font-mono tabular-nums whitespace-nowrap px-4">{p.telefone}</td>
 									<td class="w-[20%]">{p.lotacao}</td>
 									<td>
@@ -464,6 +526,10 @@
 								>
 							</div>
 							<div class="space-y-1 text-sm mb-3">
+								<div class="flex justify-between">
+									<span class="text-surface-600 dark:text-surface-400">Situação</span>
+									{@render seloSituacao(p)}
+								</div>
 								<div class="flex justify-between">
 									<span class="text-surface-600 dark:text-surface-400">Matrícula</span>
 									<span class="text-surface-900 dark:text-surface-100 font-mono tabular-nums"

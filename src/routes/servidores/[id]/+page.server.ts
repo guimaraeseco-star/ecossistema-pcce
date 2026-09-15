@@ -306,6 +306,14 @@ export const load: PageServerLoad = async ({ locals, params, platform, depends }
 		solicitacoesCampo,
 		solicitacoesAcao,
 		afastamentoVigenteId: afastamentoAtual?.id ?? null,
+		/** Para o selo no cabeçalho: tipo e período em curso hoje (fase 2-C). */
+		afastamentoAtual: afastamentoAtual
+			? {
+					subtipo: afastamentoAtual.subtipo ?? 'outros',
+					data_inicio: afastamentoAtual.data_inicio ?? '',
+					data_fim: afastamentoAtual.data_fim || null
+				}
+			: null,
 		// Recorte do manifesto, não o id completo nem a chave pública. Chaves
 		// revogadas entram em `chavesAnteriores` para confrontar PDF antigo.
 		passkey: credencialPasskey

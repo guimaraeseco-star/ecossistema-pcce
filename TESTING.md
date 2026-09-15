@@ -382,6 +382,32 @@ Verificar cada transição de status:
       subárvore) e "Hab./policial" (população ÷ lotados da subárvore); ficha da
       unidade mostra "N municípios · X habitantes · 1 policial para Y hab." no
       card de municípios, com a população de cada um
+- [ ] Carga de servidores (`node scripts/importar-servidores.mjs --planilha
+Servidores.xlsx --enviar --local`): 697/697 importados; relatório lista
+      só divergências reais (AIS da planilha ≠ AIS da unidade, sem e-mail,
+      status sem datas); reexecutar não duplica afastamentos nem titulares;
+      Gestão de unidade passa a mostrar o efetivo real (férias/afastados pela
+      data de hoje) e "1 policial para N hab."; ficha do servidor mostra o
+      afastamento importado com o rótulo do catálogo (LTS, cessão, LIP…); o
+      cadastro de afastamento pela tela oferece os 19 tipos
+- [ ] Números clicáveis na Gestão de unidade (lista e ficha): "Férias" em
+      dourado e "Afast." em vermelho; clicar abre o painel "quem são" (nome,
+      matrícula, cargo, tipo de afastamento com a base legal, início, fim, dias
+      restantes; nos totais de seccional/departamento agrupado por unidade);
+      nome abre a ficha do servidor; "Ver em Servidores" abre a lista filtrada;
+      zero fica apagado e não abre; a lista tem a linha "Total de DPI SUL com
+      vinculadas" batendo com o cabeçalho
+- [ ] Servidores: filtro "Situação hoje" (Todos/Ativos/Férias/Afastados) e
+      coluna Situação (Ativo; Férias até dd/mm em dourado; tipo de afastamento
+      até dd/mm em vermelho); a ficha mostra o mesmo selo ao lado do nome
+- [ ] Histórico da planilha (`node scripts/importar-servidores.mjs --historico
+    HISTORICO.xlsx --enviar --local`): 698/914 linhas casam com a base (os
+      216 desvinculados ficam no relatório, não entram); a ficha do servidor
+      ganha na linha do tempo férias/licenças com datas (subtipo pelo texto:
+      LTS, paternidade, maternidade…), movimentações com data e destino, e
+      "Anotação (planilha de histórico)" para o texto que não virou evento
+      (sustação/reprogramação de férias, portarias soltas…); reenviar não
+      duplica; o evento atual da planilha de servidores não é repetido
 - [ ] Regimes após a migração 0087: toda unidade do DPI SUL com "Expediente";
       "Plantão" só em 2ª Seccional, Aracati, Brejo Santo, Crato, Iguatu, Quixadá,
       Russas, Tauá; "Fim de semana" nessas mais Icó, Senador Pompeu e Quixeramobim
