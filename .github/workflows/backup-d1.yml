@@ -96,10 +96,17 @@ jobs:
               exit 1
             fi
           done
-          if ! grep -Eq "INSERT INTO [\`\"]?policiais[\`\" (]" backup.sql; then
-            echo "::error::Dump sem nenhum INSERT em 'policiais' (banco vazio?). Abortando upload."
-            exit 1
-          fi
+          # "Banco vazio?" se mede em tabelas que SEMPRE têm linha: a estrutura
+          # (unidades) e quem administra (administradores). Não em 'policiais':
+          # a produção da conta própria nasceu sem servidores (eles entram na
+          # fase 2-C) e o check antigo derrubou o backup por dias sem que o
+          # banco estivesse vazio (13–16/09/2026).
+          for tabela in unidades administradores; do
+            if ! grep -Eq "INSERT INTO [\`\"]?${tabela}[\`\" (]" backup.sql; then
+              echo "::error::Dump sem nenhum INSERT em '${tabela}' (banco vazio?). Abortando upload."
+              exit 1
+            fi
+          done
 
       - name: Comprimir e cifrar
         run: |
