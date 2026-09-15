@@ -344,7 +344,7 @@ Verificar cada transição de status:
       mesmos quatro grupos (Gestão de pessoal · operacional · de unidade ·
       administrativa), cada título é link para a tela do grupo, e "Início" leva
       a `/`
-- [ ] Ficha da unidade (`/unidade/[id]`, depois da carga): foto da fachada, endereço/telefone/e-mail, AIS ao lado do tipo, "Tira-gravame" e "Xadrezes" no bloco de efetivo, tabela "Municípios atendidos" com plantão da semana e do fim de semana (Icó: semana com Iguatu, FDS com a própria DP); seccional e departamento têm ficha sem municípios; a lista `/unidade` mostra a coluna "Municípios" com link para a ficha
+- [ ] Ficha da unidade (`/unidade/[id]`, depois da carga): foto da fachada, endereço/telefone/e-mail, AIS ao lado do tipo, bloco de efetivo por cargo (DPC e OIP) × situação (ativos hoje, férias, afastados por outro motivo, lotados — um servidor com férias e licença ao mesmo tempo conta uma vez, como afastado), "Tira-gravame" e "Xadrezes", tabela "Municípios atendidos" com plantão da semana e do fim de semana (Icó: semana com Iguatu, FDS com a própria DP); seccional e departamento têm ficha sem municípios; a lista `/unidade` mostra a coluna "Municípios" com link para a ficha
 - [ ] Barra do topo: brasão + "Polícia Civil do Ceará - DPI SUL" para o Admin
       Geral; "- seccional" para o admin de seccional; "- seccional - delegacia"
       para o admin de unidade; só "Polícia Civil do Ceará" para o Super Admin

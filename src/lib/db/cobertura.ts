@@ -13,7 +13,7 @@
  * `scripts/importar-delegacias-municipios.mjs`, e edição pela tela entra com o
  * módulo Municípios (Admin Geral, sem proposta — E6).
  */
-import { asc, eq, inArray, sql } from 'drizzle-orm';
+import { asc, eq, inArray } from 'drizzle-orm';
 import {
 	municipios,
 	municipiosCobertura,
@@ -103,11 +103,20 @@ export async function municipiosDaUnidade(
 	}));
 }
 
-/** Quantos municípios cada unidade atende — para a coluna da lista. Unidade sem município não aparece. */
-export async function contagemMunicipiosPorUnidade(db: Database): Promise<Map<number, number>> {
+/**
+ * Os IBGEs que cada unidade atende — para a coluna da lista e para somar por
+ * subárvore SEM repetir (Juazeiro do Norte tem duas DPs: contado uma vez no
+ * total da seccional e do departamento). Unidade sem município não aparece.
+ */
+export async function municipiosPorUnidade(db: Database): Promise<Map<number, string[]>> {
 	const linhas = await db
-		.select({ unidadeId: unidadeMunicipios.unidade_id, n: sql<number>`count(*)` })
-		.from(unidadeMunicipios)
-		.groupBy(unidadeMunicipios.unidade_id);
-	return new Map(linhas.map((l) => [l.unidadeId, Number(l.n)]));
+		.select({ unidadeId: unidadeMunicipios.unidade_id, ibge: unidadeMunicipios.ibge })
+		.from(unidadeMunicipios);
+	const mapa = new Map<number, string[]>();
+	for (const l of linhas) {
+		const lista = mapa.get(l.unidadeId) ?? [];
+		lista.push(l.ibge);
+		mapa.set(l.unidadeId, lista);
+	}
+	return mapa;
 }

@@ -1,6 +1,7 @@
 /**
- * Efetivo por lotação (Gestão de unidade, decisão E39): contagem por cargo e
- * afastados HOJE pela mesma régua de `afastamentoVigente`.
+ * Efetivo por lotação (Gestão de unidade, decisão E39): por cargo, quantos
+ * estão ativos, de férias e afastados HOJE — pela mesma régua de
+ * `afastamentoVigente`.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { Database } from '$lib/db';
@@ -19,11 +20,16 @@ async function policial(nome: string, cargo: 'DPC' | 'OIP', lotacao: string, ati
 	return l.id;
 }
 
-async function afastar(policialId: number, inicio: string, fim: string | null) {
+async function afastar(
+	policialId: number,
+	inicio: string,
+	fim: string | null,
+	subtipo: 'ferias' | 'licenca_medica' | 'judicial' | 'licenca_outros' | 'outros' = 'ferias'
+) {
 	await db.insert(policialHistorico).values({
 		policial_id: policialId,
 		tipo: 'afastamento',
-		subtipo: 'ferias',
+		subtipo,
 		data_inicio: inicio,
 		data_fim: fim
 	});
@@ -34,7 +40,7 @@ beforeEach(() => {
 });
 
 describe('efetivo por lotação', () => {
-	it('conta ativos por cargo, ignora inativos e devolve só as lotações com gente', async () => {
+	it('conta lotados por cargo, ignora inativos e devolve só as lotações com gente', async () => {
 		await policial('A', 'DPC', 'DP de Iguatu');
 		await policial('B', 'OIP', 'DP de Iguatu');
 		await policial('C', 'OIP', 'DP de Iguatu');
@@ -42,26 +48,34 @@ describe('efetivo por lotação', () => {
 		await policial('E', 'OIP', 'DP de Icó');
 
 		const mapa = await efetivoPorLotacao(db, '2026-09-13');
-		expect(mapa.get('DP de Iguatu')).toEqual({ dpc: 1, oip: 2, total: 3, afastados: 0 });
-		expect(mapa.get('DP de Icó')).toEqual({ dpc: 0, oip: 1, total: 1, afastados: 0 });
+		expect(mapa.get('DP de Iguatu')).toEqual({
+			dpc: { ativos: 1, ferias: 0, afastados: 0, total: 1 },
+			oip: { ativos: 2, ferias: 0, afastados: 0, total: 2 },
+			total: 3
+		});
+		expect(mapa.get('DP de Icó')?.oip.ativos).toBe(1);
 		expect(mapa.get('DP de Crato')).toBeUndefined();
 	});
 
-	it('afastado hoje = afastamento aberto ou que cobre a data; encerrado e futuro não contam', async () => {
-		const a = await policial('A', 'OIP', 'DP de Iguatu');
+	it('férias e afastamento por outro motivo saem dos ativos, por cargo; encerrado e futuro não contam', async () => {
+		const hoje = '2026-09-13';
+		const a = await policial('A', 'DPC', 'DP de Iguatu');
 		const b = await policial('B', 'OIP', 'DP de Iguatu');
 		const c = await policial('C', 'OIP', 'DP de Iguatu');
 		const d = await policial('D', 'OIP', 'DP de Iguatu');
-		await afastar(a, '2026-09-01', '2026-09-30'); // cobre hoje
-		await afastar(b, '2026-09-10', null); // aberto
-		await afastar(c, '2026-08-01', '2026-08-31'); // encerrado
-		await afastar(d, '2026-10-01', '2026-10-15'); // futuro
-		await afastar(a, '2026-09-05', '2026-09-20'); // segundo evento do MESMO servidor: conta um
+		const e = await policial('E', 'OIP', 'DP de Iguatu');
+		await afastar(a, '2026-09-01', '2026-09-30', 'ferias'); // DPC de férias
+		await afastar(b, '2026-09-10', null, 'licenca_medica'); // OIP afastado (aberto)
+		await afastar(c, '2026-08-01', '2026-08-31', 'ferias'); // encerrado: ativo
+		await afastar(d, '2026-10-01', '2026-10-15', 'ferias'); // futuro: ativo
+		// férias E licença ao mesmo tempo: conta UMA vez, como afastado
+		await afastar(e, '2026-09-05', '2026-09-20', 'ferias');
+		await afastar(e, '2026-09-10', '2026-09-25', 'judicial');
 
-		const hoje = '2026-09-13';
-		const mapa = await efetivoPorLotacao(db, hoje);
-		expect(mapa.get('DP de Iguatu')?.afastados).toBe(2);
-		expect(mapa.get('DP de Iguatu')?.total).toBe(4);
+		const iguatu = (await efetivoPorLotacao(db, hoje)).get('DP de Iguatu')!;
+		expect(iguatu.dpc).toEqual({ ativos: 0, ferias: 1, afastados: 0, total: 1 });
+		expect(iguatu.oip).toEqual({ ativos: 2, ferias: 0, afastados: 2, total: 4 });
+		expect(iguatu.total).toBe(5);
 
 		// A mesma régua que a ficha do servidor usa em memória.
 		const regra = (inicio: string, fim: string | null) =>
@@ -84,20 +98,31 @@ describe('efetivo por lotação', () => {
 		await afastar(a, '2026-09-01', null);
 		await policial('B', 'OIP', 'DP de Iguatu');
 		expect((await efetivoPorLotacao(db, '2026-09-13')).get('DP de Iguatu')).toEqual({
-			dpc: 0,
-			oip: 1,
-			total: 1,
-			afastados: 0
+			dpc: { ativos: 0, ferias: 0, afastados: 0, total: 0 },
+			oip: { ativos: 1, ferias: 0, afastados: 0, total: 1 },
+			total: 1
 		});
 	});
 
 	it('soma efetivos eixo a eixo', () => {
 		expect(
 			somarEfetivos([
-				{ dpc: 1, oip: 2, total: 3, afastados: 1 },
-				{ dpc: 0, oip: 5, total: 5, afastados: 0 },
+				{
+					dpc: { ativos: 1, ferias: 0, afastados: 0, total: 1 },
+					oip: { ativos: 1, ferias: 1, afastados: 0, total: 2 },
+					total: 3
+				},
+				{
+					dpc: { ativos: 0, ferias: 0, afastados: 0, total: 0 },
+					oip: { ativos: 4, ferias: 0, afastados: 1, total: 5 },
+					total: 5
+				},
 				efetivoVazio()
 			])
-		).toEqual({ dpc: 1, oip: 7, total: 8, afastados: 1 });
+		).toEqual({
+			dpc: { ativos: 1, ferias: 0, afastados: 0, total: 1 },
+			oip: { ativos: 5, ferias: 1, afastados: 1, total: 7 },
+			total: 8
+		});
 	});
 });

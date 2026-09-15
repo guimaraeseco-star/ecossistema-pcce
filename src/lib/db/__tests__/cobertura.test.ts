@@ -11,7 +11,7 @@ import {
 	unidadeMunicipios,
 	unidades
 } from '$lib/server/schema';
-import { contagemMunicipiosPorUnidade, municipiosDaUnidade } from '../cobertura';
+import { municipiosPorUnidade, municipiosDaUnidade } from '../cobertura';
 import { rotuloTipoPlantao } from '$lib/unidades/plantao';
 
 let db: Database;
@@ -66,10 +66,10 @@ describe('municípios de uma unidade', () => {
 		expect(deIco[0].fds?.plantonista).toBe('DP de Icó');
 		expect(rotuloTipoPlantao(deIco[0].semana!.tipo)).toBe('Físico misto');
 
-		const contagem = await contagemMunicipiosPorUnidade(db);
-		expect(contagem.get(iguatu)).toBe(2);
-		expect(contagem.get(ico)).toBe(1);
-		expect(contagem.get(dep)).toBeUndefined();
+		const porUnidade = await municipiosPorUnidade(db);
+		expect(porUnidade.get(iguatu)?.length).toBe(2);
+		expect(porUnidade.get(ico)).toEqual(['2305407']);
+		expect(porUnidade.get(dep)).toBeUndefined();
 	});
 
 	it('unidade sem município devolve lista vazia', async () => {

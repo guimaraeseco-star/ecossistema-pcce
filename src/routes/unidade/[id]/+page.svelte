@@ -5,8 +5,8 @@
 	 * Blocos: identificação e contato (foto, endereço, telefone, e-mail — fase
 	 * 2), efetivo por cargo e situação (cada número leva à lista de servidores
 	 * já filtrada), os municípios atendidos com o plantão de cada um, as
-	 * unidades vinculadas e, por fim, o que a fase 4 ainda vai trazer (veículos
-	 * e armas), para quem abre saber que o que falta é dado, não tela.
+	 * unidades vinculadas e o cartão de estrutura (xadrezes, tira-gravame e, como
+	 * previstos, veículos e armas da fase 4).
 	 */
 	import type { PageProps } from './$types';
 	import BotaoVoltar from '$lib/components/BotaoVoltar.svelte';
@@ -35,8 +35,7 @@
 	const plantao = (p: { tipo: string; plantonista: string } | null) =>
 		p ? `${rotuloTipoPlantao(p.tipo)}${p.plantonista ? ` · ${p.plantonista}` : ''}` : '—';
 
-	const NUM = 'text-2xl font-bold tabular-nums text-surface-900 dark:text-surface-50';
-	const ROTULO = 'text-2xs font-semibold tracking-[0.18em] text-surface-500 uppercase';
+	const NUM = 'text-lg font-bold tabular-nums text-surface-900 dark:text-surface-50';
 </script>
 
 <svelte:head>
@@ -125,51 +124,90 @@
 				Ver servidores →
 			</a>
 		</div>
-		<dl class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-			<div>
-				<dt class={ROTULO}>Delegados (DPC)</dt>
-				<dd class="mt-1">
-					<a href="{hrefServidores}&cargo=DPC" class="{NUM} no-underline">{data.efetivo.dpc}</a>
-				</dd>
-			</div>
-			<div>
-				<dt class={ROTULO}>Oficiais (OIP)</dt>
-				<dd class="mt-1">
-					<a href="{hrefServidores}&cargo=OIP" class="{NUM} no-underline">{data.efetivo.oip}</a>
-				</dd>
-			</div>
-			<div>
-				<dt class={ROTULO}>Afastados hoje</dt>
-				<dd class="mt-1 {NUM}">{data.efetivo.afastados}</dd>
-			</div>
-			<div>
-				<dt class={ROTULO}>Ativos</dt>
-				<dd class="mt-1 {NUM}">{data.efetivo.total}</dd>
-			</div>
-		</dl>
+		<!-- Uma linha por cargo: ativos hoje, de férias, afastados por outro motivo
+		     e o total lotado. O número de ativos é link para a lista filtrada. -->
+		<div class="table-wrap">
+			<table class="table">
+				<thead>
+					<tr class="text-2xs">
+						<th>Cargo</th>
+						<th class="!text-center">Ativos</th>
+						<th class="!text-center">Férias</th>
+						<th class="!text-center">Afastados</th>
+						<th class="!text-center">Lotados</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each [['dpc', 'Delegados (DPC)'], ['oip', 'Oficiais (OIP)']] as const as [cargo, rotulo] (cargo)}
+						{@const c = data.efetivo[cargo]}
+						<tr>
+							<td class="font-medium">{rotulo}</td>
+							<td class="text-center">
+								<a href="{hrefServidores}&cargo={cargo.toUpperCase()}" class="{NUM} no-underline"
+									>{c.ativos}</a
+								>
+							</td>
+							<td class="text-center text-lg tabular-nums text-surface-600 dark:text-surface-300"
+								>{c.ferias}</td
+							>
+							<td class="text-center text-lg tabular-nums text-surface-600 dark:text-surface-300"
+								>{c.afastados}</td
+							>
+							<td class="text-center text-lg font-semibold tabular-nums">{c.total}</td>
+						</tr>
+					{/each}
+					<tr class="text-sm font-semibold text-warning-600 dark:text-warning-400">
+						<td>Total</td>
+						<td class="text-center tabular-nums"
+							>{data.efetivo.dpc.ativos + data.efetivo.oip.ativos}</td
+						>
+						<td class="text-center tabular-nums"
+							>{data.efetivo.dpc.ferias + data.efetivo.oip.ferias}</td
+						>
+						<td class="text-center tabular-nums"
+							>{data.efetivo.dpc.afastados + data.efetivo.oip.afastados}</td
+						>
+						<td class="text-center font-semibold tabular-nums">{data.efetivo.total}</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
 		{#if data.totalVinculadas > 0}
 			<p class="mt-4 text-xs text-surface-500">
 				Com as {data.totalVinculadas} unidade{data.totalVinculadas === 1 ? '' : 's'} vinculada{data.totalVinculadas ===
 				1
 					? ''
-					: 's'}: {data.subtotal.total} servidores ({data.subtotal.dpc} DPC, {data.subtotal.oip} OIP,
-				{data.subtotal.afastados} afastados).
+					: 's'}: {data.subtotal.total} lotados — DPC {data.subtotal.dpc.ativos} ativos, {data
+					.subtotal.dpc.ferias} de férias, {data.subtotal.dpc.afastados} afastados; OIP {data
+					.subtotal.oip.ativos} ativos, {data.subtotal.oip.ferias} de férias, {data.subtotal.oip
+					.afastados} afastados.
 			</p>
 		{/if}
 		{#if regimes}
 			<p class="mt-2 text-xs text-surface-500">Regimes de escala: {regimes}.</p>
 		{/if}
-		<p class="mt-2 text-xs text-surface-500">
-			Tira-gravame: {u.tira_gravame ? 'sim' : 'não'} · Xadrezes: {u.xadrezes}
-		</p>
 	</section>
 
-	<!-- Dados previstos -->
-	<section class="card-elevated rounded-2xl p-5" aria-labelledby="previstos">
-		<h2 id="previstos" class="mb-3 text-base font-semibold text-surface-900 dark:text-surface-50">
-			Dados previstos
+	<!-- Estrutura e patrimônio: o que a unidade TEM (xadrezes, tira-gravame) e
+	     o que a fase 4 ainda vai trazer (veículos, armas), no mesmo cartão a
+	     pedido do responsável (15/09/2026). -->
+	<section class="card-elevated rounded-2xl p-5" aria-labelledby="estrutura">
+		<h2 id="estrutura" class="mb-3 text-base font-semibold text-surface-900 dark:text-surface-50">
+			Estrutura e patrimônio
 		</h2>
 		<ul class="space-y-2">
+			<li class="flex items-baseline justify-between gap-3 text-sm">
+				<span class="text-surface-600 dark:text-surface-400">Xadrezes</span>
+				<span class="font-semibold tabular-nums text-surface-900 dark:text-surface-50"
+					>{u.xadrezes}</span
+				>
+			</li>
+			<li class="flex items-baseline justify-between gap-3 text-sm">
+				<span class="text-surface-600 dark:text-surface-400">Tira-gravame</span>
+				<span class="font-semibold text-surface-900 dark:text-surface-50"
+					>{u.tira_gravame ? 'Sim' : 'Não'}</span
+				>
+			</li>
 			{#each PREVISTOS as p (p.campo)}
 				<li class="flex items-baseline justify-between gap-3 text-sm">
 					<span class="text-surface-600 dark:text-surface-400">{p.campo}</span>
@@ -231,10 +269,11 @@
 				<thead>
 					<tr>
 						<th>Unidade</th>
-						<th class="text-right">DPC</th>
-						<th class="text-right">OIP</th>
+						<th class="text-right">DPC ativos</th>
+						<th class="text-right">OIP ativos</th>
+						<th class="text-right">Férias</th>
 						<th class="text-right">Afastados</th>
-						<th class="text-right">Servidores</th>
+						<th class="text-right">Lotados</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -246,9 +285,12 @@
 								>
 								<span class="ml-2 text-2xs text-surface-500 uppercase">{f.tipoRotulo}</span>
 							</td>
-							<td class="text-right tabular-nums">{f.efetivo.dpc}</td>
-							<td class="text-right tabular-nums">{f.efetivo.oip}</td>
-							<td class="text-right tabular-nums">{f.efetivo.afastados}</td>
+							<td class="text-right tabular-nums">{f.efetivo.dpc.ativos}</td>
+							<td class="text-right tabular-nums">{f.efetivo.oip.ativos}</td>
+							<td class="text-right tabular-nums">{f.efetivo.dpc.ferias + f.efetivo.oip.ferias}</td>
+							<td class="text-right tabular-nums"
+								>{f.efetivo.dpc.afastados + f.efetivo.oip.afastados}</td
+							>
 							<td class="text-right font-semibold tabular-nums">{f.efetivo.total}</td>
 						</tr>
 					{/each}

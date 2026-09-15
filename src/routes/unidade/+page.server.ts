@@ -21,7 +21,7 @@ import {
 	somarEfetivos,
 	type EfetivoLotacao
 } from '$lib/db/efetivo';
-import { contagemMunicipiosPorUnidade } from '$lib/db/cobertura';
+import { municipiosPorUnidade } from '$lib/db/cobertura';
 import { escopoDeUnidades } from '$lib/server/unidades/escopo';
 import { nivelTipoUnidade, rotuloTipoUnidade } from '$lib/unidades/tipos';
 import { hojeBrasilISO } from '$lib/utils/datas';
@@ -36,11 +36,11 @@ export interface LinhaUnidade {
 	efetivo: EfetivoLotacao;
 	/** A unidade com tudo abaixo dela — igual a `efetivo` quando é folha. */
 	subtotal: EfetivoLotacao;
-	/** Quantas unidades respondem a ela (subárvore sem ela mesma). */
+	/** Quantas unidades respondem a ela (subárvore sem ela mesma e sem subdepartamento). */
 	vinculadas: number;
 	/** Municípios que a própria unidade atende. */
 	municipios: number;
-	/** Municípios atendidos pela unidade e por tudo abaixo dela (sem repetir). */
+	/** Municípios DISTINTOS atendidos pela unidade e por tudo abaixo dela. */
 	municipiosSubtotal: number;
 }
 
@@ -60,9 +60,9 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 	// Uma unidade só no escopo: a "lista" seria a própria ficha.
 	if (escopo.nos.length === 1) redirect(302, `/unidade/${escopo.raiz.id}`);
 
-	const [efetivos, municipiosPorUnidade] = await Promise.all([
+	const [efetivos, ibgesPorUnidade] = await Promise.all([
 		efetivoPorLotacao(db, hojeBrasilISO()),
-		contagemMunicipiosPorUnidade(db)
+		municipiosPorUnidade(db)
 	]);
 	const filhosDe = (id: number) =>
 		escopo.nos
@@ -89,14 +89,13 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 				proprio,
 				...desc.map((d) => efetivos.get(d.nome) ?? efetivoVazio())
 			]),
-			vinculadas: desc.length,
-			municipios: municipiosPorUnidade.get(n.id) ?? 0,
-			// Soma simples: um município atendido por duas unidades (Juazeiro) conta
-			// duas vezes aqui; o número exato por subárvore é o da tela de Municípios.
-			municipiosSubtotal: [n, ...desc].reduce(
-				(t, d) => t + (municipiosPorUnidade.get(d.id) ?? 0),
-				0
-			)
+			// Subdepartamento (o "DPI Sul - Juazeiro") é sede administrativa, não
+			// unidade que responde ao departamento — o responsável pediu em
+			// 15/09/2026 que ele não entre na contagem.
+			vinculadas: desc.filter((d) => d.tipo !== 'sub_departamento').length,
+			municipios: ibgesPorUnidade.get(n.id)?.length ?? 0,
+			// Distintos: Juazeiro do Norte, atendido por duas DPs, conta uma vez.
+			municipiosSubtotal: new Set([n, ...desc].flatMap((d) => ibgesPorUnidade.get(d.id) ?? [])).size
 		};
 	};
 
