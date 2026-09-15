@@ -389,7 +389,7 @@ O dump contém dados pessoais em claro (nome, e-mail, telefone) — por isso é 
 2. **Bucket:** crie `escalas-backups` no R2 e configure no dashboard:
    - **Lifecycle:** apagar objetos de `d1/diario/` após **90 dias** e de `d1/mensal/` após **12 meses**;
    - **Lock de retenção** (Settings do bucket): impede deleção dentro da janela mesmo com token comprometido.
-3. **Token dedicado:** crie um API token com escopo mínimo (**D1 Edit** — o `wrangler d1 export` exige Edit, não Read; foi confirmado em 13/09/2026 quando o run falhou com Read — + **R2 write restrito ao bucket `escalas-backups`**) e cadastre como secret `CLOUDFLARE_BACKUP_API_TOKEN`. **Não reutilize** o token de deploy.
+3. **Token dedicado:** crie um API token (Manage Account → API Tokens → Custom) com duas políticas na **conta inteira**: **D1 → Write** (o `wrangler d1 export` exige Edit, não Read; confirmado em 13/09/2026 quando o run falhou com Read) e **Workers R2 Storage → Write**. A permissão por bucket ("Workers R2 Storage Bucket Item Write" em `escalas-backups`) **não serve**: o `wrangler r2 object put` usa a API REST de objetos da conta e recebe `403 Authentication error` com ela — confirmado em 16/09/2026, dois runs seguidos. O custo é o token poder escrever nos outros buckets; aceito, porque a alternativa era não ter backup. Cadastre como secret `CLOUDFLARE_BACKUP_API_TOKEN`. **Não reutilize** o token de deploy.
 4. Confira os 3 secrets em Settings → Secrets and variables → Actions (`CLOUDFLARE_ACCOUNT_ID` já existe do deploy) e rode o workflow manualmente (aba Actions → _Backup D1_ → Run workflow) para validar ponta a ponta.
 
 **Restauração** (para um banco novo/vazio — nunca por cima de produção sem export prévio):
