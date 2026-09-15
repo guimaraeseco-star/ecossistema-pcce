@@ -46,6 +46,10 @@ export interface ResultadoSync {
 	vazias: number;
 	/** Falhas e descartes, com a linha identificada. Contrato ÚNICO. */
 	erros: string[];
+	/** O que entrou mas pede atenção (ex.: titular já cadastrado pela tela). Não muda o status. */
+	avisos?: string[];
+	/** Contadores extras da rodada (ex.: histórico gravado/repetido). */
+	extras?: Record<string, number>;
 }
 
 /**
@@ -62,7 +66,9 @@ export function respostaDeSync(r: ResultadoSync): Response {
 		imported: r.importadas,
 		skippedEmpty: r.vazias,
 		failed: r.erros.length,
-		errors: r.erros.length > 0 ? r.erros : undefined
+		errors: r.erros.length > 0 ? r.erros : undefined,
+		warnings: r.avisos && r.avisos.length > 0 ? r.avisos : undefined,
+		...(r.extras ?? {})
 	};
 	return json(corpo, { status: r.erros.length === 0 ? 200 : 422 });
 }

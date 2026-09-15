@@ -7,7 +7,14 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import type { Database } from '$lib/db';
 import { bancoMigrado, drizzleSobre } from './sqlite-migrado';
 import { policiais, policialHistorico } from '$lib/server/schema';
-import { efetivoPorLotacao, efetivoVazio, somarEfetivos } from '../efetivo';
+import {
+	afastamentosVigentesDe,
+	efetivoPorLotacao,
+	efetivoVazio,
+	servidoresPorSituacao,
+	situacaoDe,
+	somarEfetivos
+} from '../efetivo';
 import { afastamentoVigente } from '../policiais/historico';
 
 let db: Database;
@@ -124,5 +131,38 @@ describe('efetivo por lotação', () => {
 			oip: { ativos: 5, ferias: 1, afastados: 1, total: 7 },
 			total: 8
 		});
+	});
+});
+
+describe('situação de hoje por servidor (fase 2-C)', () => {
+	it('lista por situação e cargo; licença prevalece sobre férias; férias em dourado é só rótulo', async () => {
+		const hoje = '2026-09-15';
+		const a = await policial('A', 'DPC', 'DP de Iguatu');
+		const b = await policial('B', 'OIP', 'DP de Iguatu');
+		const c = await policial('C', 'OIP', 'DP de Iguatu');
+		await policial('D', 'OIP', 'DP de Icó');
+		await afastar(a, '2026-09-08', '2026-09-17', 'ferias');
+		await afastar(b, '2026-09-01', null, 'licenca_medica');
+		await afastar(c, '2026-09-10', '2026-09-20', 'ferias');
+		await afastar(c, '2026-09-12', '2026-09-13', 'judicial'); // encerrado: não conta
+
+		const vig = await afastamentosVigentesDe(db, [a, b, c], hoje);
+		expect(situacaoDe(vig.get(a))).toBe('ferias');
+		expect(situacaoDe(vig.get(b))).toBe('afastado');
+		expect(vig.get(b)?.data_fim).toBeNull();
+		expect(situacaoDe(vig.get(c))).toBe('ferias');
+		expect(situacaoDe(undefined)).toBe('ativo');
+
+		const ferias = await servidoresPorSituacao(db, ['DP de Iguatu', 'DP de Icó'], hoje, {
+			situacao: 'ferias'
+		});
+		expect(ferias.map((s) => s.nome)).toEqual(['A', 'C']);
+		expect(ferias[0].afastamento).toMatchObject({ subtipo: 'ferias', data_fim: '2026-09-17' });
+		const ativosOip = await servidoresPorSituacao(db, ['DP de Iguatu', 'DP de Icó'], hoje, {
+			situacao: 'ativos',
+			cargo: 'OIP'
+		});
+		expect(ativosOip.map((s) => s.nome)).toEqual(['D']);
+		expect(await servidoresPorSituacao(db, [], hoje)).toEqual([]);
 	});
 });

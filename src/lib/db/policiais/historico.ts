@@ -12,7 +12,8 @@ import type { Database } from '../core';
 import { camposDeAtualizacao, type CamposDoPolicial } from './cadastro';
 import type { CpfCriptoEnv } from '../../crypto/cpf-cripto';
 
-type TipoHistorico = 'movimentacao' | 'afastamento' | 'desvinculacao' | 'edicao' | 'papel';
+type TipoHistorico =
+	'movimentacao' | 'afastamento' | 'desvinculacao' | 'edicao' | 'papel' | 'observacao';
 
 /**
  * O que um evento funcional DESCREVE: unidades, datas, protocolo e o PDF anexo.

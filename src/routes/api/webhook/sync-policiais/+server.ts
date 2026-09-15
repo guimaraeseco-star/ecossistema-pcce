@@ -19,11 +19,28 @@
  *
  * O upsert é por MATRÍCULA e preserva o que a fonte externa não é dona:
  * senha, `primeiro_acesso` e contatos já cadastrados (ver `upsertPolicial`).
+ *
+ * Fase 2-C: a linha pode trazer o COMPLEMENTO da planilha de pessoal
+ * (`$lib/schemas/carga-planilha`): cargo anterior, nascimento, posse,
+ * designação e o evento de afastamento — aplicados por
+ * `$lib/db/policiais/carga-planilha` depois do upsert. Designação de titular
+ * (Delegado Titular/Seccional, Diretor) grava o responsável pela unidade.
+ * O que não pôde ser aplicado sem ser erro (titular já cadastrado pela tela)
+ * volta em `warnings`.
  */
 import type { RequestHandler } from './$types';
 import { linhaVazia, respostaDeSync } from '$lib/server/sync/resultado';
 import { getDB, auditar, contextoDeEvento } from '$lib/db';
 import { upsertPolicial, buscarPolicialPorMatricula } from '$lib/db/policiais';
+import {
+	DESIGNACOES_DE_TITULAR,
+	idDaDesignacao,
+	regravarAfastamentosLegados,
+	regravarHistoricoDaPlanilha,
+	regravarTitularDaPlanilha
+} from '$lib/db/policiais/carga-planilha';
+import { complementoDaPlanilhaSchema, temComplemento } from '$lib/schemas/carga-planilha';
+import { hojeBrasilISO } from '$lib/utils/datas';
 import { eq } from 'drizzle-orm';
 import { unidades } from '$lib/server/schema';
 import {
@@ -92,6 +109,10 @@ export const POST: RequestHandler = async (event) => {
 		let successCount = 0;
 		let vazias = 0;
 		const errors: string[] = [];
+		const avisos: string[] = [];
+		const hoje = hojeBrasilISO();
+		let historicoGravado = 0;
+		let historicoRepetido = 0;
 
 		for (const item of data) {
 			const rowId = item.matricula || item.nome || 'Linha desconhecida';
@@ -107,6 +128,24 @@ export const POST: RequestHandler = async (event) => {
 				}
 				if (!item.matricula || String(item.matricula).trim() === '') {
 					throw new Error('Linha sem matrícula');
+				}
+				// Só histórico (planilha de histórico, fase 2-C): NÃO faz upsert — a
+				// planilha traz nome e cargo antigos — e exige que a matrícula exista.
+				if (item.somente_historico === true) {
+					const alvo = await buscarPolicialPorMatricula(db, String(item.matricula));
+					if (!alvo)
+						throw new Error('Matrícula não cadastrada; histórico exige servidor existente');
+					const so = complementoDaPlanilhaSchema.parse(item);
+					const r = await regravarHistoricoDaPlanilha(
+						db,
+						alvo.id,
+						so.historico ?? [],
+						'planilha de histórico'
+					);
+					historicoGravado += r.gravados;
+					historicoRepetido += r.repetidos;
+					successCount++;
+					continue;
 				}
 				if (!item.nome || String(item.nome).trim() === '') {
 					throw new Error('Linha sem nome');
@@ -134,6 +173,16 @@ export const POST: RequestHandler = async (event) => {
 				// ativos; existentes preservam o `ativo` já gravado (omitido no
 				// upsert = coluna intocada).
 				const existente = await buscarPolicialPorMatricula(db, String(item.matricula).trim());
+
+				// Complemento da planilha de pessoal (fase 2-C): validado antes do
+				// upsert para a linha falhar inteira, não pela metade.
+				const complemento = temComplemento(item as Record<string, unknown>)
+					? complementoDaPlanilhaSchema.parse(item)
+					: null;
+				const designacaoId =
+					complemento?.designacao !== undefined
+						? await idDaDesignacao(db, complemento.designacao)
+						: undefined;
 				const regimeMap = item.regime?.toLowerCase() === 'expediente' ? 'expediente' : 'plantao';
 
 				let papelMap: string | null = null;
@@ -209,10 +258,50 @@ export const POST: RequestHandler = async (event) => {
 							.trim(),
 						regime: regimeMap,
 						papel: papelMap,
-						papel_unidade_id: papelUnidadeId
+						papel_unidade_id: papelUnidadeId,
+						...(complemento
+							? {
+									cargo_anterior: complemento.cargo_anterior,
+									data_nascimento: complemento.data_nascimento,
+									data_posse: complemento.data_posse,
+									designacao_id: designacaoId
+								}
+							: {})
 					},
 					env
 				);
+				if (complemento) {
+					const gravado = await buscarPolicialPorMatricula(db, String(item.matricula));
+					if (!gravado) throw new Error('Servidor não encontrado depois do upsert');
+					if (complemento.afastamentos) {
+						await regravarAfastamentosLegados(
+							db,
+							gravado.id,
+							complemento.afastamentos,
+							'carga da planilha'
+						);
+					}
+					const designacao = complemento.designacao?.trim() ?? '';
+					if (
+						(DESIGNACOES_DE_TITULAR as readonly string[]).includes(designacao) &&
+						cargo !== 'DPC'
+					) {
+						// Só delegado responde por unidade (decisão de 14/09/2026): um OIP com
+						// designação de direção é erro da planilha, não titularidade.
+						avisos.push(
+							`${rowId}: designação "${designacao}" em servidor ${cargo}; só DPC é titular — ignorado`
+						);
+					} else if ((DESIGNACOES_DE_TITULAR as readonly string[]).includes(designacao)) {
+						const r = await regravarTitularDaPlanilha(db, gravado.id, lotacaoMap, hoje);
+						if (r.acao === 'unidade_desconhecida') {
+							avisos.push(`${rowId}: titular de "${lotacaoMap}", unidade não cadastrada`);
+						} else if (r.acao === 'vigente_do_sistema') {
+							avisos.push(
+								`${rowId}: "${lotacaoMap}" já tem titular cadastrado pela tela (id ${r.vigentePolicialId}); a planilha não substitui`
+							);
+						}
+					}
+				}
 				successCount++;
 			} catch (err: unknown) {
 				errors.push(`${rowId}: ${mensagemDeErro(err)}`);
@@ -245,7 +334,9 @@ export const POST: RequestHandler = async (event) => {
 			processadas: data.length,
 			importadas: successCount,
 			vazias,
-			erros: errors
+			erros: errors,
+			avisos,
+			extras: { historicoGravado, historicoRepetido }
 		});
 	} catch (err: unknown) {
 		// 400 (não 500): payload do webhook é input inválido do caller, não bug

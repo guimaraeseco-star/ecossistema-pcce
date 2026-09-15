@@ -65,6 +65,13 @@ export const policiais = sqliteTable(
 		papel: text('papel', { enum: ['admin_seccional', 'admin_unidade'] }),
 		// Unidade/Seccional sob responsabilidade do papel (FK a unidades.id)
 		papel_unidade_id: integer('papel_unidade_id'),
+		// ---- Fase 2-C (migração 0088): o que a planilha de pessoal traz ----
+		/** IPC/EPC antes da unificação em OIP (E31); só histórico. */
+		cargo_anterior: text('cargo_anterior').notNull().default(''),
+		data_nascimento: text('data_nascimento'),
+		data_posse: text('data_posse'),
+		/** A função exercida (catálogo `designacoes`). */
+		designacao_id: integer('designacao_id'),
 		// Achado LGPD: `cpf` guarda o CPF cifrado (AES-GCM, `enc:v1:...`); este é
 		// o índice cego HMAC para lookup (login por certificado) sem decifrar.
 		cpf_index: text('cpf_index'),
@@ -1671,7 +1678,8 @@ export const policialHistorico = sqliteTable(
 			.notNull()
 			.references(() => policiais.id, { onDelete: 'cascade' }),
 		tipo: text('tipo', {
-			enum: ['movimentacao', 'afastamento', 'desvinculacao', 'edicao', 'papel']
+			// `observacao` (fase 2-C): anotação de texto vinda da planilha de histórico.
+			enum: ['movimentacao', 'afastamento', 'desvinculacao', 'edicao', 'papel', 'observacao']
 		}).notNull(),
 		/** Subtipo do afastamento: ferias | licenca_medica | judicial | licenca_outros | outros. */
 		subtipo: text('subtipo'),
@@ -1696,6 +1704,11 @@ export const policialHistorico = sqliteTable(
 		dados_antes: text('dados_antes'),
 		/** JSON: snapshot DEPOIS da edição. */
 		dados_depois: text('dados_depois'),
+		/**
+		 * Veio da carga da planilha de pessoal (0088) e é RE-ESCRITO a cada carga;
+		 * o que a operação registra pela tela fica em 0 e nunca é tocado por ela.
+		 */
+		legado: integer('legado').notNull().default(0),
 		// ---- Ator (quem registrou) ----
 		registrado_por_id: integer('registrado_por_id'),
 		registrado_por_nome: text('registrado_por_nome'),
@@ -2229,9 +2242,67 @@ export const temposMedicao = sqliteTable('tempos_medicao', {
 	pares: integer('pares').notNull()
 });
 
+// ---- Fase 2-C: designações e responsáveis pelas unidades (0088) ----
+
+/**
+ * A função exercida pelo servidor — catálogo parametrizado, semeado com os 18
+ * valores da planilha do DPI Sul (Operacional, Plantão, Cartório, chefias de
+ * seção, Delegado Titular…) e o símbolo da gratificação (DAS/DNS).
+ */
+export const designacoes = sqliteTable('designacoes', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	nome: text('nome').notNull().unique(),
+	simbolo: text('simbolo').notNull().default(''),
+	ordem: integer('ordem').notNull().default(100),
+	ativo: integer('ativo', { mode: 'boolean' }).default(true).notNull(),
+	created_at: text('created_at')
+		.notNull()
+		.default(sql`(datetime('now', '-3 hours'))`)
+});
+
+/**
+ * Quem responde pela unidade: TITULAR ou RESPONDENTE (delegado de outra
+ * unidade respondendo subsidiariamente — §7.1 da proposta da fase 2). Sempre
+ * DPC; início obrigatório; fim aberto enquanto vigente, e só UMA vigente por
+ * unidade (índice parcial no banco). `origem = 'planilha'` é o que a carga da
+ * planilha de pessoal grava e regrava; `'sistema'` é o cadastro pela tela.
+ * O respondente NÃO entra no efetivo da unidade que ele responde.
+ */
+export const unidadeResponsaveis = sqliteTable(
+	'unidade_responsaveis',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		unidade_id: integer('unidade_id')
+			.notNull()
+			.references(() => unidades.id),
+		policial_id: integer('policial_id')
+			.notNull()
+			.references(() => policiais.id),
+		papel: text('papel', { enum: ['titular', 'respondente'] }).notNull(),
+		data_inicio: text('data_inicio').notNull(),
+		data_fim: text('data_fim'),
+		portaria: text('portaria').notNull().default(''),
+		observacao: text('observacao').notNull().default(''),
+		origem: text('origem', { enum: ['sistema', 'planilha'] })
+			.notNull()
+			.default('sistema'),
+		registrado_por_id: integer('registrado_por_id'),
+		registrado_por_nome: text('registrado_por_nome').notNull().default(''),
+		created_at: text('created_at')
+			.notNull()
+			.default(sql`(datetime('now', '-3 hours'))`)
+	},
+	(table) => [
+		index('idx_unidade_responsaveis_policial').on(table.policial_id),
+		index('idx_unidade_responsaveis_unidade').on(table.unidade_id)
+	]
+);
+
 // ---- Tipos inferidos ----
 
 export type Policial = typeof policiais.$inferSelect;
+export type Designacao = typeof designacoes.$inferSelect;
+export type UnidadeResponsavel = typeof unidadeResponsaveis.$inferSelect;
 export type PolicialHistorico = typeof policialHistorico.$inferSelect;
 export type CadastroSolicitacao = typeof cadastroSolicitacoes.$inferSelect;
 export type PolicialAcaoSolicitacao = typeof policialAcaoSolicitacoes.$inferSelect;

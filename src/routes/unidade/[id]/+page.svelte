@@ -11,6 +11,8 @@
 	import type { PageProps } from './$types';
 	import BotaoVoltar from '$lib/components/BotaoVoltar.svelte';
 	import { rotuloTipoPlantao } from '$lib/unidades/plantao';
+	import { COR_SITUACAO } from '$lib/servidores/afastamentos';
+	import ModalEfetivo, { type PedidoEfetivo } from '../_components/ModalEfetivo.svelte';
 
 	const { data }: PageProps = $props();
 
@@ -35,7 +37,34 @@
 	const plantao = (p: { tipo: string; plantonista: string } | null) =>
 		p ? `${rotuloTipoPlantao(p.tipo)}${p.plantonista ? ` · ${p.plantonista}` : ''}` : '—';
 
-	const NUM = 'text-lg font-bold tabular-nums text-surface-900 dark:text-surface-50';
+	// O painel "quem são" — abre ao clicar num número (pedido de 15/09/2026).
+	let painelAberto = $state(false);
+	let pedido = $state<PedidoEfetivo | null>(null);
+	function abrirPainel(
+		situacao: PedidoEfetivo['situacao'],
+		cargo: PedidoEfetivo['cargo'],
+		subarvore = false
+	) {
+		pedido = {
+			unidadeId: u.id,
+			unidadeNome: u.nome,
+			unidadeRotulo: u.sigla || u.nome,
+			situacao,
+			cargo,
+			subarvore
+		};
+		painelAberto = true;
+	}
+	const corDe = (situacao: PedidoEfetivo['situacao'], n: number) =>
+		n === 0
+			? 'text-surface-400'
+			: situacao === 'ativos'
+				? COR_SITUACAO.ativo
+				: situacao === 'ferias'
+					? COR_SITUACAO.ferias
+					: COR_SITUACAO.afastado;
+	const BOTAO_NUM =
+		'cursor-pointer rounded px-1.5 text-lg font-bold tabular-nums hover:bg-surface-500/10';
 </script>
 
 <svelte:head>
@@ -140,33 +169,36 @@
 				<tbody>
 					{#each [['dpc', 'Delegados (DPC)'], ['oip', 'Oficiais (OIP)']] as const as [cargo, rotulo] (cargo)}
 						{@const c = data.efetivo[cargo]}
+						{@const sigla = cargo === 'dpc' ? 'DPC' : 'OIP'}
 						<tr>
 							<td class="font-medium">{rotulo}</td>
-							<td class="text-center">
-								<a href="{hrefServidores}&cargo={cargo.toUpperCase()}" class="{NUM} no-underline"
-									>{c.ativos}</a
-								>
-							</td>
-							<td class="text-center text-lg tabular-nums text-surface-600 dark:text-surface-300"
-								>{c.ferias}</td
-							>
-							<td class="text-center text-lg tabular-nums text-surface-600 dark:text-surface-300"
-								>{c.afastados}</td
-							>
+							{#each [['ativos', c.ativos], ['ferias', c.ferias], ['afastados', c.afastados]] as const as [situacao, n] (situacao)}
+								<td class="text-center">
+									<button
+										type="button"
+										class="{BOTAO_NUM} {corDe(situacao, n)}"
+										disabled={n === 0}
+										title="Ver quem"
+										onclick={() => abrirPainel(situacao, sigla)}>{n}</button
+									>
+								</td>
+							{/each}
 							<td class="text-center text-lg font-semibold tabular-nums">{c.total}</td>
 						</tr>
 					{/each}
 					<tr class="text-sm font-semibold text-warning-600 dark:text-warning-400">
 						<td>Total</td>
-						<td class="text-center tabular-nums"
-							>{data.efetivo.dpc.ativos + data.efetivo.oip.ativos}</td
-						>
-						<td class="text-center tabular-nums"
-							>{data.efetivo.dpc.ferias + data.efetivo.oip.ferias}</td
-						>
-						<td class="text-center tabular-nums"
-							>{data.efetivo.dpc.afastados + data.efetivo.oip.afastados}</td
-						>
+						{#each [['ativos', data.efetivo.dpc.ativos + data.efetivo.oip.ativos], ['ferias', data.efetivo.dpc.ferias + data.efetivo.oip.ferias], ['afastados', data.efetivo.dpc.afastados + data.efetivo.oip.afastados]] as const as [situacao, n] (situacao)}
+							<td class="text-center tabular-nums">
+								<button
+									type="button"
+									class="cursor-pointer rounded px-1.5 hover:bg-surface-500/10 disabled:cursor-default"
+									disabled={n === 0}
+									title="Ver quem"
+									onclick={() => abrirPainel(situacao, undefined)}>{n}</button
+								>
+							</td>
+						{/each}
 						<td class="text-center font-semibold tabular-nums">{data.efetivo.total}</td>
 					</tr>
 				</tbody>
@@ -309,3 +341,5 @@
 		</div>
 	</section>
 {/if}
+
+<ModalEfetivo bind:open={painelAberto} {pedido} />
