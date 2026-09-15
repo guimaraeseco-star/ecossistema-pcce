@@ -82,6 +82,7 @@ export function destinosDoMenu(usuario: UsuarioDeTeste, flags: FlagsMenu): strin
 	if (flags.showUnidade) destinos.push('/unidade');
 	// Gestão administrativa
 	if (flags.showColaboradores) destinos.push('/colaboradores');
+	if (flags.showMunicipios) destinos.push('/municipios');
 	// Meu perfil
 	if (usuario.tipo === 'policial') destinos.push('/perfil');
 

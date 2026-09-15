@@ -12,8 +12,15 @@
 	 * `href` renderiza um `<a>` (navegação de verdade: nova aba, URL visível);
 	 * `onclick` renderiza um `<button>`, para quem volta desfazendo estado local
 	 * em vez de mudar de rota. Passar os dois é erro de uso — o `href` vence.
+	 *
+	 * Com `href`, o clique normal VOLTA pelo histórico quando a página foi
+	 * alcançada de dentro do app (`useOrigemDaNavegacao`): é o que impede o
+	 * pingue-pongue lista → ficha → lista que o voltar do navegador fazia depois
+	 * de um "Voltar" que empilhava navegação nova. O `href` continua sendo o
+	 * destino de "abrir em nova aba" e o de quem chegou pela URL.
 	 */
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+	import { useOrigemDaNavegacao } from '$lib/composables';
 
 	const {
 		href,
@@ -28,6 +35,16 @@
 		class?: string;
 	} = $props();
 
+	const origem = useOrigemDaNavegacao();
+
+	/** Clique simples com histórico do app: desfaz a entrada em vez de empilhar outra. */
+	function voltarPeloHistorico(e: MouseEvent) {
+		if (!origem.podeVoltar || e.defaultPrevented) return;
+		if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+		e.preventDefault();
+		history.back();
+	}
+
 	const CLASSES =
 		'btn btn-sm preset-outlined-surface-500 hover:bg-surface-50 dark:hover:bg-surface-900 px-3 py-1.5 rounded-xl transition-all flex w-fit max-w-full items-center gap-2 group';
 </script>
@@ -38,7 +55,7 @@
 {/snippet}
 
 {#if href}
-	<a {href} class="{CLASSES} {classe}">{@render conteudo()}</a>
+	<a {href} class="{CLASSES} {classe}" onclick={voltarPeloHistorico}>{@render conteudo()}</a>
 {:else}
 	<button type="button" class="{CLASSES} {classe}" {onclick}>{@render conteudo()}</button>
 {/if}

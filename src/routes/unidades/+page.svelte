@@ -27,16 +27,12 @@
 	import SkeletonTableRows from '$lib/components/SkeletonTableRows.svelte';
 	import FloatingRefresh from '$lib/components/FloatingRefresh.svelte';
 	import BotaoLimparFiltros from '$lib/components/BotaoLimparFiltros.svelte';
-	import { invalidateShared } from '$lib/cross-tab-invalidate';
-	import { enhance } from '$app/forms';
-	import { toaster } from '$lib/toast';
 	import type { Unidade } from '$lib/types';
-	import { CIDADES_CEARA } from '$lib/constants/cidades';
 	import { nivelTipoUnidade, rotuloTipoUnidade } from '$lib/unidades/tipos';
 	import { useAutorizacao, useFiltrosPaginados, useSamePathNavigating } from '$lib/composables';
 	import { getSavedFilters } from '$lib/utils/localStorage';
-	import type { ActionResult } from '@sveltejs/kit';
 	import ModalCadastrarUnidade from './_components/ModalCadastrarUnidade.svelte';
+	import ModalEditarUnidade from './_components/ModalEditarUnidade.svelte';
 	import ModalDesativarUnidade from './_components/ModalDesativarUnidade.svelte';
 	import BadgeTipoEscala from '$lib/components/BadgeTipoEscala.svelte';
 	import EstadoVazio from '$lib/components/EstadoVazio.svelte';
@@ -137,17 +133,9 @@
 
 	const seccionais = $derived(unidades.filter((u) => u.tipo === 'seccional'));
 
-	// Edição inline
-	let editandoId = $state<number | null>(null);
-	let editNome = $state('');
-	let editTipo = $state<Unidade['tipo']>('delegacia');
-	let editSeccionalId = $state<number | null>(null);
-	let editTemPlantao = $state(false);
-	let editTemExpediente = $state(false);
-	let editTemFds = $state(false);
-	let editCidade = $state('');
-	let editSigla = $state('');
-	let pendingEditar = $state(false);
+	// Edição (estrutura + ficha) no modal dedicado
+	let edicaoOpen = $state(false);
+	let unidadeEmEdicao = $state<Unidade | null>(null);
 
 	// Desativação (não há exclusão de unidade — ver o cabeçalho)
 	let dialogDesativarOpen = $state(false);
@@ -159,45 +147,8 @@
 	const temFiltros = $derived(filtroSeccional !== 'todas' || filtroBusca !== '');
 
 	function iniciarEdicao(u: Unidade) {
-		editandoId = u.id;
-		editNome = u.nome;
-		editTipo = u.tipo;
-		editSeccionalId = u.seccional_id;
-		editTemPlantao = u.tem_plantao ?? false;
-		editTemExpediente = u.tem_expediente ?? false;
-		editTemFds = u.tem_fds ?? false;
-		editCidade = u.cidade ?? '';
-		editSigla = u.sigla ?? '';
-	}
-
-	function cancelarEdicao() {
-		editandoId = null;
-		editNome = '';
-		editTipo = 'delegacia';
-		editSeccionalId = null;
-		editTemPlantao = false;
-		editTemExpediente = false;
-		editTemFds = false;
-		editCidade = '';
-		editSigla = '';
-	}
-
-	function handleEditar() {
-		pendingEditar = true;
-		return async ({ result }: { result: ActionResult }) => {
-			pendingEditar = false;
-			if (result.type === 'success') {
-				await invalidateShared('app:unidades');
-				toaster.create({ title: 'Unidade atualizada com sucesso!', type: 'success' });
-				cancelarEdicao();
-			} else {
-				const d =
-					result.type === 'failure'
-						? (result.data as Record<string, unknown> | undefined)
-						: undefined;
-				toaster.create({ title: String(d?.error || 'Erro ao atualizar unidade'), type: 'error' });
-			}
-		};
+		unidadeEmEdicao = u;
+		edicaoOpen = true;
 	}
 
 	function solicitarDesativacao(id: number, nome: string, ativo: boolean) {
@@ -225,66 +176,6 @@
 	{#if u.tem_plantao}<BadgeTipoEscala tipo="plantao" tamanho="3xs" />{/if}
 	{#if u.tem_expediente}<BadgeTipoEscala tipo="expediente" tamanho="3xs" />{/if}
 	{#if u.tem_fds}<BadgeTipoEscala tipo="fds" tamanho="3xs" />{/if}
-{/snippet}
-
-{#snippet editInputs()}
-	<input type="hidden" name="id" value={editandoId} />
-	<input type="hidden" name="nome" value={editNome} />
-	<input type="hidden" name="tipo" value={editTipo} />
-	<input type="hidden" name="seccional_id" value={editSeccionalId ?? ''} />
-	<input type="hidden" name="tem_plantao" value={editTemPlantao ? 'on' : ''} />
-	<input type="hidden" name="tem_expediente" value={editTemExpediente ? 'on' : ''} />
-	<input type="hidden" name="tem_fds" value={editTemFds ? 'on' : ''} />
-	<input type="hidden" name="cidade" value={editCidade} />
-	<input type="hidden" name="sigla" value={editSigla} />
-{/snippet}
-
-{#snippet editFields(datalistId: string)}
-	<input
-		class="input text-sm w-full"
-		type="text"
-		bind:value={editNome}
-		onkeydown={(e) => {
-			if (e.key === 'Escape') cancelarEdicao();
-		}}
-	/>
-	<div class="flex flex-wrap items-center gap-3 text-sm py-2">
-		<label class="flex items-center space-x-1.5"
-			><input class="checkbox" type="checkbox" bind:checked={editTemPlantao} /><span>Plantão</span
-			></label
-		>
-		<label class="flex items-center space-x-1.5"
-			><input class="checkbox" type="checkbox" bind:checked={editTemExpediente} /><span
-				>Expediente</span
-			></label
-		>
-		<label class="flex items-center space-x-1.5"
-			><input class="checkbox" type="checkbox" bind:checked={editTemFds} /><span>FDS</span></label
-		>
-		<input
-			class="input text-xs w-full sm:w-auto sm:min-w-[140px] sm:max-w-[200px]"
-			type="text"
-			list={datalistId}
-			bind:value={editCidade}
-			placeholder="Mudar cidade..."
-		/>
-		<datalist id={datalistId}>
-			{#each CIDADES_CEARA as c (c)}
-				<option value={c}></option>
-			{/each}
-		</datalist>
-		{#if editTipo === 'departamento' || editTipo === 'sub_departamento'}
-			<!-- Sigla é atributo de departamento; delegacia e seccional não têm. -->
-			<input
-				class="input text-xs w-full sm:w-auto sm:max-w-[140px]"
-				type="text"
-				maxlength="20"
-				bind:value={editSigla}
-				placeholder="Sigla (DPI SUL)"
-				aria-label="Sigla do departamento"
-			/>
-		{/if}
-	</div>
 {/snippet}
 
 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -392,36 +283,30 @@
 											class="absolute left-1 top-1/2 w-4 h-px bg-surface-400 dark:bg-surface-500"
 										></div>
 									{/if}
-									{#if isAdmin && editandoId === u.id}
-										<div class="flex flex-col gap-2">
-											{@render editFields('cidades-ce-edicao')}
-										</div>
-									{:else}
-										<div>
-											<span class="font-medium block {u.ativo ? '' : 'opacity-60 line-through'}"
-												>{u.nome}</span
-											>
-											{#if !u.ativo}
-												<span
-													class="inline-block mt-1 mr-1 text-3xs font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-warning-500/20 text-warning-700 dark:text-warning-300"
-													>Desativada</span
-												>
-											{/if}
+									<div>
+										<span class="font-medium block {u.ativo ? '' : 'opacity-60 line-through'}"
+											>{u.nome}</span
+										>
+										{#if !u.ativo}
 											<span
-												class="inline-block mt-1 text-3xs font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-surface-200/80 dark:bg-surface-700/80 text-surface-600 dark:text-surface-300"
-												>{tipoLabel(u.tipo)}</span
+												class="inline-block mt-1 mr-1 text-3xs font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-warning-500/20 text-warning-700 dark:text-warning-300"
+												>Desativada</span
 											>
-											{#if u.sigla}
-												<span
-													class="inline-block mt-1 ml-1 text-3xs font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-primary-500/15 text-primary-700 dark:text-primary-300"
-													>{u.sigla}</span
-												>
-											{/if}
-											<div class="flex gap-1.5 mt-1.5 items-center">
-												{@render badges(u)}
-											</div>
+										{/if}
+										<span
+											class="inline-block mt-1 text-3xs font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-surface-200/80 dark:bg-surface-700/80 text-surface-600 dark:text-surface-300"
+											>{tipoLabel(u.tipo)}</span
+										>
+										{#if u.sigla}
+											<span
+												class="inline-block mt-1 ml-1 text-3xs font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-primary-500/15 text-primary-700 dark:text-primary-300"
+												>{u.sigla}</span
+											>
+										{/if}
+										<div class="flex gap-1.5 mt-1.5 items-center">
+											{@render badges(u)}
 										</div>
-									{/if}
+									</div>
 								</td>
 								<td class="text-surface-600 dark:text-surface-300 text-xs">
 									{#if u.seccional_id}
@@ -438,44 +323,21 @@
 								>
 								{#if isAdmin}
 									<td>
-										{#if editandoId === u.id}
-											<form
-												method="POST"
-												action="?/editar"
-												use:enhance={handleEditar}
-												class="flex gap-2"
+										<div class="flex gap-2">
+											<button
+												type="button"
+												class="btn btn-sm preset-outlined-surface-500"
+												onclick={() => iniciarEdicao(u)}>Editar</button
 											>
-												{@render editInputs()}
-												<button
-													type="submit"
-													class="btn btn-sm preset-filled-primary-500 flex items-center gap-1.5 transition-all"
-													disabled={pendingEditar || !editNome.trim()}
-												>
-													{pendingEditar ? 'Salvando...' : 'Salvar'}
-												</button>
-												<button
-													type="button"
-													class="btn btn-sm preset-outlined-surface-500"
-													onclick={cancelarEdicao}>Cancelar</button
-												>
-											</form>
-										{:else}
-											<div class="flex gap-2">
-												<button
-													type="button"
-													class="btn btn-sm preset-outlined-surface-500"
-													onclick={() => iniciarEdicao(u)}>Editar</button
-												>
-												<button
-													type="button"
-													class="btn btn-sm {u.ativo
-														? 'preset-outlined-surface-500'
-														: 'preset-filled-success-500'} transition-all"
-													onclick={() => solicitarDesativacao(u.id, u.nome, u.ativo)}
-													>{u.ativo ? 'Desativar' : 'Reativar'}</button
-												>
-											</div>
-										{/if}
+											<button
+												type="button"
+												class="btn btn-sm {u.ativo
+													? 'preset-outlined-surface-500'
+													: 'preset-filled-success-500'} transition-all"
+												onclick={() => solicitarDesativacao(u.id, u.nome, u.ativo)}
+												>{u.ativo ? 'Desativar' : 'Reativar'}</button
+											>
+										</div>
 									</td>
 								{/if}
 							</tr>
@@ -496,79 +358,56 @@
 							? 'border-l-4 border-l-surface-400 dark:border-l-surface-600 border-surface-200 dark:border-white/10 ml-3 sm:ml-6'
 							: 'border-surface-200 dark:border-white/10'}"
 					>
-						{#if isAdmin && editandoId === u.id}
-							<div class="space-y-2">
-								{@render editFields('cidades-ce-edicao-mobile')}
-								<form method="POST" action="?/editar" use:enhance={handleEditar} class="flex gap-2">
-									{@render editInputs()}
-									<button
-										type="submit"
-										class="btn btn-sm preset-filled-primary-500 flex-1 flex items-center justify-center gap-1.5 transition-all"
-										disabled={pendingEditar || !editNome.trim()}
+						<div class="flex items-center justify-between gap-3">
+							<div class="min-w-0">
+								<p class="font-semibold text-sm {u.ativo ? '' : 'opacity-60 line-through'}">
+									{u.nome}
+								</p>
+								{#if !u.ativo}
+									<span
+										class="inline-block mt-0.5 text-3xs font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-warning-500/20 text-warning-700 dark:text-warning-300"
+										>Desativada</span
 									>
-										{pendingEditar ? 'Salvando...' : 'Salvar'}
-									</button>
+								{/if}
+								<p
+									class="text-3xs font-bold uppercase text-surface-600 dark:text-surface-400 mt-0.5"
+								>
+									{tipoLabel(u.tipo)}
+									{#if u.sigla}
+										<span class="ml-1 text-primary-700 dark:text-primary-300">{u.sigla}</span>
+									{/if}
+								</p>
+								{#if u.seccional_id}
+									<p class="text-3xs text-surface-600 dark:text-surface-400 mt-0.5 truncate">
+										Subordinada a: {unidades.find((x) => x.id === u.seccional_id)?.nome ??
+											u.seccional_id}
+									</p>
+								{/if}
+								<div class="flex flex-wrap gap-1.5 mt-1.5 mb-1">
+									{@render badges(u)}
+								</div>
+								<p class="text-2xs text-surface-600 dark:text-surface-300 font-medium italic mt-1">
+									{u.cidade || 'Sem cidade'}
+								</p>
+							</div>
+							{#if isAdmin}
+								<div class="flex gap-2 shrink-0">
 									<button
 										type="button"
-										class="btn btn-sm preset-outlined-surface-500 flex-1"
-										onclick={cancelarEdicao}>Cancelar</button
+										class="btn btn-sm preset-outlined-surface-500"
+										onclick={() => iniciarEdicao(u)}>Editar</button
 									>
-								</form>
-							</div>
-						{:else}
-							<div class="flex items-center justify-between gap-3">
-								<div class="min-w-0">
-									<p class="font-semibold text-sm {u.ativo ? '' : 'opacity-60 line-through'}">
-										{u.nome}
-									</p>
-									{#if !u.ativo}
-										<span
-											class="inline-block mt-0.5 text-3xs font-bold uppercase tracking-wide px-2 py-0.5 rounded-md bg-warning-500/20 text-warning-700 dark:text-warning-300"
-											>Desativada</span
-										>
-									{/if}
-									<p
-										class="text-3xs font-bold uppercase text-surface-600 dark:text-surface-400 mt-0.5"
+									<button
+										type="button"
+										class="btn btn-sm {u.ativo
+											? 'preset-outlined-surface-500'
+											: 'preset-filled-success-500'} transition-all"
+										onclick={() => solicitarDesativacao(u.id, u.nome, u.ativo)}
+										>{u.ativo ? 'Desativar' : 'Reativar'}</button
 									>
-										{tipoLabel(u.tipo)}
-										{#if u.sigla}
-											<span class="ml-1 text-primary-700 dark:text-primary-300">{u.sigla}</span>
-										{/if}
-									</p>
-									{#if u.seccional_id}
-										<p class="text-3xs text-surface-600 dark:text-surface-400 mt-0.5 truncate">
-											Subordinada a: {unidades.find((x) => x.id === u.seccional_id)?.nome ??
-												u.seccional_id}
-										</p>
-									{/if}
-									<div class="flex flex-wrap gap-1.5 mt-1.5 mb-1">
-										{@render badges(u)}
-									</div>
-									<p
-										class="text-2xs text-surface-600 dark:text-surface-300 font-medium italic mt-1"
-									>
-										{u.cidade || 'Sem cidade'}
-									</p>
 								</div>
-								{#if isAdmin}
-									<div class="flex gap-2 shrink-0">
-										<button
-											type="button"
-											class="btn btn-sm preset-outlined-surface-500"
-											onclick={() => iniciarEdicao(u)}>Editar</button
-										>
-										<button
-											type="button"
-											class="btn btn-sm {u.ativo
-												? 'preset-outlined-surface-500'
-												: 'preset-filled-success-500'} transition-all"
-											onclick={() => solicitarDesativacao(u.id, u.nome, u.ativo)}
-											>{u.ativo ? 'Desativar' : 'Reativar'}</button
-										>
-									</div>
-								{/if}
-							</div>
-						{/if}
+							{/if}
+						</div>
 					</div>
 				{/each}
 			{/if}
@@ -583,3 +422,4 @@
 	{/if}
 </div>
 <FloatingRefresh chaves="app:unidades" />
+<ModalEditarUnidade bind:open={edicaoOpen} unidade={unidadeEmEdicao} {unidades} />

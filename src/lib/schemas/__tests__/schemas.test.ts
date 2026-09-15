@@ -264,4 +264,40 @@ describe('unidadeSchema', () => {
 		const result = unidadeSchema.safeParse({ nome: '' });
 		expect(result.success).toBe(false);
 	});
+
+	it('ficha: campos ausentes caem nos padrões (o modal de cadastro não os envia)', () => {
+		const r = unidadeSchema.safeParse({ nome: 'DP de Icó' });
+		expect(r.success).toBe(true);
+		if (r.success) {
+			expect(r.data).toMatchObject({
+				endereco: '',
+				telefone: '',
+				email: '',
+				ais: '',
+				xadrezes: 0,
+				tira_gravame: false,
+				foto_url: null
+			});
+		}
+	});
+
+	it('ficha: e-mail vazio vale, e-mail inválido não; link da foto exige http e vira null quando vazio', () => {
+		expect(unidadeSchema.safeParse({ nome: 'x', email: '' }).success).toBe(true);
+		expect(unidadeSchema.safeParse({ nome: 'x', email: 'sem-arroba' }).success).toBe(false);
+		expect(unidadeSchema.safeParse({ nome: 'x', email: ' dp@pc.ce.gov.br ' }).success).toBe(true);
+		expect(unidadeSchema.safeParse({ nome: 'x', foto_url: 'drive.google.com/x' }).success).toBe(
+			false
+		);
+		const ok = unidadeSchema.safeParse({ nome: 'x', foto_url: ' https://drive.google.com/x ' });
+		expect(ok.success && ok.data.foto_url).toBe('https://drive.google.com/x');
+		const vazio = unidadeSchema.safeParse({ nome: 'x', foto_url: '  ' });
+		expect(vazio.success && vazio.data.foto_url).toBeNull();
+	});
+
+	it('ficha: xadrezes é inteiro de 0 a 99', () => {
+		expect(unidadeSchema.safeParse({ nome: 'x', xadrezes: 3 }).success).toBe(true);
+		expect(unidadeSchema.safeParse({ nome: 'x', xadrezes: -1 }).success).toBe(false);
+		expect(unidadeSchema.safeParse({ nome: 'x', xadrezes: 100 }).success).toBe(false);
+		expect(unidadeSchema.safeParse({ nome: 'x', xadrezes: 1.5 }).success).toBe(false);
+	});
 });

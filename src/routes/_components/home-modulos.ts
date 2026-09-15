@@ -434,16 +434,17 @@ export function gruposHome({ usuario, flags }: EntradaHome): GrupoHome[] {
 		)
 	);
 	// Municípios: só de departamento para cima, sem proposta (E32).
-	if (ehAdmin) {
-		administrativo.push(
-			planejado(
-				'municipios',
-				'Municípios',
-				'Os municípios atendidos e a cobertura de cada um: delegacia, AIS, plantão, custódia.',
-				ICONE.painel,
-				2
-			)
-		);
+	if (flags.showMunicipios) {
+		administrativo.push({
+			id: 'municipios',
+			titulo: 'Municípios',
+			descricao:
+				'Os municípios atendidos pelo departamento e a cobertura de cada um: delegacia, AIS, plantão, custódia, PM e PEFOCE.',
+			icone: ICONE.mapa,
+			href: '/municipios',
+			cta: 'Ver municípios',
+			atalhos: []
+		});
 	}
 
 	const grupos: GrupoHome[] = [

@@ -74,6 +74,9 @@ const txt = (v) => {
 	return String(v).trim();
 };
 const num = (v) => {
+	// Célula numérica chega como número (258.788 = km²): tirar o ponto dela
+	// multiplicava a área por mil (corrigido nos dados pela migração 0087).
+	if (typeof v === 'number') return Number.isFinite(v) ? v : null;
 	const s = txt(v).replace(/\./g, '').replace(',', '.');
 	const n = Number(s);
 	return Number.isFinite(n) ? n : null;

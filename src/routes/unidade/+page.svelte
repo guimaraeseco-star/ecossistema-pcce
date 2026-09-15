@@ -19,15 +19,25 @@
 	import type { PageProps } from './$types';
 	import type { BlocoUnidade, LinhaUnidade } from './+page.server';
 	import Search from '@lucide/svelte/icons/search';
-	import {
-		CLASSE_CAIXA_FILTRO,
-		CLASSE_INPUT_FILTRO,
-		CLASSE_ROTULO_FILTRO
-	} from '$lib/gise/filtro-historico-ui';
+	import { CLASSE_INPUT_FILTRO } from '$lib/gise/filtro-historico-ui';
 
 	const { data }: PageProps = $props();
 
 	let busca = $state('');
+
+	/**
+	 * Alturas medidas do cabeçalho fixo e da primeira linha do `thead`: os
+	 * `th` são `position: sticky` e precisam saber onde parar — abaixo da barra
+	 * do topo (h-14 = 3.5rem), do cabeçalho da página e, na segunda linha, da
+	 * primeira. Medir (`bind:clientHeight`) em vez de fixar números é o que
+	 * mantém as três camadas alinhadas quando o texto quebra em tela estreita.
+	 */
+	let alturaCabecalho = $state(0);
+	let alturaLinha1 = $state(0);
+	const topoLinha1 = $derived(`calc(3.5rem + ${alturaCabecalho}px)`);
+	const topoLinha2 = $derived(`calc(3.5rem + ${alturaCabecalho + alturaLinha1}px)`);
+	/** Fundo opaco dos th fixos: o mesmo do card, senão as linhas passam por trás. */
+	const TH_FIXO = 'sticky z-10 bg-white dark:bg-surface-900';
 
 	const casa = (u: LinhaUnidade, termo: string) =>
 		!termo || [u.nome, u.sigla, u.tipoRotulo].some((s) => s.toLowerCase().includes(termo));
@@ -51,6 +61,7 @@
 	const hrefServidores = (u: LinhaUnidade) => `/servidores?lotacao=${encodeURIComponent(u.nome)}`;
 
 	const CELULA_NUM = 'text-right tabular-nums';
+	const fmt = new Intl.NumberFormat('pt-BR');
 	const LINK_NUM =
 		'inline-block min-w-6 rounded px-1 font-semibold text-primary-700 no-underline hover:bg-primary-500/10 dark:text-primary-400';
 </script>
@@ -59,7 +70,15 @@
 	<title>{titulo} | Ecossistema PCCE</title>
 </svelte:head>
 
-<div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+<!--
+	Cabeçalho FIXO (sticky, logo abaixo da barra do topo, que tem h-14): o título
+	e a busca ficam visíveis enquanto a lista rola — pedido do responsável em
+	15/09/2026. O fundo opaco é o que evita a tabela passar por trás do texto.
+-->
+<div
+	bind:clientHeight={alturaCabecalho}
+	class="sticky top-14 z-20 -mx-2 mb-4 flex flex-col gap-3 border-b border-surface-200 bg-page-canvas px-2 pt-2 pb-3 sm:-mx-4 sm:flex-row sm:items-end sm:justify-between sm:px-4 dark:border-white/10 dark:bg-surface-950"
+>
 	<div>
 		<p
 			class="text-2xs font-semibold tracking-[0.18em] text-primary-700 uppercase dark:text-primary-400"
@@ -79,50 +98,49 @@
 				.raiz.municipiosSubtotal === 1
 				? ''
 				: 's'}
+			{#if data.raiz.populacao > 0}
+				· {fmt.format(data.raiz.populacao)} habitantes{/if}
+			{#if data.raiz.habPorPolicial != null}
+				· 1 policial para {fmt.format(data.raiz.habPorPolicial)} hab.{/if}
 		</p>
 	</div>
-	<a
-		href="/unidade/{data.raiz.id}"
-		class="btn btn-sm preset-outlined-surface-500 self-start sm:self-auto"
-	>
-		Ficha de {data.raiz.sigla || data.raiz.nome}
-	</a>
-</div>
-
-<div class="{CLASSE_CAIXA_FILTRO} mb-6">
-	<label class="flex flex-col gap-1.5">
-		<span class={CLASSE_ROTULO_FILTRO}>Buscar unidade</span>
-		<div class="relative">
+	<div class="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+		<a
+			href="/unidade/{data.raiz.id}"
+			class="btn btn-sm preset-outlined-surface-500 self-start sm:self-auto"
+		>
+			Ficha de {data.raiz.sigla || data.raiz.nome}
+		</a>
+		<div class="relative w-full sm:w-80">
 			<input
 				type="search"
 				class="{CLASSE_INPUT_FILTRO} w-full pl-10"
 				bind:value={busca}
-				placeholder="Qualquer parte do nome, da sigla ou do tipo…"
-				aria-label="Buscar unidade"
+				placeholder="Buscar unidade…"
+				aria-label="Buscar unidade (qualquer parte do nome, da sigla ou do tipo)"
 			/>
 			<div class="pointer-events-none absolute inset-y-0 left-3 flex items-center opacity-50">
 				<Search class="h-4 w-4" />
 			</div>
 		</div>
-	</label>
+	</div>
 </div>
 
+<!-- Por cargo: ativos · férias · afastados. O número é link para a lista de
+     servidores já filtrada pela lotação e pelo cargo. -->
+{#snippet celulasCargo(u: LinhaUnidade, cargo: 'dpc' | 'oip')}
+	{@const c = u.efetivo[cargo]}
+	{@const href = `${hrefServidores(u)}&cargo=${cargo.toUpperCase()}`}
+	<td class={CELULA_NUM}>
+		<a {href} class={LINK_NUM} title="{cargo.toUpperCase()} ativos em {u.nome}">{c.ativos}</a>
+	</td>
+	<td class="{CELULA_NUM} text-surface-500">{c.ferias}</td>
+	<td class="{CELULA_NUM} text-surface-500">{c.afastados}</td>
+{/snippet}
+
 {#snippet celulasEfetivo(u: LinhaUnidade)}
-	<td class={CELULA_NUM}>
-		<a href={hrefServidores(u)} class={LINK_NUM} title="Ver servidores de {u.nome}"
-			>{u.efetivo.dpc}</a
-		>
-	</td>
-	<td class={CELULA_NUM}>
-		<a href={hrefServidores(u)} class={LINK_NUM} title="Ver servidores de {u.nome}"
-			>{u.efetivo.oip}</a
-		>
-	</td>
-	<td class={CELULA_NUM}>
-		<a href={hrefServidores(u)} class={LINK_NUM} title="Ver servidores de {u.nome}"
-			>{u.efetivo.afastados}</a
-		>
-	</td>
+	{@render celulasCargo(u, 'dpc')}
+	{@render celulasCargo(u, 'oip')}
 	<td class="{CELULA_NUM} font-semibold">
 		<a href={hrefServidores(u)} class={LINK_NUM} title="Ver servidores de {u.nome}"
 			>{u.efetivo.total}</a
@@ -137,9 +155,24 @@
 				class={LINK_NUM}
 				title="Municípios atendidos por {u.nome}">{u.municipios}</a
 			>
+		{:else if u.municipiosSubtotal > 0}
+			<!-- Unidade com vinculadas (departamento, seccional): a SOMA dos
+			     municípios atendidos por elas — pedido do responsável em 15/09/2026. -->
+			<span class="font-semibold" title="Soma dos municípios atendidos pelas unidades vinculadas"
+				>{u.municipiosSubtotal}</span
+			>
 		{:else}
 			<span class="text-surface-400">0</span>
 		{/if}
+	</td>
+	<td class={CELULA_NUM}>
+		{#if u.populacao > 0}{fmt.format(u.populacao)}{:else}<span class="text-surface-400">—</span
+			>{/if}
+	</td>
+	<td class="{CELULA_NUM} font-semibold">
+		{#if u.habPorPolicial != null}{fmt.format(u.habPorPolicial)}{:else}<span
+				class="text-surface-400">—</span
+			>{/if}
 	</td>
 {/snippet}
 
@@ -162,19 +195,49 @@
 	</td>
 {/snippet}
 
-<div class="card-elevated overflow-hidden rounded-2xl p-4 shadow-sm sm:p-6">
-	<div class="table-wrap">
+<!-- O card não pode cortar (overflow-hidden) nem rolar (table-wrap): sticky só
+     funciona contra a rolagem da PÁGINA. Em tela estreita volta o scroll
+     horizontal, e aí o cabeçalho de colunas deixa de fixar — escolha consciente. -->
+<div class="card-elevated rounded-2xl p-4 shadow-sm sm:p-6">
+	<div class="table-wrap lg:overflow-visible">
 		<table class="table">
 			<thead>
-				<tr>
-					<th>Unidade</th>
-					<th class="text-right">DPC</th>
-					<th class="text-right">OIP</th>
-					<th class="text-right">Afastados</th>
-					<th class="text-right">Servidores</th>
-					<th class="text-right">Veículos</th>
-					<th class="text-right">Armas</th>
-					<th class="text-right">Municípios</th>
+				<tr class="text-2xs" bind:clientHeight={alturaLinha1}>
+					<th rowspan="2" class="{TH_FIXO} align-bottom" style:top={topoLinha1}>Unidade</th>
+					<th
+						colspan="3"
+						class="{TH_FIXO} border-b border-surface-200 !text-center dark:border-white/10"
+						style:top={topoLinha1}>DPC</th
+					>
+					<th
+						colspan="3"
+						class="{TH_FIXO} border-b border-surface-200 !text-center dark:border-white/10"
+						style:top={topoLinha1}>OIP</th
+					>
+					<th rowspan="2" class="{TH_FIXO} text-right align-bottom" style:top={topoLinha1}>Total</th
+					>
+					<th rowspan="2" class="{TH_FIXO} text-right align-bottom" style:top={topoLinha1}
+						>Veículos</th
+					>
+					<th rowspan="2" class="{TH_FIXO} text-right align-bottom" style:top={topoLinha1}>Armas</th
+					>
+					<th rowspan="2" class="{TH_FIXO} text-right align-bottom" style:top={topoLinha1}
+						>Municípios</th
+					>
+					<th rowspan="2" class="{TH_FIXO} text-right align-bottom" style:top={topoLinha1}
+						>População</th
+					>
+					<th rowspan="2" class="{TH_FIXO} text-right align-bottom" style:top={topoLinha1}
+						>Hab./policial</th
+					>
+				</tr>
+				<tr class="text-2xs">
+					<th class="{TH_FIXO} text-right" style:top={topoLinha2}>Ativos</th>
+					<th class="{TH_FIXO} text-right font-normal" style:top={topoLinha2}>Férias</th>
+					<th class="{TH_FIXO} text-right font-normal" style:top={topoLinha2}>Afast.</th>
+					<th class="{TH_FIXO} text-right" style:top={topoLinha2}>Ativos</th>
+					<th class="{TH_FIXO} text-right font-normal" style:top={topoLinha2}>Férias</th>
+					<th class="{TH_FIXO} text-right font-normal" style:top={topoLinha2}>Afast.</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -202,13 +265,21 @@
 							<td class="pl-8 italic"
 								>Total de {bloco.unidade.sigla || bloco.unidade.nome} com vinculadas</td
 							>
-							<td class={CELULA_NUM}>{bloco.unidade.subtotal.dpc}</td>
-							<td class={CELULA_NUM}>{bloco.unidade.subtotal.oip}</td>
-							<td class={CELULA_NUM}>{bloco.unidade.subtotal.afastados}</td>
+							{#each ['dpc', 'oip'] as const as cargo (cargo)}
+								<td class={CELULA_NUM}>{bloco.unidade.subtotal[cargo].ativos}</td>
+								<td class={CELULA_NUM}>{bloco.unidade.subtotal[cargo].ferias}</td>
+								<td class={CELULA_NUM}>{bloco.unidade.subtotal[cargo].afastados}</td>
+							{/each}
 							<td class="{CELULA_NUM} font-semibold">{bloco.unidade.subtotal.total}</td>
 							<td class={CELULA_NUM}>—</td>
 							<td class={CELULA_NUM}>—</td>
 							<td class={CELULA_NUM}>{bloco.unidade.municipiosSubtotal}</td>
+							<td class={CELULA_NUM}>{fmt.format(bloco.unidade.populacao)}</td>
+							<td class="{CELULA_NUM} font-semibold"
+								>{bloco.unidade.habPorPolicial != null
+									? fmt.format(bloco.unidade.habPorPolicial)
+									: '—'}</td
+							>
 						</tr>
 					{/if}
 				{/each}

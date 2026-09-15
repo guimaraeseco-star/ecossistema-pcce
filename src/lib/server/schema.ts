@@ -2061,7 +2061,12 @@ export const municipiosCobertura = sqliteTable(
 			.notNull()
 			.references(() => unidades.id),
 		area_km2: real('area_km2'),
+		/** Censo 2022 (IBGE, tabela 4714) — a planilha trazia o preliminar. */
 		populacao_2022: integer('populacao_2022'),
+		/** Estimativa anual do IBGE (tabela 6579) e o ano dela — migração 0087. É a base da proporção habitantes/policial. */
+		populacao_estimada: integer('populacao_estimada'),
+		populacao_ano: integer('populacao_ano'),
+		populacao_atualizada_em: text('populacao_atualizada_em'),
 		ais: text('ais').notNull().default(''),
 		nucleo_custodia: text('nucleo_custodia').notNull().default(''),
 		risp: text('risp').notNull().default(''),

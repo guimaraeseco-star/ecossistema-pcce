@@ -344,13 +344,56 @@ Verificar cada transição de status:
       mesmos quatro grupos (Gestão de pessoal · operacional · de unidade ·
       administrativa), cada título é link para a tela do grupo, e "Início" leva
       a `/`
-- [ ] Ficha da unidade (`/unidade/[id]`, depois da carga): foto da fachada, endereço/telefone/e-mail, AIS ao lado do tipo, "Tira-gravame" e "Xadrezes" no bloco de efetivo, tabela "Municípios atendidos" com plantão da semana e do fim de semana (Icó: semana com Iguatu, FDS com a própria DP); seccional e departamento têm ficha sem municípios; a lista `/unidade` mostra a coluna "Municípios" com link para a ficha
+- [ ] Ficha da unidade (`/unidade/[id]`, depois da carga): foto da fachada, endereço/telefone/e-mail, AIS ao lado do tipo, bloco de efetivo por cargo (DPC e OIP) × situação (ativos hoje, férias, afastados por outro motivo, lotados — um servidor com férias e licença ao mesmo tempo conta uma vez, como afastado), "Tira-gravame" e "Xadrezes", tabela "Municípios atendidos" com plantão da semana e do fim de semana (Icó: semana com Iguatu, FDS com a própria DP); seccional e departamento têm ficha sem municípios; a lista `/unidade` mostra a coluna "Municípios" com link para a ficha
 - [ ] Barra do topo: brasão + "Polícia Civil do Ceará - DPI SUL" para o Admin
       Geral; "- seccional" para o admin de seccional; "- seccional - delegacia"
       para o admin de unidade; só "Polícia Civil do Ceará" para o Super Admin
-- [ ] Cartão planejado (Diárias, Extras, Armamento, Veículos, Patrimônio móvel,
-      Municípios, Atualização de valores) aparece desligado com "Em breve · fase N";
-      Municípios e Atualização de valores só para o Admin Geral
+- [ ] Cartão planejado (Diárias, Extras, Armamento, Veículos, Patrimônio móvel)
+      aparece desligado com "Em breve · fase N"; Municípios e Atualização de
+      valores só para o Admin Geral
+- [ ] Municípios (`/municipios`, Admin Geral; item em Gestão administrativa):
+      cabeçalho "DPI SUL · 81 municípios atendidos · N habitantes" fixo com a
+      busca; tabela com quem atende (Juazeiro do Norte com as DUAS DPs), AIS,
+      macrorregião, plantão semana/FDS (só o tipo quando o plantonista é a
+      própria unidade; "Virtual · DP de Tauá" quando é outra), população;
+      nome abre `/municipios/[ibge]` (atendimento com seccional, plantão,
+      cobertura: custódia, RISP, PM, BM, PEFOCE; "ver no mapa"); IBGE de fora
+      do departamento → 404/403; admin de seccional/unidade → 403; colunas
+      "Efetivo" (lotados das unidades que atendem; Juazeiro soma as duas DPs) e
+      "Hab./policial"; botão "Atualizar população (IBGE)" (Admin Geral) troca o
+      cabeçalho de "(Censo 2022)" para "(estimativa AAAA)" e a ficha passa a
+      mostrar as duas (estimativa e Censo); área em km² com casa decimal certa
+      (Juazeiro 259, não 258.788)
+- [ ] "← Voltar": lista → ficha (unidade ou município) → "Voltar" → voltar do
+      NAVEGADOR leva à tela anterior à lista (não à ficha de novo); ficha aberta
+      por URL colada → "Voltar" leva à lista; Ctrl/⌘+clique abre a lista em
+      nova aba
+- [ ] Mapa (`/municipios/mapa`, botão "Ver no mapa" na lista): os 81 municípios
+      coloridos por AIS (paleta do mapa antigo) e, no botão, por seccional; o
+      resto do Ceará em cinza; nome de cada município; passar o ponteiro mostra
+      município/unidade/AIS; clicar abre o painel (atendido por, seccional,
+      plantões, população com fonte, efetivo · hab./policial, "Abrir a ficha");
+      roda aproxima em torno do cursor, arrastar move, ⌂ reenquadra; clicar num
+      item da legenda destaca a categoria; o selecionado ganha borda preta em
+      negrito por cima dos vizinhos (sem "moldura" retangular — era o anel de
+      foco); primeira abertura baixa a malha do IBGE (qualidade intermediária,
+      ~270 KB) e guarda no R2 (`mapas/ce-municipios.geojson`)
+- [ ] Gestão de unidade: colunas "População" (soma DISTINTA dos municípios da
+      subárvore) e "Hab./policial" (população ÷ lotados da subárvore); ficha da
+      unidade mostra "N municípios · X habitantes · 1 policial para Y hab." no
+      card de municípios, com a população de cada um
+- [ ] Regimes após a migração 0087: toda unidade do DPI SUL com "Expediente";
+      "Plantão" só em 2ª Seccional, Aracati, Brejo Santo, Crato, Iguatu, Quixadá,
+      Russas, Tauá; "Fim de semana" nessas mais Icó, Senador Pompeu e Quixeramobim
+      (ver a ficha `/unidade/[id]`, "Regimes de escala")
+- [ ] Editar unidade (`/unidades`, Super Admin): "Editar" abre o modal com
+      estrutura (nome, tipo, unidade superior — a própria e as vinculadas não
+      aparecem no combo —, cidade, sigla só para departamento, regimes) e ficha
+      (endereço, telefone, e-mail, AIS, xadrezes, tira-gravame, foto atual +
+      arquivo JPEG/PNG até 3 MB + link de origem); salvar reflete na ficha
+      `/unidade/[id]`; foto enviada aparece em `/api/unidades/[id]/foto`;
+      "Remover a cópia guardada" volta ao link (ou a nada); e-mail inválido e
+      xadrezes fora de 0–99 são recusados
 - [ ] Gestão de unidade: admin de unidade cai direto na ficha da delegacia; admin
       de seccional vê a tabela com a seccional no topo e as delegacias dela;
       Admin Geral vê o departamento, as seccionais e as delegacias em blocos, com

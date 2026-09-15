@@ -70,6 +70,8 @@ export interface FlagsMenu {
 	showUnidade: boolean;
 	/** Atualização de valores (`/valores`) — de departamento para cima (E39): sessão de admin. */
 	showValores: boolean;
+	/** Municípios (`/municipios`) — de departamento para cima (E32): sessão de admin. */
+	showMunicipios: boolean;
 	temPresencaGiseAtiva: boolean;
 	temGiseHistorico: boolean;
 	showGrupo1: boolean;
@@ -131,6 +133,7 @@ export function visibilidadeDoMenu(entrada: EntradaVisibilidade): FlagsMenu {
 		showColaboradores: ehAdmin,
 		showUnidade: ehAdmin || temPapelComEscopo,
 		showValores: ehAdmin,
+		showMunicipios: ehAdmin,
 		temPresencaGiseAtiva: temPresencaGisePendente,
 		temGiseHistorico,
 		showGrupo1,

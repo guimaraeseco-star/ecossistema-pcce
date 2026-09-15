@@ -44,6 +44,8 @@ export const load: PageServerLoad = async ({ locals, platform, params }) => {
 		municipiosDaUnidade(db, id)
 	]);
 	const porNome = (n: NoUnidade) => efetivos.get(n.nome) ?? efetivoVazio();
+	const efetivo = porNome({ ...unidade });
+	const populacaoAtendida = municipiosAtendidos.reduce((n, m) => n + (m.populacao ?? 0), 0);
 
 	const filhas = escopo.nos
 		.filter((n) => n.seccional_id === id)
@@ -87,6 +89,11 @@ export const load: PageServerLoad = async ({ locals, platform, params }) => {
 			xadrezes: unidade.xadrezes
 		},
 		municipios: municipiosAtendidos,
+		populacaoAtendida,
+		habPorPolicial:
+			populacaoAtendida > 0 && efetivo.total > 0
+				? Math.round(populacaoAtendida / efetivo.total)
+				: null,
 		pai: pai
 			? {
 					id: pai.id,
@@ -96,7 +103,7 @@ export const load: PageServerLoad = async ({ locals, platform, params }) => {
 				}
 			: null,
 		ehRaizDoEscopo: escopo.raiz.id === id,
-		efetivo: porNome({ ...unidade }),
+		efetivo,
 		subtotal: somarEfetivos([porNome({ ...unidade }), ...descendentes.map(porNome)]),
 		filhas: filhas.map((f) => ({
 			id: f.id,

@@ -1,44 +1,58 @@
 /**
  * Efetivo por unidade — as contagens que a Gestão de unidade (`/unidade`)
- * mostra: quantos servidores ATIVOS cada lotação tem, por cargo, e quantos
- * deles estão AFASTADOS hoje (decisão E39, itens 3.1–3.3).
+ * mostra: por CARGO (DPC, OIP), quantos servidores estão ATIVOS hoje, quantos
+ * de FÉRIAS e quantos AFASTADOS por outro motivo (decisão E39, itens
+ * 3.1–3.3; pedido do responsável em 15/09/2026).
  *
  * A ligação servidor → unidade é pelo NOME (`policiais.lotacao` =
  * `unidades.nome`), herança da planilha que originou o sistema — ver o
  * cabeçalho de `$lib/db/unidades`. Por isso o mapa devolvido é indexado por
  * nome de lotação, e quem consome casa com `unidade.nome`.
  *
- * "Afastado" segue a MESMA regra de `afastamentoVigente` (histórico):
- * evento `afastamento` com `data_inicio <= hoje` e `data_fim` vazia ou
- * `>= hoje`. Está em SQL aqui, e não em memória, porque a pergunta é para
- * todas as unidades de uma vez e o histórico inteiro não cabe numa ida ao D1
- * por unidade. Se a regra mudar lá, tem de mudar aqui — o teste em
- * `__tests__/efetivo.test.ts` fixa os dois lados.
+ * "Fora de serviço hoje" segue a MESMA regra de `afastamentoVigente`
+ * (histórico): evento `afastamento` com `data_inicio <= hoje` e `data_fim`
+ * vazia ou `>= hoje`. Férias é o subtipo `ferias` desse evento; qualquer outro
+ * subtipo (licença médica, judicial, outros) conta como afastado. Está em SQL
+ * aqui, e não em memória, porque a pergunta é para todas as unidades de uma
+ * vez e o histórico inteiro não cabe numa ida ao D1 por unidade. Se a regra
+ * mudar lá, tem de mudar aqui — o teste em `__tests__/efetivo.test.ts` fixa os
+ * dois lados.
  *
- * Duas consultas, não uma: cargo e afastamento são eixos independentes e um
- * `GROUP BY` só com os dois multiplicaria linhas sem ganho.
+ * Um servidor com férias E licença no mesmo dia conta uma vez, como afastado
+ * (o motivo que o tira do serviço por mais tempo prevalece). `ativos` é o que
+ * sobra: lotados menos férias menos afastados.
  */
 import { and, eq, sql } from 'drizzle-orm';
 import { policiais, policialHistorico } from '../server/schema';
 import type { Database } from './core';
 
-/** As contagens de UMA lotação. `total` = ativos (afastado continua ativo). */
-export interface EfetivoLotacao {
-	dpc: number;
-	oip: number;
-	total: number;
+/** As contagens de UM cargo numa lotação. `total` = lotados (ativos + férias + afastados). */
+interface EfetivoCargo {
+	ativos: number;
+	ferias: number;
 	afastados: number;
+	total: number;
 }
+
+/** As contagens de UMA lotação, por cargo, mais o total geral. */
+export interface EfetivoLotacao {
+	dpc: EfetivoCargo;
+	oip: EfetivoCargo;
+	/** Lotados no total (DPC + OIP). */
+	total: number;
+}
+
+const cargoVazio = (): EfetivoCargo => ({ ativos: 0, ferias: 0, afastados: 0, total: 0 });
 
 /** Um efetivo zerado — para unidade sem servidor cadastrado. */
 export function efetivoVazio(): EfetivoLotacao {
-	return { dpc: 0, oip: 0, total: 0, afastados: 0 };
+	return { dpc: cargoVazio(), oip: cargoVazio(), total: 0 };
 }
 
 /**
- * Efetivo de TODAS as lotações que têm servidor ativo, indexado por nome de
- * lotação. Unidade sem servidor não aparece no mapa — quem consome usa
- * `efetivoVazio()` como padrão.
+ * Efetivo de TODAS as lotações que têm servidor ativo (`policiais.ativo = 1`),
+ * indexado por nome de lotação. Unidade sem servidor não aparece no mapa —
+ * quem consome usa `efetivoVazio()` como padrão.
  *
  * @param hojeISO `YYYY-MM-DD` no fuso da corporação (`hojeBrasilISO()`).
  */
@@ -46,7 +60,7 @@ export async function efetivoPorLotacao(
 	db: Database,
 	hojeISO: string
 ): Promise<Map<string, EfetivoLotacao>> {
-	const porCargo = await db
+	const lotados = await db
 		.select({
 			lotacao: policiais.lotacao,
 			cargo: policiais.cargo,
@@ -56,10 +70,14 @@ export async function efetivoPorLotacao(
 		.where(eq(policiais.ativo, 1))
 		.groupBy(policiais.lotacao, policiais.cargo);
 
-	const afastados = await db
+	// Um servidor pode ter mais de um afastamento vigente; o `max` faz licença
+	// prevalecer sobre férias, e o `GROUP BY policial_id` conta cada um uma vez.
+	const foraDeServico = await db
 		.select({
 			lotacao: policiais.lotacao,
-			n: sql<number>`count(distinct ${policialHistorico.policial_id})`
+			cargo: policiais.cargo,
+			ferias: sql<number>`max(case when ${policialHistorico.subtipo} = 'ferias' then 1 else 0 end)`,
+			outro: sql<number>`max(case when ${policialHistorico.subtipo} = 'ferias' then 0 else 1 end)`
 		})
 		.from(policialHistorico)
 		.innerJoin(policiais, eq(policiais.id, policialHistorico.policial_id))
@@ -71,7 +89,7 @@ export async function efetivoPorLotacao(
 				sql`(${policialHistorico.data_fim} IS NULL OR ${policialHistorico.data_fim} = '' OR ${policialHistorico.data_fim} >= ${hojeISO})`
 			)
 		)
-		.groupBy(policiais.lotacao);
+		.groupBy(policialHistorico.policial_id, policiais.lotacao, policiais.cargo);
 
 	const mapa = new Map<string, EfetivoLotacao>();
 	const de = (lotacao: string) => {
@@ -82,13 +100,21 @@ export async function efetivoPorLotacao(
 		}
 		return e;
 	};
-	for (const l of porCargo) {
+	const cargoDe = (e: EfetivoLotacao, cargo: string) => (cargo === 'DPC' ? e.dpc : e.oip);
+
+	for (const l of lotados) {
 		const e = de(l.lotacao);
-		if (l.cargo === 'DPC') e.dpc += Number(l.n);
-		else e.oip += Number(l.n);
+		const c = cargoDe(e, l.cargo);
+		c.total += Number(l.n);
+		c.ativos += Number(l.n);
 		e.total += Number(l.n);
 	}
-	for (const l of afastados) de(l.lotacao).afastados = Number(l.n);
+	for (const l of foraDeServico) {
+		const c = cargoDe(de(l.lotacao), l.cargo);
+		if (Number(l.outro) === 1) c.afastados += 1;
+		else c.ferias += 1;
+		c.ativos -= 1;
+	}
 	return mapa;
 }
 
@@ -96,10 +122,13 @@ export async function efetivoPorLotacao(
 export function somarEfetivos(lista: EfetivoLotacao[]): EfetivoLotacao {
 	const s = efetivoVazio();
 	for (const e of lista) {
-		s.dpc += e.dpc;
-		s.oip += e.oip;
+		for (const cargo of ['dpc', 'oip'] as const) {
+			s[cargo].ativos += e[cargo].ativos;
+			s[cargo].ferias += e[cargo].ferias;
+			s[cargo].afastados += e[cargo].afastados;
+			s[cargo].total += e[cargo].total;
+		}
 		s.total += e.total;
-		s.afastados += e.afastados;
 	}
 	return s;
 }

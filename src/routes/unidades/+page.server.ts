@@ -24,9 +24,11 @@ import { redirect, fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import {
 	getDB,
+	tryGetR2,
 	listarTodasUnidades,
 	criarUnidade,
 	atualizarUnidade,
+	motivoParaRecusarSuperior,
 	definirUnidadeAtiva,
 	vinculosDaUnidade,
 	descreverVinculosUnidade,
@@ -39,6 +41,10 @@ import { unidades, type Unidade } from '$lib/server/schema';
 import { ehViolacaoUnique, mensagemComCausas } from '$lib/server/db-errors';
 import { ConflitoDeRenomeacaoUnidade } from '$lib/db/unidades';
 import { logger } from '$lib/server/logger';
+import { detectarTipoImagem } from '$lib/server/assinatura/selfie-upload';
+
+/** Teto da foto da fachada: 3 MB já é uma foto de celular em boa resolução. */
+const FOTO_MAX_BYTES = 3 * 1024 * 1024;
 
 /**
  * Lê e valida os campos de unidade do FormData (mesmos campos em criar/editar).
@@ -56,9 +62,35 @@ function lerUnidadeDoForm(data: FormData) {
 		tem_expediente: data.get('tem_expediente') === 'on',
 		tem_fds: data.get('tem_fds') === 'on',
 		cidade,
-		sigla: data.get('sigla')?.toString() || ''
+		sigla: data.get('sigla')?.toString() || '',
+		// A ficha (0085). O modal de cadastro não envia estes campos: caem nos
+		// padrões do schema.
+		endereco: data.get('endereco')?.toString() ?? '',
+		telefone: data.get('telefone')?.toString() ?? '',
+		email: data.get('email')?.toString() ?? '',
+		ais: data.get('ais')?.toString() ?? '',
+		xadrezes: data.has('xadrezes') ? Number(data.get('xadrezes')) : 0,
+		tira_gravame: data.get('tira_gravame') === 'on',
+		foto_url: data.get('foto_url')?.toString() ?? ''
 	});
 	return { parsed, nome, tipo, cidade };
+}
+
+/**
+ * A foto da fachada enviada pelo modal de edição, já validada pelo CONTEÚDO
+ * (magic bytes de JPEG/PNG — o `type` do arquivo é declaração do navegador),
+ * ou `null` quando não veio arquivo. `string` = motivo da recusa.
+ */
+async function lerFotoDoForm(
+	data: FormData
+): Promise<{ bytes: Uint8Array; ext: 'jpg' | 'png' } | null | string> {
+	const foto = data.get('foto');
+	if (!(foto instanceof File) || foto.size === 0) return null;
+	if (foto.size > FOTO_MAX_BYTES) return 'A foto precisa ter no máximo 3 MB';
+	const bytes = new Uint8Array(await foto.arrayBuffer());
+	const ext = detectarTipoImagem(bytes);
+	if (!ext) return 'A foto precisa ser JPEG ou PNG';
+	return { bytes, ext };
 }
 
 /**
@@ -164,16 +196,43 @@ export const actions: Actions = {
 
 		const data = await request.formData();
 		const id = Number(data.get('id'));
+		if (!Number.isInteger(id) || id <= 0) return fail(400, { error: 'ID inválido' });
 		const { parsed } = lerUnidadeDoForm(data);
 		if (!parsed.success) {
 			return fail(400, { error: parsed.error.issues[0].message });
 		}
+		const foto = await lerFotoDoForm(data);
+		if (typeof foto === 'string') return fail(400, { error: foto });
+		const removerFoto = data.get('remover_foto') === 'on';
 
 		const db = getDB(platform);
+		// Trocar o pai é a única edição capaz de fechar um ciclo na árvore.
+		const recusa = await motivoParaRecusarSuperior(db, id, parsed.data.seccional_id);
+		if (recusa) return fail(400, { error: recusa });
+
 		// Estado anterior para o diff da auditoria (a linha muda logo abaixo).
 		const antes = await db.select().from(unidades).where(eq(unidades.id, id)).get();
+		if (!antes) return fail(404, { error: 'Unidade não encontrada' });
 		try {
 			await atualizarUnidade(db, id, parsed.data);
+
+			// A foto vai para o R2 na MESMA chave da importação
+			// (`unidades/{id}/foto.<ext>`) e a ficha passa a servi-la por
+			// `foto_key`; o link de origem fica como reserva. Remover apaga a
+			// cópia e zera a chave — o link, se o admin o deixou, volta a valer.
+			if (foto || removerFoto) {
+				const r2 = tryGetR2(platform);
+				if (!r2) return fail(503, { error: 'Armazenamento de fotos indisponível' });
+				if (antes.foto_key) await r2.delete(antes.foto_key);
+				let fotoKey: string | null = null;
+				if (foto) {
+					fotoKey = `unidades/${id}/foto.${foto.ext}`;
+					await r2.put(fotoKey, foto.bytes, {
+						httpMetadata: { contentType: foto.ext === 'png' ? 'image/png' : 'image/jpeg' }
+					});
+				}
+				await db.update(unidades).set({ foto_key: fotoKey }).where(eq(unidades.id, id));
+			}
 			const { contexto, env } = contextoDeEvento(event);
 			await auditar(
 				db,
@@ -186,8 +245,11 @@ export const actions: Actions = {
 					alvo_id: id,
 					alvo_nome: parsed.data.nome.trim(),
 					detalhes: `Unidade editada: ${parsed.data.nome.trim()}`,
-					dados_antes: antes ?? undefined,
-					dados_depois: parsed.data,
+					dados_antes: antes,
+					dados_depois: {
+						...parsed.data,
+						foto: foto ? 'nova' : removerFoto ? 'removida' : 'mantida'
+					},
 					...contexto
 				},
 				{ env }
