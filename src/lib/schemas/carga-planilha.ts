@@ -42,6 +42,8 @@ const eventoDoHistoricoSchema = z
 export const complementoDaPlanilhaSchema = z.object({
 	/** Só o histórico: não faz upsert do cadastro (a planilha de histórico traz nome/cargo velhos). */
 	somente_historico: z.boolean().optional(),
+	/** Só os afastamentos da planilha dedicada (`legado = 3`), que mandam sobre o histórico. */
+	somente_afastamentos: z.boolean().optional(),
 	/** Os eventos da planilha de histórico — até 400 por servidor (a maior célula tem ~60). */
 	historico: z.array(eventoDoHistoricoSchema).max(400).optional(),
 	cargo_anterior: z.string().trim().max(10, 'Cargo anterior muito longo').optional(),
@@ -61,6 +63,7 @@ export function temComplemento(item: Record<string, unknown>): boolean {
 		'designacao',
 		'afastamentos',
 		'historico',
-		'somente_historico'
+		'somente_historico',
+		'somente_afastamentos'
 	].some((k) => item[k] !== undefined);
 }

@@ -83,14 +83,21 @@
 		cargo: '',
 		seccional: 'todas',
 		busca: '',
-		situacao: ''
+		situacao: '',
+		designacao: ''
 	});
 
 	const unidades = $derived(data.unidades as Unidade[]);
-	/** A linha da lista: o cadastro mais a situação de hoje (fase 2-C). */
+	const designacoes = $derived(data.designacoes as { id: number; nome: string; simbolo: string }[]);
+	/**
+	 * A linha da lista: o cadastro, a situação de hoje (fase 2-C) e a designação
+	 * já resolvida pelo `load` — o `designacao_id` cru não diz nada na tela.
+	 */
 	type LinhaServidor = Policial & {
 		situacao: SituacaoServidor;
 		afastamento: { subtipo: string; data_inicio: string; data_fim: string | null } | null;
+		designacao: string | null;
+		designacao_simbolo: string | null;
 	};
 	const policiais = $derived(data.policiais as LinhaServidor[]);
 
@@ -112,6 +119,7 @@
 		})
 	);
 	let filtroBusca = $state(untrack(() => data.filtros.busca || savedFilters.busca));
+	let filtroDesignacao = $state(untrack(() => data.filtros.designacao || savedFilters.designacao));
 
 	const seccionais = $derived(unidades.filter((u) => u.tipo === 'seccional'));
 	// Toda unidade ATIVA é lotação possível — departamento, subdepartamento,
@@ -142,7 +150,8 @@
 			cargo: filtroCargo,
 			seccional: filtroSeccional,
 			busca: filtroBusca,
-			situacao: filtroSituacao
+			situacao: filtroSituacao,
+			designacao: filtroDesignacao
 		}),
 		query: (p) => {
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity
@@ -156,6 +165,7 @@
 				params.set('lotacao', filtroLotacao);
 			}
 			if (filtroCargo) params.set('cargo', filtroCargo);
+			if (filtroDesignacao) params.set('designacao', filtroDesignacao);
 			if (filtroSituacao) params.set('situacao', filtroSituacao);
 			if (filtroBusca) params.set('busca', filtroBusca);
 			if (filtroSeccional && filtroSeccional !== 'todas') {
@@ -218,6 +228,7 @@
 	function limparFiltros() {
 		filtroLotacao = filtroLotacaoBase;
 		filtroCargo = '';
+		filtroDesignacao = '';
 		filtroSituacao = '';
 		filtroSeccional = 'todas';
 		filtroBusca = '';
@@ -228,6 +239,7 @@
 	const temFiltros = $derived(
 		filtroLotacao !== filtroLotacaoBase ||
 			filtroCargo !== '' ||
+			filtroDesignacao !== '' ||
 			filtroSituacao !== '' ||
 			filtroSeccional !== 'todas' ||
 			filtroBusca !== ''
@@ -259,6 +271,21 @@
 				? `até ${formatarData(p.afastamento.data_fim)}`
 				: `desde ${formatarData(p.afastamento?.data_inicio ?? '')}`}</span
 		>
+	{/if}
+{/snippet}
+
+<!-- A função exercida, com o símbolo da gratificação embaixo quando há (DAS/DNS).
+     Servidor sem designação é o da célula vazia na planilha, não um erro. -->
+{#snippet designacaoDaLinha(p: LinhaServidor)}
+	{#if p.designacao}
+		<span class="block text-xs">{p.designacao}</span>
+		{#if p.designacao_simbolo}
+			<span class="block text-3xs tracking-wide text-surface-500 uppercase"
+				>{p.designacao_simbolo}</span
+			>
+		{/if}
+	{:else}
+		<span class="text-xs text-surface-400">—</span>
 	{/if}
 {/snippet}
 
@@ -360,6 +387,24 @@
 					</SegmentedControl.Control>
 				</SegmentedControl>
 			</div>
+			<!-- Designação = a FUNÇÃO exercida, não o cargo: é ela que responde
+			     "quem são os de plantão", "quantos chefes de cartório há aqui".
+			     Fora do `isAdmin` de propósito — o administrador de seccional e de
+			     unidade precisa da mesma pergunta dentro do escopo dele. -->
+			<label class="flex flex-col gap-1.5 flex-1 min-w-[240px] lg:max-w-xs">
+				<span class={CLASSE_ROTULO_FILTRO}>Designação</span>
+				<select
+					class="{CLASSE_INPUT_FILTRO} w-full"
+					bind:value={filtroDesignacao}
+					onchange={navegarComFiltros}
+				>
+					<option value="">Todas as designações</option>
+					{#each designacoes as d (d.id)}
+						<option value={String(d.id)}>{d.nome}{d.simbolo ? ` (${d.simbolo})` : ''}</option>
+					{/each}
+				</select>
+			</label>
+
 			{#if isAdmin}
 				<label class="flex flex-col gap-1.5 flex-1 min-w-[220px] lg:max-w-xs">
 					<span class={CLASSE_ROTULO_FILTRO}>Seccional</span>
@@ -448,12 +493,13 @@
 				<table class="table">
 					<thead>
 						<tr>
-							<th class="w-[24%]">Nome</th>
-							<th class="w-[12%] whitespace-nowrap px-4">Matrícula</th>
-							<th class="w-[9%] whitespace-nowrap px-4">Cargo</th>
+							<th class="w-[20%]">Nome</th>
+							<th class="w-[10%] whitespace-nowrap px-4">Matrícula</th>
+							<th class="w-[7%] whitespace-nowrap px-4">Cargo</th>
+							<th class="w-[16%] px-4">Designação</th>
 							<th class="whitespace-nowrap px-4">Situação</th>
-							<th class="w-[14%] whitespace-nowrap px-4">Telefone</th>
-							<th class="w-[20%]">Lotação</th>
+							<th class="w-[11%] whitespace-nowrap px-4">Telefone</th>
+							<th class="w-[18%]">Lotação</th>
 							<th>Ações</th>
 						</tr>
 					</thead>
@@ -464,7 +510,9 @@
 									'h-4 w-40',
 									'h-4 w-20',
 									'h-6 w-16 rounded-full',
+									'h-4 w-36',
 									'h-4 w-32',
+									'h-4 w-28',
 									'h-4 w-28',
 									'h-8 w-32 rounded-lg'
 								]}
@@ -472,7 +520,7 @@
 						{:else}
 							{#each policiais as p (p.id)}
 								<tr>
-									<td class="w-[24%]">{p.nome}</td>
+									<td class="w-[20%]">{p.nome}</td>
 									<td class="font-mono tabular-nums whitespace-nowrap px-4">{p.matricula}</td>
 									<td class="px-4">
 										<span
@@ -481,9 +529,10 @@
 												: 'preset-filled-warning-500'}">{p.cargo}</span
 										>
 									</td>
+									<td class="w-[16%] px-4">{@render designacaoDaLinha(p)}</td>
 									<td class="px-4">{@render seloSituacao(p)}</td>
 									<td class="font-mono tabular-nums whitespace-nowrap px-4">{p.telefone}</td>
-									<td class="w-[20%]">{p.lotacao}</td>
+									<td class="w-[18%]">{p.lotacao}</td>
 									<td>
 										<div class="flex gap-2">
 											<a
@@ -526,6 +575,10 @@
 								>
 							</div>
 							<div class="space-y-1 text-sm mb-3">
+								<div class="flex justify-between gap-3">
+									<span class="shrink-0 text-surface-600 dark:text-surface-400">Designação</span>
+									<span class="text-right">{@render designacaoDaLinha(p)}</span>
+								</div>
 								<div class="flex justify-between">
 									<span class="text-surface-600 dark:text-surface-400">Situação</span>
 									{@render seloSituacao(p)}

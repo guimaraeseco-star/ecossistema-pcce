@@ -35,6 +35,7 @@ import { upsertPolicial, buscarPolicialPorMatricula } from '$lib/db/policiais';
 import {
 	DESIGNACOES_DE_TITULAR,
 	idDaDesignacao,
+	regravarAfastamentosDaPlanilha,
 	regravarAfastamentosLegados,
 	regravarHistoricoDaPlanilha,
 	regravarTitularDaPlanilha
@@ -113,6 +114,8 @@ export const POST: RequestHandler = async (event) => {
 		const hoje = hojeBrasilISO();
 		let historicoGravado = 0;
 		let historicoRepetido = 0;
+		let afastamentosGravados = 0;
+		let afastamentosSuprimidos = 0;
 
 		for (const item of data) {
 			const rowId = item.matricula || item.nome || 'Linha desconhecida';
@@ -129,6 +132,25 @@ export const POST: RequestHandler = async (event) => {
 				if (!item.matricula || String(item.matricula).trim() === '') {
 					throw new Error('Linha sem matrícula');
 				}
+				// Só afastamentos (planilha dedicada, fase 2-C): mandam sobre o
+				// histórico no que for o mesmo afastamento. Também sem upsert.
+				if (item.somente_afastamentos === true) {
+					const alvo = await buscarPolicialPorMatricula(db, String(item.matricula));
+					if (!alvo)
+						throw new Error('Matrícula não cadastrada; afastamentos exigem servidor existente');
+					const so = complementoDaPlanilhaSchema.parse(item);
+					const r = await regravarAfastamentosDaPlanilha(
+						db,
+						alvo.id,
+						so.historico ?? [],
+						'planilha de afastamentos'
+					);
+					afastamentosGravados += r.gravados;
+					afastamentosSuprimidos += r.suprimidosDoHistorico;
+					successCount++;
+					continue;
+				}
+
 				// Só histórico (planilha de histórico, fase 2-C): NÃO faz upsert — a
 				// planilha traz nome e cargo antigos — e exige que a matrícula exista.
 				if (item.somente_historico === true) {
@@ -183,6 +205,19 @@ export const POST: RequestHandler = async (event) => {
 					complemento?.designacao !== undefined
 						? await idDaDesignacao(db, complemento.designacao)
 						: undefined;
+				// A designação definida pela TELA vence a da planilha (0089): o
+				// `upsertPolicial` a preserva, e aqui a carga RELATA — a divergência
+				// calada é o que fazia a correção do Admin Geral sumir na folha
+				// seguinte sem que ninguém soubesse.
+				if (
+					designacaoId !== undefined &&
+					existente?.designacao_origem === 'sistema' &&
+					existente.designacao_id !== designacaoId
+				) {
+					avisos.push(
+						`${rowId}: designação "${complemento?.designacao ?? ''}" na planilha, mas a da tela vence — planilha ignorada`
+					);
+				}
 				const regimeMap = item.regime?.toLowerCase() === 'expediente' ? 'expediente' : 'plantao';
 
 				let papelMap: string | null = null;
@@ -336,7 +371,7 @@ export const POST: RequestHandler = async (event) => {
 			vazias,
 			erros: errors,
 			avisos,
-			extras: { historicoGravado, historicoRepetido }
+			extras: { historicoGravado, historicoRepetido, afastamentosGravados, afastamentosSuprimidos }
 		});
 	} catch (err: unknown) {
 		// 400 (não 500): payload do webhook é input inválido do caller, não bug

@@ -34,6 +34,7 @@ import {
 	excluirPolicial,
 	excluirCredenciaisDoDono,
 	listarUnidades,
+	listarDesignacoes,
 	registrarAuditComContexto,
 	auditar,
 	contextoDeEvento,
@@ -66,6 +67,8 @@ export const load: PageServerLoad = async ({ locals, platform, url, depends }) =
 	const situacao = (['ativos', 'ferias', 'afastados'] as const).find((s) => s === situacaoParam);
 	const hoje = hojeBrasilISO();
 	const busca = url.searchParams.get('busca') || undefined;
+	const designacaoParam = url.searchParams.get('designacao') || '';
+	const designacaoId = Number(designacaoParam) > 0 ? Number(designacaoParam) : undefined;
 	const page = url.searchParams.get('page') ? Number(url.searchParams.get('page')) : undefined;
 
 	const seccional = url.searchParams.get('seccional');
@@ -74,7 +77,7 @@ export const load: PageServerLoad = async ({ locals, platform, url, depends }) =
 	// `null` = irrestrito (Admin Geral); Set = as lotações do papel.
 	const escopo = await escopoDaFicha(db, u);
 
-	const [resultado, unidades] = await Promise.all([
+	const [resultado, unidades, designacoes] = await Promise.all([
 		listarPoliciais(db, lotacaoParam, false, {
 			busca,
 			cargo,
@@ -82,10 +85,12 @@ export const load: PageServerLoad = async ({ locals, platform, url, depends }) =
 			escopoLotacoes: escopo ? [...escopo] : undefined,
 			situacao,
 			hojeISO: hoje,
+			designacaoId,
 			page,
 			limit: 20
 		}),
-		listarUnidades(db)
+		listarUnidades(db),
+		listarDesignacoes(db)
 	]);
 
 	// CPF é cifrado em repouso (LGPD) e só é decifrado para quem edita o cadastro
@@ -118,12 +123,14 @@ export const load: PageServerLoad = async ({ locals, platform, url, depends }) =
 			totalPages: resultado.totalPages
 		},
 		unidades,
+		designacoes,
 		filtros: {
 			lotacao: lotacaoParam ?? '',
 			cargo: cargo ?? '',
 			busca: busca ?? '',
 			seccional: seccional ?? 'todas',
-			situacao: situacao ?? ''
+			situacao: situacao ?? '',
+			designacao: designacaoId ? String(designacaoId) : ''
 		},
 		lotacaoUsuario: u.lotacao
 	};

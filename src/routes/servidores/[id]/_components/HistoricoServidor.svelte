@@ -34,11 +34,14 @@
 		afastamentoVigenteId: number | null;
 		/** Unidades para resolver ids (ex.: papel_unidade_id) para nome legível. */
 		unidades?: { id: number; nome: string }[];
+		/** Catálogo de designações, para resolver `designacao_id` no diff. */
+		designacoes?: { id: number; nome: string }[];
 	}
 
-	const { historico, afastamentoVigenteId, unidades = [] }: Props = $props();
+	const { historico, afastamentoVigenteId, unidades = [], designacoes = [] }: Props = $props();
 
 	const nomePorUnidadeId = $derived(new Map(unidades.map((u) => [u.id, u.nome])));
+	const nomePorDesignacaoId = $derived(new Map(designacoes.map((d) => [d.id, d.nome])));
 
 	// Paginação client-side (o histórico completo já vem no load).
 	const ITENS_POR_PAGINA = 5;
@@ -125,6 +128,7 @@
 		email_pessoal: 'E-mail pessoal',
 		papel: 'Papel',
 		papel_unidade_id: 'Unidade do papel',
+		designacao_id: 'Designação',
 		ativo: 'Ativo'
 	};
 
@@ -146,6 +150,9 @@
 	function formatarValor(campo: string, v: unknown): string {
 		if (v === null || v === undefined || v === '') return '—';
 		if (campo === 'papel_unidade_id') return nomePorUnidadeId.get(Number(v)) ?? String(v);
+		// Sem isto a linha do tempo dizia "designacao_id: 9 → 11", que não é
+		// informação para quem lê a vida funcional do servidor.
+		if (campo === 'designacao_id') return nomePorDesignacaoId.get(Number(v)) ?? String(v);
 		if (campo === 'papel') return LABEL_PAPEL[String(v)] ?? String(v);
 		if (campo === 'regime')
 			return v === 'plantao' ? 'Plantão' : v === 'expediente' ? 'Expediente' : String(v);
@@ -201,13 +208,18 @@
 
 						<div class="mt-2 text-sm text-surface-700 dark:text-surface-200 space-y-1">
 							{#if ev.tipo === 'movimentacao'}
-								<p class="flex items-center gap-1.5 flex-wrap">
-									<span class="text-surface-600 dark:text-surface-400"
-										>{ev.unidade_origem || '—'}</span
-									>
-									<ArrowRightLeft size={14} class="text-primary-500" />
-									<span class="font-medium">{ev.unidade_destino}</span>
-								</p>
+								<!-- Movimentação vinda das planilhas costuma ter só o texto: sem
+								     destino, o par origem → destino ficaria "— ⇄" (fase 2-C). -->
+								{#if ev.unidade_destino}
+									<p class="flex items-center gap-1.5 flex-wrap">
+										<span class="text-surface-600 dark:text-surface-400"
+											>{ev.unidade_origem || '—'}</span
+										>
+										<ArrowRightLeft size={14} class="text-primary-500" />
+										<span class="font-medium">{ev.unidade_destino}</span>
+									</p>
+								{/if}
+								{#if ev.descricao}<p class="text-xs whitespace-pre-line">{ev.descricao}</p>{/if}
 								{#if ev.data_evento}<p class="text-xs text-surface-600 dark:text-surface-400">
 										Data: {formatarData(ev.data_evento)}
 									</p>{/if}

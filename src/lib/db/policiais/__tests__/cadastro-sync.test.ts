@@ -179,3 +179,44 @@ describe('upsertPolicial — o que a rodada de sync NÃO pode fazer', () => {
 		expect(linha().papel).toBeNull();
 	});
 });
+
+/**
+ * A DESIGNAÇÃO tem dois donos possíveis, e a coluna `designacao_origem` (0089)
+ * é o que diz qual deles vale naquela linha. O teste existe porque a preservação
+ * é feita por um `CASE` dentro do `ON CONFLICT DO UPDATE` — SQL que nenhum mock
+ * de query builder executaria.
+ */
+describe('upsertPolicial — designação: a tela vence a planilha (0089)', () => {
+	it('regrava a designação quando ela veio da planilha', async () => {
+		await upsertPolicial(db, { ...BASE, designacao_id: 14 });
+		expect(linha().designacao_id).toBe(14);
+
+		await upsertPolicial(db, { ...BASE, designacao_id: 15 });
+		expect(linha().designacao_id).toBe(15);
+		expect(linha().designacao_origem).toBe('planilha');
+	});
+
+	it('NÃO desfaz a designação escolhida na tela', async () => {
+		await upsertPolicial(db, { ...BASE, designacao_id: 14 });
+		// O que a ficha do servidor grava quando o Admin Geral troca a função.
+		sqlite.exec("UPDATE policiais SET designacao_id = 3, designacao_origem = 'sistema'");
+
+		await upsertPolicial(db, { ...BASE, designacao_id: 15 });
+
+		const l = linha();
+		expect(l.designacao_id).toBe(3);
+		expect(l.designacao_origem).toBe('sistema');
+	});
+
+	it('payload SEM designação não zera a coluna', async () => {
+		await upsertPolicial(db, { ...BASE, designacao_id: 14 });
+		// O Apps Script antigo manda a folha sem o complemento da fase 2-C.
+		await upsertPolicial(db, { ...BASE, nome: 'FULANO ATUALIZADO' });
+		expect(linha().designacao_id).toBe(14);
+	});
+
+	it('quem nasce pelo sync nasce com a designação da planilha', async () => {
+		await upsertPolicial(db, { ...BASE, designacao_id: 16 });
+		expect(linha().designacao_origem).toBe('planilha');
+	});
+});

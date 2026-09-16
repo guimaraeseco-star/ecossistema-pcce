@@ -20,11 +20,19 @@
 	import { enhance } from '$app/forms';
 	import { toaster } from '$lib/toast';
 	import { mostrarErroDeResultado } from '$lib/enhance-handler';
-	import { ROTULO_CAMPO } from '$lib/cadastro-campos';
+	import { ROTULO_CAMPO, textoDoValorSolicitado } from '$lib/cadastro-campos';
 	import DetalheSolicitacaoAcao from '$lib/components/DetalheSolicitacaoAcao.svelte';
 	import type { ActionResult } from '@sveltejs/kit';
 
 	const { data }: PageProps = $props();
+
+	/** O valor como se lê: `designacao_id` vira o nome da função (E50). */
+	const texto = (campo: string, valor: string | null) =>
+		textoDoValorSolicitado(
+			campo as Parameters<typeof textoDoValorSolicitado>[0],
+			valor,
+			data.designacoes
+		);
 
 	// Derivados graváveis: espelham o load, mas admitem a atualização local.
 	let pendentes = $derived(data.pendentes);
@@ -144,9 +152,9 @@
 									</td>
 									<td class="py-3 px-4 font-medium whitespace-nowrap">{ROTULO_CAMPO[s.campo]}</td>
 									<td class="py-3 px-4 text-surface-600 dark:text-surface-400"
-										>{s.valor_atual || '—'}</td
+										>{texto(s.campo, s.valor_atual) || '—'}</td
 									>
-									<td class="py-3 px-4 font-semibold">{s.valor_novo}</td>
+									<td class="py-3 px-4 font-semibold">{texto(s.campo, s.valor_novo)}</td>
 									<td class="py-3 px-4 text-surface-600 dark:text-surface-400 max-w-xs break-words">
 										<p>{s.justificativa || '—'}</p>
 										{#if s.solicitante_nome}
@@ -239,7 +247,7 @@
 										De
 									</dt>
 									<dd class="text-surface-600 dark:text-surface-400 break-words">
-										{s.valor_atual || '—'}
+										{texto(s.campo, s.valor_atual) || '—'}
 									</dd>
 								</div>
 								<div>
@@ -248,7 +256,7 @@
 									>
 										Para
 									</dt>
-									<dd class="font-semibold break-words">{s.valor_novo}</dd>
+									<dd class="font-semibold break-words">{texto(s.campo, s.valor_novo)}</dd>
 								</div>
 								<div>
 									<dt

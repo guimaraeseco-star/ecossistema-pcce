@@ -26,6 +26,7 @@ import {
 	decidirSolicitacaoCadastro,
 	listarSolicitacoesCadastroPendentes,
 	listarSolicitacoesAcaoPendentes,
+	listarDesignacoes,
 	registrarAuditComContexto,
 	contextoDeEvento
 } from '$lib/db';
@@ -42,11 +43,14 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 	if (u.tipo !== 'admin') redirect(302, '/bem-vindo');
 
 	const db = getDB(platform);
-	const [pendentes, acoesPendentes] = await Promise.all([
+	const [pendentes, acoesPendentes, designacoes] = await Promise.all([
 		listarSolicitacoesCadastroPendentes(db),
-		listarSolicitacoesAcaoPendentes(db)
+		listarSolicitacoesAcaoPendentes(db),
+		// O catálogo vai junto porque `designacao_id` guarda o id: sem ele a fila
+		// pediria ao Admin Geral que decidisse entre "9" e "11" (E50).
+		listarDesignacoes(db)
 	]);
-	return { pendentes, acoesPendentes };
+	return { pendentes, acoesPendentes, designacoes };
 };
 
 /** `id` + `decisao` do formulário, ou a mensagem de recusa. */

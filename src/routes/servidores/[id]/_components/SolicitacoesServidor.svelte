@@ -12,7 +12,7 @@
 	 * decisão pendente sobre aquele servidor antes de editar o cadastro por cima
 	 * dela.
 	 */
-	import { ROTULO_CAMPO } from '$lib/cadastro-campos';
+	import { ROTULO_CAMPO, textoDoValorSolicitado } from '$lib/cadastro-campos';
 	import StatusSolicitacao from '$lib/components/StatusSolicitacao.svelte';
 	import DetalheSolicitacaoAcao from '$lib/components/DetalheSolicitacaoAcao.svelte';
 	import type { CadastroSolicitacao, PolicialAcaoSolicitacao } from '$lib/types';
@@ -23,8 +23,23 @@
 		desvinculacao: 'Desvinculação'
 	};
 
-	const { campos, acoes }: { campos: CadastroSolicitacao[]; acoes: PolicialAcaoSolicitacao[] } =
-		$props();
+	const {
+		campos,
+		acoes,
+		/** Catálogo para resolver `designacao_id` — sem ele a fila mostraria "11". */
+		designacoes = []
+	}: {
+		campos: CadastroSolicitacao[];
+		acoes: PolicialAcaoSolicitacao[];
+		designacoes?: { id: number; nome: string }[];
+	} = $props();
+
+	const texto = (campo: string, valor: string | null) =>
+		textoDoValorSolicitado(
+			campo as Parameters<typeof textoDoValorSolicitado>[0],
+			valor,
+			designacoes
+		);
 
 	const pendentes = $derived(
 		campos.filter((s) => s.status === 'pendente').length +
@@ -65,8 +80,10 @@
 						{#each campos as s (s.id)}
 							<tr class="border-t border-surface-200 dark:border-white/5 align-top">
 								<td class="py-2 font-medium whitespace-nowrap">{ROTULO_CAMPO[s.campo]}</td>
-								<td class="py-2 text-surface-600 dark:text-surface-400">{s.valor_atual || '—'}</td>
-								<td class="py-2 font-semibold">{s.valor_novo}</td>
+								<td class="py-2 text-surface-600 dark:text-surface-400"
+									>{texto(s.campo, s.valor_atual) || '—'}</td
+								>
+								<td class="py-2 font-semibold">{texto(s.campo, s.valor_novo)}</td>
 								<td class="py-2 text-surface-600 dark:text-surface-400 max-w-xs break-words">
 									{s.justificativa || '—'}
 								</td>
@@ -93,14 +110,14 @@
 									De
 								</dt>
 								<dd class="text-surface-600 dark:text-surface-400 break-words">
-									{s.valor_atual || '—'}
+									{texto(s.campo, s.valor_atual) || '—'}
 								</dd>
 							</div>
 							<div>
 								<dt class="text-2xs font-semibold uppercase text-surface-600 dark:text-surface-400">
 									Para
 								</dt>
-								<dd class="font-semibold break-words">{s.valor_novo}</dd>
+								<dd class="font-semibold break-words">{texto(s.campo, s.valor_novo)}</dd>
 							</div>
 							<div>
 								<dt class="text-2xs font-semibold uppercase text-surface-600 dark:text-surface-400">

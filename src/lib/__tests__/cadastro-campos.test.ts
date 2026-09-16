@@ -18,7 +18,8 @@ import {
 	MAX_JUSTIFICATIVA,
 	ROTULO_CAMPO,
 	classesDoCargo,
-	motivoParaRecusarValor
+	motivoParaRecusarValor,
+	textoDoValorSolicitado
 } from '../cadastro-campos';
 
 /** A lista é o contrato: a ficha monta o formulário a partir dela. */
@@ -91,5 +92,46 @@ describe('motivoParaRecusarValor', () => {
 describe('justificativa', () => {
 	it('o teto é o mesmo que a tela e o servidor aplicam', () => {
 		expect(MAX_JUSTIFICATIVA).toBe(300);
+	});
+});
+
+/**
+ * `designacao_id` é a única referência da lista: a fila do Admin Geral precisa
+ * mostrar a FUNÇÃO, não o id, e o valor pedido tem de ser um id plausível antes
+ * de o servidor ir ao banco conferir se ele existe.
+ */
+describe('designação (E50)', () => {
+	const CATALOGO = [
+		{ id: 3, nome: 'Delegado Titular' },
+		{ id: 9, nome: 'Chefe de seção de expedientes e cartório' }
+	];
+
+	it('é solicitável, e a ponta é quem sabe da mudança', () => {
+		expect(oferecidos).toContain('designacao_id');
+		expect(ROTULO_CAMPO.designacao_id).toBe('Designação');
+	});
+
+	it('só aceita id plausível — a existência quem confere é o banco', () => {
+		expect(motivoParaRecusarValor('designacao_id', '9', 'OIP')).toBeNull();
+		expect(motivoParaRecusarValor('designacao_id', '0', 'OIP')).toBeTruthy();
+		expect(motivoParaRecusarValor('designacao_id', 'Cartório', 'OIP')).toBeTruthy();
+		expect(motivoParaRecusarValor('designacao_id', '-3', 'OIP')).toBeTruthy();
+	});
+
+	it('exibe o nome da função, nunca o id', () => {
+		expect(textoDoValorSolicitado('designacao_id', '9', CATALOGO)).toBe(
+			'Chefe de seção de expedientes e cartório'
+		);
+	});
+
+	it('id que sumiu do catálogo mostra o valor cru, não vazio', () => {
+		// Designação desativada depois do pedido: a fila continua legível e quem
+		// decide vê que há algo estranho, em vez de uma célula em branco.
+		expect(textoDoValorSolicitado('designacao_id', '404', CATALOGO)).toBe('404');
+	});
+
+	it('os demais campos passam pelo helper sem tradução', () => {
+		expect(textoDoValorSolicitado('telefone', '85999990000', CATALOGO)).toBe('85999990000');
+		expect(textoDoValorSolicitado('nome', null, CATALOGO)).toBe('');
 	});
 });

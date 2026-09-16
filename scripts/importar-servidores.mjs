@@ -33,6 +33,14 @@
  *       completo como último recurso; extrai os eventos do texto
  *       (`src/lib/servidores/historico-texto.ts`) e envia `somente_historico`.
  *       Quem não está no banco (desvinculados) NÃO entra — só no relatório.
+ *   node scripts/importar-servidores.mjs --afastamentos afastamentos.xlsx --relatorio|--enviar --local|--remote
+ *       a planilha DEDICADA de afastamentos (SERVIDOR · DATA INICIAL · DIAS ·
+ *       DATA FINAL · TIPO · CID · TIPO · STATUS · NUP). Casa pelo NOME
+ *       SANITIZADO (sem acento, pontuação nem partículas — ela não traz
+ *       matrícula) e manda sobre o histórico no que for o mesmo afastamento
+ *       (período sobreposto). O campo TIPO é livre e também traz pedidos de
+ *       movimentação e recados: só o que é afastamento vira afastamento
+ *       (`src/lib/servidores/afastamentos-planilha.ts`).
  */
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -45,10 +53,29 @@ const ExcelJS = require('exceljs');
 // O Node 24 lê TypeScript sem passo de build (type stripping); o módulo não
 // importa nada de `$lib` justamente para poder ser usado daqui.
 const { extrairHistorico } = await import('../src/lib/servidores/historico-texto.ts');
+const { classificarTipoAfastamento, nomeSanitizado } =
+	await import('../src/lib/servidores/afastamentos-planilha.ts');
 
 const DB = 'escalas-db';
 const SEGREDOS = 'C:/Ecossistema-PCCE/segredos';
 const TAMANHO_LOTE = 40;
+/**
+ * Produção responde por trás do Cloudflare: lote menor e pausa entre eles.
+ * O lote de HISTÓRICO é ainda menor — cada servidor traz dezenas de eventos e
+ * o Worker faz um DELETE mais N INSERTs por item; com 20 por requisição o D1
+ * estourava o tempo e devolvia 503 (carga de produção de 16/09/2026).
+ */
+const TAMANHO_LOTE_REMOTO = 20;
+/**
+ * O tamanho do lote pesado é REGULÁVEL por `LOTE_PESADO=n` porque o teto não é
+ * fixo: ele cai à medida que a base cresce. Com a tabela vazia, 4 servidores
+ * por requisição passavam; com 3,7 mil eventos já gravados, o mesmo lote passou
+ * a estourar o tempo do Worker e voltar 503 (16/09/2026). Quem retoma uma carga
+ * interrompida abaixa o número em vez de editar o script.
+ */
+const TAMANHO_LOTE_REMOTO_PESADO = Number(process.env.LOTE_PESADO) || 4;
+const TENTATIVAS = 5;
+const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /* ── utilitários ────────────────────────────────────────────────────────── */
 
@@ -343,41 +370,97 @@ function segredoDoAlvo(alvo) {
 	};
 }
 
+/**
+ * POST com repetição: o Worker devolve 503/502 esporádico quando um lote pega
+ * um isolate frio ou o D1 está ocupado (visto na carga de produção de
+ * 16/09/2026, lote 9 de 18). Repetir é seguro — todas as rotas de carga fazem
+ * upsert e regravam por marca.
+ *
+ * As opções vêm de uma FUNÇÃO, não de um objeto: o anti-replay do webhook
+ * recusa nonce repetido (401), então cada tentativa precisa de timestamp e
+ * nonce novos — reenviar os mesmos headers transformava o 503 em 401.
+ */
+async function postComRepeticao(url, montarOpcoes, rotulo) {
+	let ultimo = '';
+	for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
+		try {
+			const r = await fetch(url, montarOpcoes());
+			const resposta = await r.json().catch(() => ({}));
+			if (r.status === 200 || r.status === 422) return resposta;
+			ultimo = `HTTP ${r.status} ${JSON.stringify(resposta).slice(0, 200)}`;
+		} catch (e) {
+			ultimo = String(e.message ?? e).slice(0, 200);
+		}
+		if (tentativa < TENTATIVAS) {
+			const pausa = 5000 * tentativa;
+			console.log(`  ${rotulo}: ${ultimo} — tentando de novo em ${pausa / 1000}s`);
+			await espera(pausa);
+		}
+	}
+	throw new Error(`${rotulo}: ${ultimo}`);
+}
+
 async function enviar(itens, alvo) {
 	const { base, token } = segredoDoAlvo(alvo);
 	let importadas = 0;
 	const erros = [];
 	const avisos = [];
-	const extras = { historicoGravado: 0, historicoRepetido: 0 };
-	for (let i = 0; i < itens.length; i += TAMANHO_LOTE) {
-		const lote = itens.slice(i, i + TAMANHO_LOTE);
+	const extras = {
+		historicoGravado: 0,
+		historicoRepetido: 0,
+		afastamentosGravados: 0,
+		afastamentosSuprimidos: 0
+	};
+	// "Pesado" = carga de eventos (histórico/afastamentos), não de cadastro.
+	const pesado = itens.some((i) => Array.isArray(i.historico) && i.historico.length > 0);
+	const tamanho =
+		alvo === '--remote'
+			? pesado
+				? TAMANHO_LOTE_REMOTO_PESADO
+				: TAMANHO_LOTE_REMOTO
+			: TAMANHO_LOTE;
+	const total = Math.ceil(itens.length / tamanho);
+	for (let i = 0; i < itens.length; i += tamanho) {
+		const lote = itens.slice(i, i + tamanho);
 		const body = JSON.stringify(lote);
 		const assinatura = createHmac('sha256', token).update(body).digest('hex');
-		const r = await fetch(`${base}/api/webhook/sync-policiais`, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'X-Hub-Signature-256': `sha256=${assinatura}`,
-				'X-Webhook-Timestamp': String(Math.floor(Date.now() / 1000)),
-				'X-Webhook-Nonce': randomBytes(16).toString('hex')
-			},
-			body
-		});
-		const resposta = await r.json().catch(() => ({}));
-		if (r.status !== 200 && r.status !== 422) {
-			throw new Error(
-				`lote ${i / TAMANHO_LOTE + 1}: HTTP ${r.status} ${JSON.stringify(resposta).slice(0, 300)}`
+		let resposta;
+		try {
+			resposta = await postComRepeticao(
+				`${base}/api/webhook/sync-policiais`,
+				() => ({
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'X-Hub-Signature-256': `sha256=${assinatura}`,
+						'X-Webhook-Timestamp': String(Math.floor(Date.now() / 1000)),
+						'X-Webhook-Nonce': randomBytes(16).toString('hex')
+					},
+					body
+				}),
+				`lote ${Math.floor(i / tamanho) + 1}`
 			);
+		} catch (e) {
+			// Lote que não passou nem com as repetições NÃO aborta a carga: os
+			// outros entram, o relatório final diz quais faltaram, e reexecutar o
+			// comando conserta (tudo é upsert/regravação por marca).
+			erros.push(String(e.message ?? e));
+			console.log(`lote ${Math.floor(i / tamanho) + 1}/${total}: FALHOU — segue para o próximo`);
+			if (alvo === '--remote') await espera(2000);
+			continue;
 		}
 		importadas += resposta.imported ?? 0;
 		erros.push(...(resposta.errors ?? []));
 		avisos.push(...(resposta.warnings ?? []));
 		extras.historicoGravado += resposta.historicoGravado ?? 0;
 		extras.historicoRepetido += resposta.historicoRepetido ?? 0;
+		extras.afastamentosGravados += resposta.afastamentosGravados ?? 0;
+		extras.afastamentosSuprimidos += resposta.afastamentosSuprimidos ?? 0;
 		console.log(
-			`lote ${i / TAMANHO_LOTE + 1}/${Math.ceil(itens.length / TAMANHO_LOTE)}: ${resposta.imported ?? 0}/${lote.length} importadas` +
+			`lote ${Math.floor(i / tamanho) + 1}/${total}: ${resposta.imported ?? 0}/${lote.length} importadas` +
 				(resposta.failed ? `, ${resposta.failed} com erro` : '')
 		);
+		if (alvo === '--remote') await espera(400);
 	}
 	return { importadas, erros, avisos, extras };
 }
@@ -471,6 +554,129 @@ function casarHistorico(linhas, base) {
 	return { itens, foraDaBase, avisos, stats };
 }
 
+/* ── planilha de AFASTAMENTOS ───────────────────────────────────────────── */
+
+async function lerAfastamentos(caminho) {
+	const wb = new ExcelJS.Workbook();
+	await wb.xlsx.readFile(caminho);
+	const ws = wb.worksheets[0];
+	const cab = ws
+		.getRow(1)
+		.values.slice(1)
+		.map((v) => chave(v));
+	const col = (n, obrigatoria = true) => {
+		const i = cab.findIndex((c) => c.startsWith(chave(n)));
+		if (i < 0 && obrigatoria) throw new Error(`coluna "${n}" não está na planilha de afastamentos`);
+		return i + 1;
+	};
+	const idx = {
+		nome: col('SERVIDOR'),
+		inicio: col('DATA INICIAL'),
+		dias: col('DIAS'),
+		fim: col('DATA FINAL'),
+		tipo: col('TIPO DE AFASTAMENTO'),
+		status: col('STATUS'),
+		nup: col('NUP')
+	};
+	const linhas = [];
+	ws.eachRow((r, i) => {
+		if (i === 1) return;
+		const nome = txt(r.getCell(idx.nome).value);
+		if (!nome) return;
+		linhas.push({
+			linha: i,
+			nome,
+			inicio: dataISO(r.getCell(idx.inicio).value),
+			dias: Number(txt(r.getCell(idx.dias).value)) || 0,
+			fim: dataISO(r.getCell(idx.fim).value),
+			tipo: txt(r.getCell(idx.tipo).value),
+			status: chave(r.getCell(idx.status).value),
+			// Uma célula traz DOIS NUPs (em linhas separadas): o campo fica com o
+			// primeiro, e o texto inteiro vai para a descrição.
+			nup: (txt(r.getCell(idx.nup).value).match(NUP_RE) ?? [''])[0],
+			nupTexto: txt(r.getCell(idx.nup).value).replace(/\s+/g, ' ').trim()
+		});
+	});
+	return linhas;
+}
+
+/** Casa pelo nome sanitizado e converte cada linha no evento correspondente. */
+function casarAfastamentos(linhas, base) {
+	const porNome = new Map();
+	for (const b of base) {
+		const k = nomeSanitizado(b.nome);
+		(porNome.get(k) ?? porNome.set(k, []).get(k)).push(b);
+	}
+	const porMatricula = new Map();
+	const foraDaBase = [];
+	const ambiguos = [];
+	const semData = [];
+	const stats = { afastamento: 0, movimentacao: 0, observacao: 0 };
+	const porSubtipo = {};
+	const naoAfastamento = new Map();
+	for (const l of linhas) {
+		const cand = porNome.get(nomeSanitizado(l.nome)) ?? [];
+		if (cand.length === 0) {
+			foraDaBase.push(l);
+			continue;
+		}
+		if (cand.length > 1) {
+			ambiguos.push(l);
+			continue;
+		}
+		if (!l.inicio) {
+			semData.push(l);
+			continue;
+		}
+		const c = classificarTipoAfastamento(l.tipo);
+		stats[c.destino]++;
+		if (c.destino === 'afastamento') porSubtipo[c.subtipo] = (porSubtipo[c.subtipo] ?? 0) + 1;
+		else naoAfastamento.set(chave(l.tipo), (naoAfastamento.get(chave(l.tipo)) ?? 0) + 1);
+		const descricao = [
+			l.tipo,
+			l.dias ? `${l.dias} dia(s)` : '',
+			l.status ? `(${l.status})` : '',
+			l.nupTexto && l.nupTexto !== l.nup ? `NUP: ${l.nupTexto}` : ''
+		]
+			.filter(Boolean)
+			.join(' · ')
+			.slice(0, 500);
+		const evento =
+			c.destino === 'afastamento'
+				? {
+						tipo: 'afastamento',
+						subtipo: c.subtipo,
+						data_inicio: l.inicio,
+						...(l.fim ? { data_fim: l.fim } : {}),
+						descricao,
+						...(l.nup ? { nup: l.nup } : {})
+					}
+				: {
+						tipo: c.destino,
+						data_evento: l.inicio,
+						descricao,
+						...(l.nup ? { nup: l.nup } : {})
+					};
+		const mat = cand[0].matricula;
+		const item = porMatricula.get(mat) ?? {
+			matricula: mat,
+			somente_afastamentos: true,
+			historico: []
+		};
+		item.historico.push(evento);
+		porMatricula.set(mat, item);
+	}
+	return {
+		itens: [...porMatricula.values()],
+		foraDaBase,
+		ambiguos,
+		semData,
+		stats,
+		porSubtipo,
+		naoAfastamento
+	};
+}
+
 /* ── main ───────────────────────────────────────────────────────────────── */
 
 async function main() {
@@ -480,6 +686,53 @@ async function main() {
 		return i >= 0 ? args[i + 1] : null;
 	};
 	const alvo = args.includes('--remote') ? '--remote' : args.includes('--local') ? '--local' : null;
+
+	const afastamentos = opc('--afastamentos');
+	if (afastamentos) {
+		if (!alvo)
+			throw new Error('--afastamentos exige --local ou --remote (o casamento é contra o banco)');
+		const base = consultar(alvo, 'SELECT matricula, nome FROM policiais WHERE ativo = 1');
+		const linhas = await lerAfastamentos(afastamentos);
+		const r = casarAfastamentos(linhas, base);
+		console.log(
+			`afastamentos: ${linhas.length} linhas → ${r.itens.length} servidores casados pelo nome sanitizado`
+		);
+		console.log(
+			`classificação: ${r.stats.afastamento} afastamentos · ${r.stats.movimentacao} movimentações · ${r.stats.observacao} anotações`
+		);
+		console.log('  por subtipo: ' + JSON.stringify(r.porSubtipo));
+		if (r.naoAfastamento.size) {
+			console.log(`  textos que NÃO são afastamento (${r.naoAfastamento.size} distintos):`);
+			for (const [t, n] of [...r.naoAfastamento].sort((a, b) => b[1] - a[1]).slice(0, 25))
+				console.log(`    - ${t} (${n})`);
+		}
+		const porStatus = {};
+		for (const l of r.foraDaBase)
+			porStatus[l.status || '?'] = (porStatus[l.status || '?'] ?? 0) + 1;
+		console.log(
+			`fora do banco (não entram): ${r.foraDaBase.length} — ${JSON.stringify(porStatus)}`
+		);
+		for (const l of r.foraDaBase.filter(
+			(f) => f.status !== 'EXONERADO' && f.status !== 'TRANSFERIDO'
+		))
+			console.log(`  - linha ${l.linha}: ${l.status} ${l.nome} (${l.tipo})`);
+		for (const l of r.ambiguos)
+			console.log(`  ! linha ${l.linha}: nome casa com MAIS DE UM servidor — ignorada: ${l.nome}`);
+		for (const l of r.semData)
+			console.log(`  ! linha ${l.linha}: sem data inicial — ignorada: ${l.nome} (${l.tipo})`);
+		if (args.includes('--enviar')) {
+			const env = await enviar(r.itens, alvo);
+			console.log(
+				`\nservidores processados: ${env.importadas}/${r.itens.length} · eventos gravados: ${env.extras.afastamentosGravados} · suprimidos do histórico (mesmo afastamento): ${env.extras.afastamentosSuprimidos}`
+			);
+			if (env.erros.length) {
+				console.log(`erros (${env.erros.length}):`);
+				for (const e of env.erros) console.log('  - ' + e);
+				process.exitCode = 1;
+			}
+		}
+		return;
+	}
 
 	const historico = opc('--historico');
 	if (historico) {
@@ -518,7 +771,8 @@ async function main() {
 	}
 
 	const planilha = opc('--planilha');
-	if (!planilha) throw new Error('informe --planilha <arquivo.xlsx> ou --historico <arquivo.xlsx>');
+	if (!planilha)
+		throw new Error('informe --planilha, --historico ou --afastamentos <arquivo.xlsx>');
 
 	const linhas = await lerPlanilha(planilha);
 	const unidades = alvo ? unidadesDoBanco(alvo) : null;

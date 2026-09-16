@@ -191,6 +191,17 @@ export async function decidirSolicitacaoCadastro(
 		return { ...sol, status: 'rejeitada' };
 	}
 
-	await atualizarPolicial(db, sol.policial_id, { [sol.campo]: sol.valor_novo }, env);
+	// `designacao_id` é o único campo que guarda uma REFERÊNCIA, não texto: vai
+	// para a coluna como número, e a aprovação marca `designacao_origem` como
+	// `'sistema'` — quem homologou foi o Admin Geral, e a próxima carga da
+	// planilha tem de respeitar isso como respeita a edição direta (0089/E50).
+	const mudanca =
+		sol.campo === 'designacao_id'
+			? {
+					designacao_id: sol.valor_novo ? Number(sol.valor_novo) : null,
+					designacao_origem: 'sistema' as const
+				}
+			: { [sol.campo]: sol.valor_novo };
+	await atualizarPolicial(db, sol.policial_id, mudanca, env);
 	return { ...sol, status: 'aprovada' };
 }

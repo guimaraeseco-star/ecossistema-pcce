@@ -7,6 +7,13 @@
  * próprio servidor NÃO pede alteração do próprio cadastro — em "Meu perfil" ele
  * só troca o e-mail pessoal, que tem fluxo próprio com código de verificação.
  *
+ * **`designacao_id` entra por decisão de 16/09/2026** (E50): a função exercida
+ * muda na ponta — quem sabe que o servidor passou a chefiar o cartório é a
+ * delegacia, não o departamento —, e o Admin Geral homologa. Ele é o único
+ * campo desta lista que guarda uma REFERÊNCIA (o id do catálogo `designacoes`)
+ * em vez de texto; por isso `textoDoValorSolicitado` existe, e por isso a
+ * aprovação passa por um caso próprio em `decidirSolicitacaoCadastro`.
+ *
  * Duas ausências desta lista são decisões, não esquecimento:
  *
  * - **`email_pessoal`** não é solicitável por ninguém além do titular. Ele é o
@@ -54,7 +61,16 @@ export const MAX_JUSTIFICATIVA = 300;
  * mas não é ofertado em pedido novo: `CAMPOS_SOLICITAVEIS` é a lista viva.
  */
 export type CampoSolicitacao =
-	'nome' | 'matricula' | 'cargo' | 'cpf' | 'telefone' | 'classe' | 'regime' | 'email' | 'lotacao';
+	| 'nome'
+	| 'matricula'
+	| 'cargo'
+	| 'cpf'
+	| 'telefone'
+	| 'classe'
+	| 'regime'
+	| 'email'
+	| 'designacao_id'
+	| 'lotacao';
 
 /** Rótulos de exibição — a mesma palavra na ficha, na fila e no histórico. */
 export const ROTULO_CAMPO: Record<CampoSolicitacao, string> = {
@@ -66,6 +82,7 @@ export const ROTULO_CAMPO: Record<CampoSolicitacao, string> = {
 	classe: 'Classe',
 	regime: 'Regime de trabalho',
 	email: 'E-mail funcional',
+	designacao_id: 'Designação',
 	lotacao: 'Lotação'
 };
 
@@ -82,10 +99,33 @@ export const CAMPOS_SOLICITAVEIS = [
 	'telefone',
 	'classe',
 	'regime',
-	'email'
+	'email',
+	'designacao_id'
 ] as const satisfies readonly CampoSolicitacao[];
 
 export type CampoSolicitavel = (typeof CAMPOS_SOLICITAVEIS)[number];
+
+/**
+ * O texto de um valor pedido/atual na tela — resolve o que é REFERÊNCIA em vez
+ * de texto. Hoje só `designacao_id`, que guarda o id do catálogo `designacoes`:
+ * sem isto, a fila do Admin Geral pediria para ele decidir entre "9" e "11".
+ *
+ * Mora aqui, e não em cada tela, porque são SEIS lugares de exibição — a tabela
+ * e o cartão de `/solicitacoes` e os da ficha do servidor, com valor anterior e
+ * valor novo em cada. Seis cópias é como uma delas passa a mostrar o id cru.
+ *
+ * Devolve `''` para valor ausente; quem exibe decide o travessão.
+ */
+export function textoDoValorSolicitado(
+	campo: CampoSolicitacao,
+	valor: string | null | undefined,
+	designacoes: readonly { id: number; nome: string }[] = []
+): string {
+	const bruto = (valor ?? '').trim();
+	if (!bruto) return '';
+	if (campo !== 'designacao_id') return bruto;
+	return designacoes.find((d) => String(d.id) === bruto)?.nome ?? bruto;
+}
 
 /**
  * O valor pedido serve para o campo? Devolve `null` quando serve, ou a mensagem
@@ -126,5 +166,13 @@ export function motivoParaRecusarValor(
 			return valor === 'plantao' || valor === 'expediente' ? null : 'Regime inválido.';
 		case 'email':
 			return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(valor) ? null : 'E-mail funcional inválido.';
+		case 'designacao_id':
+			// A forma se confere aqui; a EXISTÊNCIA no catálogo é pergunta de
+			// banco, e quem a faz é `designacaoAtiva` no servidor — uma lista
+			// paralela aqui envelheceria no dia em que a corporação criasse uma
+			// função nova.
+			return /^\d{1,9}$/.test(valor) && Number(valor) > 0
+				? null
+				: 'Designação inválida — escolha uma da lista.';
 	}
 }

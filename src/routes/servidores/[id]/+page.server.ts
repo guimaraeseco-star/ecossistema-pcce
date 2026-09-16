@@ -85,6 +85,8 @@ import {
 	atualizarPolicial,
 	listarLotacoes,
 	listarUnidades,
+	listarDesignacoes,
+	designacaoAtiva,
 	vincularAdminGeral,
 	desvincularAdminGeral,
 	buscarModulosAdminVinculado,
@@ -255,6 +257,7 @@ export const load: PageServerLoad = async ({ locals, params, platform, depends }
 	const [
 		lotacoes,
 		todasUnidades,
+		designacoes,
 		modulosAdmin,
 		historico,
 		credenciaisPasskey,
@@ -268,6 +271,7 @@ export const load: PageServerLoad = async ({ locals, params, platform, depends }
 		// impossível pedir a saída de alguém da unidade.
 		listarLotacoes(db),
 		listarUnidades(db),
+		listarDesignacoes(db),
 		buscarModulosAdminVinculado(db, id),
 		listarHistoricoPolicial(db, id),
 		// A credencial pertence à PESSOA: quem tem conta admin vinculada tem duas
@@ -298,6 +302,7 @@ export const load: PageServerLoad = async ({ locals, params, platform, depends }
 		},
 		lotacoes,
 		unidades: todasUnidades,
+		designacoes,
 		modo,
 		isAdmin: isAdm,
 		ehAdminGeral,
@@ -349,8 +354,14 @@ function semCamposSensiveis(o: Record<string, unknown>): Record<string, unknown>
 	return copia;
 }
 
-/** Campos que mudam com frequência técnica e não interessam ao histórico funcional. */
-const CAMPOS_IGNORAR_DIFF = new Set(['updated_at', 'created_at', 'id']);
+/**
+ * Campos que mudam com frequência técnica e não interessam ao histórico
+ * funcional. `designacao_origem` entra aqui porque é MARCA de procedência, não
+ * fato da vida funcional: quem lê a linha do tempo quer "designação: Operacional
+ * → Chefe de seção de cartório", não "origem: planilha → sistema". A mudança
+ * continua no log de auditoria, que guarda o snapshot inteiro.
+ */
+const CAMPOS_IGNORAR_DIFF = new Set(['updated_at', 'created_at', 'id', 'designacao_origem']);
 
 /**
  * Compara dois snapshots e devolve apenas os campos cujo valor mudou, em dois
@@ -426,6 +437,24 @@ export const actions: Actions = {
 			return fail(400, { error: parsed.error.issues[0].message, fields: data });
 		}
 
+		// Designação: campo próprio, fora do schema cadastral, porque o domínio
+		// dele é uma TABELA — o valor válido é a linha do catálogo, e quem
+		// responde isso é o banco. Vazio = "sem designação" (limpa a coluna).
+		//
+		// `seguir a planilha` é a VOLTA: sem ela, o primeiro salvamento tirava o
+		// servidor da folha para sempre naquele campo, e a única saída seria SQL.
+		const seguirPlanilha = ['1', 'true', 'on'].includes(
+			String(formData.get('designacao_seguir_planilha') ?? '').toLowerCase()
+		);
+		const designacaoBruta = formData.get('designacao_id')?.toString() ?? '';
+		const designacaoId = designacaoBruta === '' ? null : Number(designacaoBruta);
+		if (designacaoId !== null && (!Number.isInteger(designacaoId) || designacaoId <= 0)) {
+			return fail(400, { error: 'Designação inválida.', fields: data });
+		}
+		if (designacaoId !== null && !(await designacaoAtiva(db, designacaoId))) {
+			return fail(400, { error: 'Designação inexistente ou desativada.', fields: data });
+		}
+
 		// Bloqueia transferência para fora do escopo do administrador. Para o Admin
 		// Geral (`escopo === null`) não recusa nada; a checagem fica porque o modo
 		// é decidido no portão e não no tipo de sessão — quem vier a ganhar modo
@@ -438,7 +467,36 @@ export const actions: Actions = {
 		}
 
 		try {
-			const mudanca = { ...parsed.data, email: data.email ?? undefined };
+			// O campo da tela entrega o telefone SÓ COM DÍGITOS (`limparTelefone` no
+			// `oninput`), e o cadastro guarda a forma que a origem gravou — a carga
+			// de pessoal traz "88 99661-9881". Sem esta comparação por dígitos, todo
+			// salvamento reescrevia o número só para tirar a máscara e registrava
+			// "Telefone: 88 99661-9881 → 88996619881" na linha do tempo, uma edição
+			// que ninguém fez. Mesmos dígitos = mantém o que está gravado.
+			// (`solicitarAlteracao` já comparava assim, por `normalizarCampo`.)
+			const telefoneGravado = alvo.telefone ?? '';
+			const mesmoTelefone =
+				limparTelefone(parsed.data.telefone) === limparTelefone(telefoneGravado);
+
+			// `designacao_origem: 'sistema'` só entra quando a designação MUDA: é a
+			// marca de "a tela decidiu isto", e é ela que faz a próxima carga da
+			// planilha preservar o valor em vez de regravá-lo (0089). Gravá-la em
+			// todo salvamento congelaria a folha para quem só corrigiu o telefone.
+			// Marcar "seguir a planilha" devolve a caneta à folha e vence a troca:
+			// o valor escolhido fica até a próxima carga, que então o regrava.
+			const trocouDesignacao = (alvo.designacao_id ?? null) !== designacaoId;
+			const origemDaDesignacao = seguirPlanilha
+				? ('planilha' as const)
+				: trocouDesignacao
+					? ('sistema' as const)
+					: undefined;
+			const mudanca = {
+				...parsed.data,
+				...(mesmoTelefone ? { telefone: telefoneGravado } : {}),
+				email: data.email ?? undefined,
+				designacao_id: designacaoId,
+				...(origemDaDesignacao ? { designacao_origem: origemDaDesignacao } : {})
+			};
 			const antes = semCamposSensiveis(alvo);
 			const depois = semCamposSensiveis(mudanca);
 
@@ -531,7 +589,17 @@ export const actions: Actions = {
 			const recusa = motivoParaRecusarValor(campo, enviado, cargoAlvo);
 			if (recusa) return fail(400, { error: recusa });
 
-			const atual = (alvo as unknown as Record<string, string | null>)[campo] ?? null;
+			// `designacao_id` é referência a uma TABELA: a forma o schema confere,
+			// a existência só o banco responde. Sem isto, um POST direto enfileiraria
+			// um pedido que só falharia na hora em que o Admin Geral aprovasse.
+			if (campo === 'designacao_id' && !(await designacaoAtiva(db, Number(enviado)))) {
+				return fail(400, { error: 'Designação inexistente ou desativada.' });
+			}
+
+			// Nem toda coluna do cadastro é texto (`designacao_id` é número), e a
+			// comparação e a fila trabalham com a forma de texto.
+			const bruto = (alvo as unknown as Record<string, unknown>)[campo];
+			const atual = bruto == null || bruto === '' ? null : String(bruto);
 			if (normalizarCampo(campo, enviado) === normalizarCampo(campo, atual)) continue;
 
 			mudancas.push({ campo, valorAtual: campo === 'cpf' ? null : atual, valorNovo: enviado });
