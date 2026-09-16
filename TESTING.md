@@ -427,6 +427,24 @@ HISTORICO.xlsx --enviar --local`): 698/914 linhas casam com a base (os
       o texto, "APTO/VERIFICAR/EXONERAÇÃO" viram anotação; reexecutar em
       qualquer ordem (folha → histórico → afastamentos ou o inverso) não
       duplica nem ressuscita o suprimido
+- [ ] Direção da unidade (E54, migração 0090) — Admin Geral: a ficha de
+      `/unidade/[id]` tem o cartão "Direção" acima do efetivo. Unidade com
+      titular mostra selo azul, nome com link para a ficha, matrícula, desde
+      quando e a designação; unidade sem titular explica que o vazio pode ser o
+      estado correto. "Registrar direção" grava e vale na hora
+- [ ] Respondente: escolher o papel "Respondente" e um delegado de OUTRA
+      unidade → selo dourado e a LOTAÇÃO DE ORIGEM ao lado do nome (não
+      aparece no titular, onde ela é a própria unidade); o NUP sai formatado
+- [ ] Troca de direção: registrar outro delegado encerra o anterior na VÉSPERA
+      do novo início e ele passa para "Quem dirigiu antes"; registrar o mesmo
+      no mesmo papel é recusado, e início anterior ao do vigente também
+- [ ] Só DPC dirige: a busca do formulário só oferece delegados, e um POST
+      direto com OIP é recusado com "Só delegado (DPC) dirige unidade"
+- [ ] Proposta pela seccional: entrando como admin de seccional, o botão diz
+      "Propor direção" e a justificativa é obrigatória; o pedido cai em
+      /solicitacoes para o Admin Geral decidir, e aprovar grava a direção sem
+      tocar no cadastro nem na linha do tempo do servidor
+- [ ] Admin de unidade: vê o cartão e NÃO vê botão; POST direto é recusado
 - [ ] Designação em Servidores (E50, migração 0089): a lista tem a coluna
       "Designação" (com o símbolo DAS/DNS embaixo) e o filtro "Todas as
       designações" — escolher "Chefe de seção de expedientes e cartório" traz
