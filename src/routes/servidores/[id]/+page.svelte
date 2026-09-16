@@ -66,6 +66,10 @@
 	let regime = $state('');
 	let lotacao = $state('');
 	let email = $state('');
+	/** Id do catálogo como TEXTO — é o que o `<select>` e o `FormData` trafegam. */
+	let designacaoId = $state('');
+	/** Devolver a caneta à folha de pessoal (só aparece quando a tela a tomou). */
+	let seguirPlanilha = $state(false);
 	let papel = $state<string | null>(null);
 	let papelUnidadeId = $state<number | null>(null);
 	let justificativa = $state('');
@@ -83,10 +87,23 @@
 			regime = data.policial.regime || 'plantao';
 			lotacao = data.policial.lotacao;
 			email = data.policial.email || '';
+			designacaoId = data.policial.designacao_id ? String(data.policial.designacao_id) : '';
+			seguirPlanilha = false;
 			papel = data.policial.papel;
 			papelUnidadeId = data.policial.papel_unidade_id;
 		}
 	});
+
+	/**
+	 * Avisa que esta designação foi decidida AQUI e que a carga da planilha não
+	 * a desfaz (0089) — sem isso, o Admin Geral não teria como saber se o valor
+	 * que ele vê sobrevive à próxima folha.
+	 */
+	const designacaoDaTela = $derived(
+		data.policial.designacao_origem === 'sistema'
+			? 'definida nesta tela; a planilha não sobrescreve'
+			: ''
+	);
 
 	/**
 	 * Há o que pedir? Compara o formulário com o cadastro, com a MESMA
@@ -102,7 +119,8 @@
 			telefone !== limparTelefone(data.policial.telefone || '') ||
 			classe !== (((data.policial as Record<string, unknown>).classe as string) || '') ||
 			regime !== (data.policial.regime || 'plantao') ||
-			email.trim() !== (data.policial.email || '')
+			email.trim() !== (data.policial.email || '') ||
+			designacaoId !== (data.policial.designacao_id ? String(data.policial.designacao_id) : '')
 	);
 
 	const podeSolicitar = $derived(houveMudanca && justificativa.trim().length > 0);
@@ -335,7 +353,43 @@
 					<option value="expediente">Expediente</option>
 				</select>
 			</label>
+			<!-- Designação = a FUNÇÃO exercida (catálogo `designacoes`). O Admin
+			     Geral troca direto; o administrador de seccional/unidade PROPÕE, e
+			     o Admin Geral homologa (E50) — quem sabe que o servidor passou a
+			     chefiar o cartório é a delegacia, não o departamento. -->
 			<label class="label sm:col-span-7">
+				<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1">
+					Designação
+					{#if designacaoDaTela}
+						<span class="normal-case font-normal opacity-70">— {designacaoDaTela}</span>
+					{/if}
+				</span>
+				<select class="select py-1 px-3 text-sm" name="designacao_id" bind:value={designacaoId}>
+					<!-- No modo solicitação "sem designação" não é pedido: campo vazio
+					     quer dizer "não quero mudar isto", a mesma convenção dos demais. -->
+					<option value="" disabled={solicitando}>— Sem designação —</option>
+					{#each data.designacoes as d (d.id)}
+						<option value={String(d.id)}>{d.nome}{d.simbolo ? ` (${d.simbolo})` : ''}</option>
+					{/each}
+				</select>
+			</label>
+			<!-- A VOLTA. Sem ela, o primeiro salvamento tirava o servidor da folha
+			     para sempre neste campo, e só o banco o devolveria. -->
+			{#if isAdmin && data.policial.designacao_origem === 'sistema'}
+				<label class="label sm:col-span-12 flex-row items-center gap-2">
+					<input
+						class="checkbox"
+						type="checkbox"
+						name="designacao_seguir_planilha"
+						value="1"
+						bind:checked={seguirPlanilha}
+					/>
+					<span class="text-2xs opacity-80">
+						Voltar a seguir a planilha de pessoal nesta designação
+					</span>
+				</label>
+			{/if}
+			<label class="label sm:col-span-12">
 				<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1">
 					Lotação
 					{#if solicitando}
@@ -521,10 +575,15 @@
 	modo={data.modo}
 />
 
-<SolicitacoesServidor campos={data.solicitacoesCampo} acoes={data.solicitacoesAcao} />
+<SolicitacoesServidor
+	designacoes={data.designacoes}
+	campos={data.solicitacoesCampo}
+	acoes={data.solicitacoesAcao}
+/>
 
 <HistoricoServidor
 	historico={data.historico}
 	afastamentoVigenteId={data.afastamentoVigenteId}
 	unidades={data.unidades}
+	designacoes={data.designacoes}
 />

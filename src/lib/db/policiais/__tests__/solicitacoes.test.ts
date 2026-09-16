@@ -191,3 +191,47 @@ describe('pedido do administrador com escopo', () => {
 		expect(row.cpf_index).not.toBe('idx-antigo');
 	});
 });
+
+/**
+ * `designacao_id` é o único campo solicitável que guarda uma REFERÊNCIA (o id
+ * do catálogo `designacoes`), e não o texto que se lê. Duas coisas têm de valer
+ * na aprovação: o valor entra como NÚMERO na coluna, e a linha passa a contar
+ * como decidida pelo sistema — senão a próxima carga da planilha desfaria em
+ * silêncio o que o Admin Geral acabou de homologar (0089/E50).
+ */
+describe('decidirSolicitacaoCadastro — designação (E50)', () => {
+	/** Ids semeados pela 0088: 9 = Chefe de seção de expedientes e cartório. */
+	const CHEFE_CARTORIO = 9;
+
+	beforeEach(async () => {
+		await criarSolicitacoesCadastro(
+			db,
+			POL,
+			[{ campo: 'designacao_id', valorAtual: null, valorNovo: String(CHEFE_CARTORIO) }],
+			'Assumiu o cartório da unidade em 01/09.',
+			{ id: ADMIN_UNIDADE, nome: 'Admin da Unidade' }
+		);
+	});
+
+	const pedido = () =>
+		sqlite.prepare("SELECT id FROM cadastro_solicitacoes WHERE campo = 'designacao_id'").get() as {
+			id: number;
+		};
+
+	const alvo = () =>
+		sqlite
+			.prepare('SELECT designacao_id, designacao_origem FROM policiais WHERE id = ?')
+			.get(POL) as { designacao_id: number | null; designacao_origem: string };
+
+	it('aprovar grava o id como número e marca a origem como sistema', async () => {
+		const r = await decidirSolicitacaoCadastro(db, pedido().id, true, 99);
+		expect(r?.status).toBe('aprovada');
+		expect(alvo()).toEqual({ designacao_id: CHEFE_CARTORIO, designacao_origem: 'sistema' });
+	});
+
+	it('rejeitar não toca no cadastro', async () => {
+		const r = await decidirSolicitacaoCadastro(db, pedido().id, false, 99);
+		expect(r?.status).toBe('rejeitada');
+		expect(alvo()).toEqual({ designacao_id: null, designacao_origem: 'planilha' });
+	});
+});

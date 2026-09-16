@@ -53,6 +53,7 @@
 	import LoadingOverlay from '$lib/components/LoadingOverlay.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import { useScrollLock, useInvalidateOnFocus, registrarNavegacao } from '$lib/composables';
+	import { larguraDaPagina } from './_components/largura-pagina';
 	import { fetchSyncEstado } from '$lib/sync-estado';
 	import BarraTopo from './_components/BarraTopo.svelte';
 	import SidebarNavegacao from './_components/SidebarNavegacao.svelte';
@@ -315,7 +316,9 @@
 		aria-hidden={nav.ehModal}
 	>
 		<div
-			class="max-w-6xl mx-auto min-w-0 px-4 sm:px-6 lg:px-8 pt-20 pb-12 print:max-w-none print:px-0 print:pt-0 print:pb-0 transition-opacity duration-200 {navigating?.to &&
+			class="{larguraDaPagina(
+				page.url.pathname
+			)} mx-auto min-w-0 px-4 sm:px-6 lg:px-8 pt-20 pb-12 print:max-w-none print:px-0 print:pt-0 print:pb-0 transition-opacity duration-200 {navigating?.to &&
 			navigating.to.url.pathname !== page.url.pathname
 				? 'opacity-40 pointer-events-none'
 				: ''}"

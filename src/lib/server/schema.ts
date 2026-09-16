@@ -72,6 +72,15 @@ export const policiais = sqliteTable(
 		data_posse: text('data_posse'),
 		/** A função exercida (catálogo `designacoes`). */
 		designacao_id: integer('designacao_id'),
+		/**
+		 * Quem definiu a designação (0089). `'planilha'` é o que a carga de
+		 * pessoal grava e regrava; `'sistema'` é a escolha feita na ficha do
+		 * servidor, e essa a carga NÃO sobrescreve — só relata a divergência.
+		 * Mesma régua de `unidade_responsaveis.origem`.
+		 */
+		designacao_origem: text('designacao_origem', { enum: ['planilha', 'sistema'] })
+			.notNull()
+			.default('planilha'),
 		// Achado LGPD: `cpf` guarda o CPF cifrado (AES-GCM, `enc:v1:...`); este é
 		// o índice cego HMAC para lookup (login por certificado) sem decifrar.
 		cpf_index: text('cpf_index'),
@@ -1583,6 +1592,11 @@ export const cadastroSolicitacoes = sqliteTable(
 				'classe',
 				'regime',
 				'email',
+				// A função exercida (E50). É o ÚNICO campo desta lista que guarda uma
+				// referência — o id de `designacoes` —, e não o texto que se lê: a
+				// tela resolve o nome por `textoDoValorSolicitado` e a aprovação tem
+				// caso próprio em `decidirSolicitacaoCadastro`.
+				'designacao_id',
 				'lotacao'
 			]
 		}).notNull(),

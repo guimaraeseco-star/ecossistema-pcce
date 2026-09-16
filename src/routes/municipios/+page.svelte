@@ -21,13 +21,17 @@
 	import { toaster } from '$lib/toast';
 	import { CLASSE_INPUT_FILTRO } from '$lib/gise/filtro-historico-ui';
 	import { rotuloTipoPlantao } from '$lib/unidades/plantao';
+	import { nomeCurtoDeUnidade } from '$lib/unidades/nome';
+	import CartaoMunicipio from './_components/CartaoMunicipio.svelte';
 
 	const { data }: PageProps = $props();
 
 	let busca = $state('');
 	let alturaCabecalho = $state(0);
 	const topoColunas = $derived(`calc(3.5rem + ${alturaCabecalho}px)`);
-	const TH_FIXO = 'sticky z-10 bg-white dark:bg-surface-900';
+	// `sm:sticky`: ver a nota em `/unidade` — no celular o cabeçalho fixo
+	// empurrava a linha de colunas para o meio da tabela.
+	const TH_FIXO = 'sm:sticky z-10 bg-white dark:bg-surface-900';
 
 	type Municipio = (typeof data.municipios)[number];
 
@@ -41,12 +45,18 @@
 		);
 	});
 
-	/** "Físico · DP de Icó" — ou só o tipo quando o plantonista é a própria unidade. */
+	/**
+	 * "Físico · DP de Icó" — ou só o tipo quando o plantonista é a própria
+	 * unidade. Nome CURTO: em coluna secundária o nome oficial quebra em duas
+	 * linhas sem distinguir nada (o nome completo fica no `title`).
+	 */
 	const plantao = (m: Municipio, p: Municipio['semana']) => {
 		if (!p) return '—';
 		const propria = m.unidades.some((u) => u.id === p.plantonistaId);
-		return `${rotuloTipoPlantao(p.tipo)}${p.plantonista && !propria ? ` · ${p.plantonista}` : ''}`;
+		return `${rotuloTipoPlantao(p.tipo)}${p.plantonista && !propria ? ` · ${nomeCurtoDeUnidade(p.plantonista)}` : ''}`;
 	};
+	const plantaoCompleto = (m: Municipio, p: Municipio['semana']) =>
+		p ? `${rotuloTipoPlantao(p.tipo)}${p.plantonista ? ` · ${p.plantonista}` : ''}` : '';
 
 	const populacaoTotal = $derived(data.municipios.reduce((n, m) => n + (m.populacao ?? 0), 0));
 	const efetivoTotal = $derived(data.departamento.efetivo);
@@ -67,7 +77,7 @@
 
 <div
 	bind:clientHeight={alturaCabecalho}
-	class="sticky top-14 z-20 -mx-2 mb-4 flex flex-col gap-3 border-b border-surface-200 bg-page-canvas px-2 pt-2 pb-3 sm:-mx-4 sm:flex-row sm:items-end sm:justify-between sm:px-4 dark:border-white/10 dark:bg-surface-950"
+	class="sm:sticky sm:top-14 z-20 -mx-2 mb-4 flex flex-col gap-3 border-b border-surface-200 bg-page-canvas px-2 pt-2 pb-3 sm:-mx-4 sm:flex-row sm:items-end sm:justify-between sm:px-4 dark:border-white/10 dark:bg-surface-950"
 >
 	<div>
 		<p
@@ -142,7 +152,7 @@
 
 <!-- Sem overflow-hidden no card e sem rolagem no wrap: sticky só funciona
      contra a rolagem da PÁGINA (mesma escolha da Gestão de unidade). -->
-<div class="card-elevated rounded-2xl p-4 shadow-sm sm:p-6">
+<div class="card-elevated hidden rounded-2xl p-4 shadow-sm sm:p-6 md:block">
 	<div class="table-wrap lg:overflow-visible">
 		<table class="table">
 			<thead>
@@ -172,15 +182,17 @@
 						<td class="text-sm">
 							{#each m.unidades as un, i (un.id)}
 								{#if i > 0}<br />{/if}
-								<a href="/unidade/{un.id}" class="no-underline hover:underline">{un.nome}</a>
+								<a href="/unidade/{un.id}" class="no-underline hover:underline" title={un.nome}
+									>{nomeCurtoDeUnidade(un.nome)}</a
+								>
 							{:else}
 								<span class="text-surface-400">—</span>
 							{/each}
 						</td>
 						<td class="text-sm whitespace-nowrap">{m.ais || '—'}</td>
 						<td class="text-sm">{m.macrorregiao || '—'}</td>
-						<td class="text-sm">{plantao(m, m.semana)}</td>
-						<td class="text-sm">{plantao(m, m.fds)}</td>
+						<td class="text-sm" title={plantaoCompleto(m, m.semana)}>{plantao(m, m.semana)}</td>
+						<td class="text-sm" title={plantaoCompleto(m, m.fds)}>{plantao(m, m.fds)}</td>
 						<td class="text-right text-sm tabular-nums">
 							{m.populacao != null ? fmt.format(m.populacao) : '—'}
 						</td>
@@ -206,4 +218,13 @@
 				: 's'}
 		</p>
 	{/if}
+</div>
+
+<!-- Celular: cartões em vez das nove colunas (mesmo padrão de /servidores). -->
+<div class="space-y-3 md:hidden">
+	{#each filtrados as m (m.ibge)}
+		<CartaoMunicipio municipio={m} habPorPolicial={m.habPorPolicial} efetivo={m.efetivo} />
+	{:else}
+		<p class="py-6 text-center text-sm text-surface-500">Nenhum município corresponde à busca.</p>
+	{/each}
 </div>

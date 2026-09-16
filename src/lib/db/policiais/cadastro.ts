@@ -18,12 +18,25 @@
  * gravar horário de Brasília, igual ao resto do schema.
  */
 import { eq, and, or, isNull, inArray, asc, sql } from 'drizzle-orm';
-import { policiais, unidades } from '../../server/schema';
+import { designacoes, policiais, unidades } from '../../server/schema';
 import type * as schema from '../../server/schema';
 import { limparMatricula } from '../../utils/formato';
 import { gerarSenhaAleatoriaHash } from '../../auth';
 import { prepararCpfParaDB, type CpfCriptoEnv } from '../../crypto/cpf-cripto';
 import { paginarComContagem, likeContains, type Database } from '../core';
+
+/**
+ * Uma linha da listagem: o cadastro sem a senha, MAIS o nome e o símbolo da
+ * designação já resolvidos pelo join.
+ *
+ * O nome vem junto porque `designacao_id` sozinho não serve para nada na tela —
+ * e deixar cada chamador buscar o catálogo por fora produziria uma consulta por
+ * página, ou pior, uma por linha.
+ */
+export type PolicialListado = Omit<schema.Policial, 'senha'> & {
+	designacao: string | null;
+	designacao_simbolo: string | null;
+};
 
 /**
  * Listagem paginada do cadastro, para a tela de policiais e para o autocomplete.
@@ -63,11 +76,13 @@ export async function listarPoliciais(
 		/** Situação de HOJE (`hojeISO` obrigatório junto): quem está ativo, de férias ou afastado. */
 		situacao?: 'ativos' | 'ferias' | 'afastados';
 		hojeISO?: string;
+		/** Função exercida (id do catálogo `designacoes`). */
+		designacaoId?: number;
 		page?: number;
 		limit?: number;
 	}
 ): Promise<{
-	policiais: Omit<schema.Policial, 'senha'>[];
+	policiais: PolicialListado[];
 	total: number;
 	page: number;
 	limit: number;
@@ -111,6 +126,12 @@ export async function listarPoliciais(
 	// Filtro por cargo
 	if (opts?.cargo) {
 		baseConditions.push(eq(policiais.cargo, opts.cargo as 'DPC' | 'OIP'));
+	}
+
+	// Filtro por designação (a função exercida): "quem são os 130 de plantão",
+	// "quantos chefes de cartório tem a 3ª Seccional".
+	if (opts?.designacaoId) {
+		baseConditions.push(eq(policiais.designacao_id, opts.designacaoId));
 	}
 
 	// Somente policiais com papel administrativo (admin_seccional ou admin_unidade)
@@ -162,11 +183,17 @@ export async function listarPoliciais(
 			data_nascimento: policiais.data_nascimento,
 			data_posse: policiais.data_posse,
 			designacao_id: policiais.designacao_id,
+			designacao_origem: policiais.designacao_origem,
+			designacao: designacoes.nome,
+			designacao_simbolo: designacoes.simbolo,
 			created_at: policiais.created_at,
 			updated_at: policiais.updated_at,
 			total: sql<number>`count(*) OVER()`
 		})
 		.from(policiais)
+		// LEFT: servidor sem designação (célula vazia na planilha) continua na
+		// lista — um INNER JOIN o esconderia sem que ninguém percebesse.
+		.leftJoin(designacoes, eq(designacoes.id, policiais.designacao_id))
 		.where(and(...baseConditions))
 		.orderBy(asc(policiais.cargo), asc(policiais.nome))
 		.limit(limit)
@@ -326,6 +353,12 @@ export async function criarPolicial(db: Database, data: DadosPolicial, env?: Cpf
  * Já `email_pessoal_verificado` é zerado quando um e-mail pessoal novo chega:
  * endereço trocado volta a exigir confirmação por código.
  *
+ * - **não desfaz a designação escolhida na TELA** (0089): quando
+ *   `designacao_origem = 'sistema'`, o `CASE` no `SET` mantém o valor gravado e
+ *   a carga só relata a divergência. É a mesma régua de
+ *   `unidade_responsaveis.origem`, e pelo mesmo motivo: a correção que o Admin
+ *   Geral fez à mão não pode ser desfeita em silêncio pela próxima folha.
+ *
  * `papel`/`papel_unidade_id` são gravados COMO RECEBIDOS. Preservá-los é
  * responsabilidade do chamador — o webhook lê o valor atual com
  * `buscarPolicialPorMatricula` antes de chamar (M-4), senão um SYNC_TOKEN
@@ -341,6 +374,13 @@ export async function upsertPolicial(db: Database, data: DadosPolicial, env?: Cp
 			target: policiais.matricula,
 			set: {
 				...daFolha,
+				// Nome de coluna sem qualificação dentro do DO UPDATE SET = o valor
+				// JÁ GRAVADO na linha, como nos `sql\`email\`` abaixo.
+				...(data.designacao_id !== undefined
+					? {
+							designacao_id: sql`CASE WHEN designacao_origem = 'sistema' THEN designacao_id ELSE ${data.designacao_id} END`
+						}
+					: {}),
 				email: data.email ? data.email : sql`email`,
 				email_pessoal: data.email_pessoal ? data.email_pessoal : sql`email_pessoal`,
 				email_pessoal_verificado: data.email_pessoal ? 0 : sql`email_pessoal_verificado`,
@@ -389,6 +429,10 @@ export type CamposDoPolicial = Partial<{
 	email: string | null;
 	email_pessoal: string | null;
 	email_pessoal_verificado: number;
+	/** A função exercida; `null` limpa. Ver `designacao_origem`. */
+	designacao_id: number | null;
+	/** Quem passou a mandar nela — a tela grava `'sistema'` (0089). */
+	designacao_origem: 'planilha' | 'sistema';
 }>;
 
 /**
@@ -426,6 +470,10 @@ export async function camposDeAtualizacao(
 	if (data.email_pessoal !== undefined) updateData.email_pessoal = data.email_pessoal;
 	if (data.email_pessoal_verificado !== undefined) {
 		updateData.email_pessoal_verificado = data.email_pessoal_verificado;
+	}
+	if (data.designacao_id !== undefined) updateData.designacao_id = data.designacao_id;
+	if (data.designacao_origem !== undefined) {
+		updateData.designacao_origem = data.designacao_origem;
 	}
 
 	updateData.updated_at = sql`datetime('now', '-3 hours')`;

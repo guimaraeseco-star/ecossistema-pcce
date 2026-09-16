@@ -120,11 +120,14 @@ export {
 	atualizarPolicialComHistorico,
 	listarHistoricoPolicial,
 	buscarEventoHistorico,
-	afastamentoVigente
+	afastamentoVigente,
+	listarDesignacoes,
+	designacaoAtiva
 } from './db/policiais';
 export type {
 	CampoSolicitacao,
 	CamposDoEventoFuncional,
+	DesignacaoDaTela,
 	MudancaSolicitada,
 	NovaAcaoSolicitada,
 	NovoEventoHistorico

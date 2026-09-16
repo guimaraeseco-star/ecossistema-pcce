@@ -22,6 +22,7 @@
 	import { CLASSE_INPUT_FILTRO } from '$lib/gise/filtro-historico-ui';
 	import { COR_SITUACAO } from '$lib/servidores/afastamentos';
 	import ModalEfetivo, { type PedidoEfetivo } from './_components/ModalEfetivo.svelte';
+	import CartaoUnidade from './_components/CartaoUnidade.svelte';
 
 	const { data }: PageProps = $props();
 
@@ -38,8 +39,13 @@
 	let alturaLinha1 = $state(0);
 	const topoLinha1 = $derived(`calc(3.5rem + ${alturaCabecalho}px)`);
 	const topoLinha2 = $derived(`calc(3.5rem + ${alturaCabecalho + alturaLinha1}px)`);
-	/** Fundo opaco dos th fixos: o mesmo do card, senão as linhas passam por trás. */
-	const TH_FIXO = 'sticky z-10 bg-white dark:bg-surface-900';
+	/**
+	 * Fundo opaco dos th fixos: o mesmo do card, senão as linhas passam por trás.
+	 * `sm:sticky` — no celular o cabeçalho da página ocupa meia tela, e o
+	 * deslocamento calculado a partir dele jogava a linha de colunas para o MEIO
+	 * da tabela (visto em 16/09/2026). Abaixo de `sm` nada gruda.
+	 */
+	const TH_FIXO = 'sm:sticky z-10 bg-white dark:bg-surface-900';
 
 	const casa = (u: LinhaUnidade, termo: string) =>
 		!termo || [u.nome, u.sigla, u.tipoRotulo].some((s) => s.toLowerCase().includes(termo));
@@ -110,7 +116,7 @@
 -->
 <div
 	bind:clientHeight={alturaCabecalho}
-	class="sticky top-14 z-20 -mx-2 mb-4 flex flex-col gap-3 border-b border-surface-200 bg-page-canvas px-2 pt-2 pb-3 sm:-mx-4 sm:flex-row sm:items-end sm:justify-between sm:px-4 dark:border-white/10 dark:bg-surface-950"
+	class="sm:sticky sm:top-14 z-20 -mx-2 mb-4 flex flex-col gap-3 border-b border-surface-200 bg-page-canvas px-2 pt-2 pb-3 sm:-mx-4 sm:flex-row sm:items-end sm:justify-between sm:px-4 dark:border-white/10 dark:bg-surface-950"
 >
 	<div>
 		<p
@@ -252,7 +258,7 @@
 <!-- O card não pode cortar (overflow-hidden) nem rolar (table-wrap): sticky só
      funciona contra a rolagem da PÁGINA. Em tela estreita volta o scroll
      horizontal, e aí o cabeçalho de colunas deixa de fixar — escolha consciente. -->
-<div class="card-elevated rounded-2xl p-4 shadow-sm sm:p-6">
+<div class="card-elevated hidden rounded-2xl p-4 shadow-sm sm:p-6 md:block">
 	<div class="table-wrap lg:overflow-visible">
 		<table class="table">
 			<thead>
@@ -395,6 +401,39 @@
 	<p class="mt-4 text-2xs text-surface-500">
 		{totalLinhas} unidades no escopo. Veículos e armas chegam com o módulo de Patrimônio.
 	</p>
+</div>
+
+<!-- Celular: cartões em vez das doze colunas (mesmo padrão de /servidores).
+     Os números continuam clicáveis e abrem o mesmo painel. -->
+<div class="space-y-3 md:hidden">
+	<CartaoUnidade unidade={data.raiz} destaque aoAbrirPainel={abrirPainel} />
+	{#each blocosFiltrados as bloco (bloco.unidade.id)}
+		<CartaoUnidade unidade={bloco.unidade} aoAbrirPainel={abrirPainel} />
+		{#each bloco.filhas as filha (filha.id)}
+			<CartaoUnidade unidade={filha} recuo aoAbrirPainel={abrirPainel} />
+		{/each}
+		{#if bloco.filhas.length}
+			<CartaoUnidade
+				unidade={bloco.unidade}
+				subarvore
+				recuo
+				rotulo="Total de {bloco.unidade.sigla || bloco.unidade.nome} com vinculadas"
+				aoAbrirPainel={abrirPainel}
+			/>
+		{/if}
+	{/each}
+	{#if !busca.trim()}
+		<CartaoUnidade
+			unidade={data.raiz}
+			subarvore
+			destaque
+			rotulo="Total de {data.raiz.sigla || data.raiz.nome} com vinculadas"
+			aoAbrirPainel={abrirPainel}
+		/>
+	{/if}
+	{#if busca && blocosFiltrados.length === 0}
+		<p class="py-6 text-center text-sm text-surface-500">Nenhuma unidade encontrada.</p>
+	{/if}
 </div>
 
 <ModalEfetivo bind:open={painelAberto} {pedido} />

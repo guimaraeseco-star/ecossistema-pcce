@@ -401,13 +401,65 @@ Servidores.xlsx --enviar --local`): 697/697 importados; relatório lista
       coluna Situação (Ativo; Férias até dd/mm em dourado; tipo de afastamento
       até dd/mm em vermelho); a ficha mostra o mesmo selo ao lado do nome
 - [ ] Histórico da planilha (`node scripts/importar-servidores.mjs --historico
-    HISTORICO.xlsx --enviar --local`): 698/914 linhas casam com a base (os
+HISTORICO.xlsx --enviar --local`): 698/914 linhas casam com a base (os
       216 desvinculados ficam no relatório, não entram); a ficha do servidor
       ganha na linha do tempo férias/licenças com datas (subtipo pelo texto:
       LTS, paternidade, maternidade…), movimentações com data e destino, e
       "Anotação (planilha de histórico)" para o texto que não virou evento
       (sustação/reprogramação de férias, portarias soltas…); reenviar não
       duplica; o evento atual da planilha de servidores não é repetido
+- [ ] Celular (390 px): `/unidade` e `/municipios` mostram CARTÕES, não a
+      tabela (tabela volta a partir de md); os números do cartão continuam
+      clicáveis, coloridos e abrem o painel "quem são"; nenhuma tela rola na
+      horizontal; o cabeçalho de colunas NÃO gruda no meio da tabela (o
+      "sticky" só vale de sm para cima)
+- [ ] Largura das telas de tabela (1600×900): `/unidade`, `/municipios` e
+      `/servidores` usam o container largo (1408 px) e as demais telas seguem
+      em 1152 px; em Municípios, "Atendido por" e os plantões mostram o nome
+      curto ("DP de Milagres") com o nome completo no tooltip, e cada linha
+      cabe em uma linha só
+- [ ] Planilha de afastamentos (`node scripts/importar-servidores.mjs
+--afastamentos afastamentos.xlsx --enviar --local`, depois das outras
+      duas): casa pelo NOME sanitizado (ela não tem matrícula); 182 servidores,
+      439 eventos; o mesmo afastamento vindo do histórico ou da folha é
+      SUBSTITUÍDO por ela (período sobreposto), e férias nunca são suprimidas
+      por um atestado; linhas de "TRANSFERIR…/MUDAR AIS" viram movimentação com
+      o texto, "APTO/VERIFICAR/EXONERAÇÃO" viram anotação; reexecutar em
+      qualquer ordem (folha → histórico → afastamentos ou o inverso) não
+      duplica nem ressuscita o suprimido
+- [ ] Designação em Servidores (E50, migração 0089): a lista tem a coluna
+      "Designação" (com o símbolo DAS/DNS embaixo) e o filtro "Todas as
+      designações" — escolher "Chefe de seção de expedientes e cartório" traz
+      50; quem está sem designação aparece com "—" e continua na lista; no
+      celular a linha "Designação" entra no cartão
+- [ ] Designação na ficha (Admin Geral): o `select` fica na mesma linha de
+      Classe e Regime; salvar troca o valor, a linha do tempo registra
+      "Designação: X → Y" (nome, não id) e o rótulo do campo passa a dizer
+      "definida nesta tela; a planilha não sobrescreve"; a caixa "voltar a
+      seguir a planilha" aparece só nesse caso e, marcada, devolve o campo à
+      folha (o aviso e a caixa somem)
+- [ ] Designação × carga: com um servidor editado pela tela, reexecutar
+      `--planilha` NÃO desfaz a escolha, e o relatório traz o aviso
+      "…a da tela vence — planilha ignorada"; para quem nunca foi editado a
+      carga continua regravando normalmente
+- [ ] Ficha do servidor: abrir e clicar em Salvar SEM mexer em nada não cria
+      "Edição cadastral" na linha do tempo. O campo de telefone da tela mostra
+      só dígitos e o cadastro guarda a forma da carga ("88 99661-9881"); antes,
+      todo salvamento reescrevia o número só para tirar a máscara e registrava
+      uma edição que ninguém fez. Mudar o número de verdade continua salvando
+- [ ] Carga pesada em lote: a regravação de histórico/afastamentos manda os
+      INSERTs num `db.batch` só, não um a um — um servidor com 40 eventos
+      gasta UMA ida ao banco. Em produção, era isso que estourava o tempo do
+      Worker e devolvia 503 com corpo vazio. `LOTE_PESADO=n` regula quantos
+      servidores vão por requisição quando for preciso retomar uma carga
+- [ ] Designação proposta pela ponta (admin de seccional/unidade): o campo
+      aparece como lista e entra no pedido junto com a justificativa; o quadro
+      "Solicitações" da ficha mostra De/Para com o NOME da função, não o id;
+      em /solicitacoes o Admin Geral vê o mesmo e, ao aprovar, o cadastro passa
+      a ter a designação nova marcada como definida pelo sistema (a planilha
+      não a desfaz); rejeitar não muda nada
+- [ ] Designação: escolher uma que não existe por POST direto → recusa
+      legível ("Designação inexistente ou desativada"), não 500
 - [ ] Regimes após a migração 0087: toda unidade do DPI SUL com "Expediente";
       "Plantão" só em 2ª Seccional, Aracati, Brejo Santo, Crato, Iguatu, Quixadá,
       Russas, Tauá; "Fim de semana" nessas mais Icó, Senador Pompeu e Quixeramobim
