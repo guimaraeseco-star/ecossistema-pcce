@@ -19,8 +19,21 @@ import { policialAcaoSolicitacoes, policiais } from '$lib/server/schema';
 import type { PolicialAcaoSolicitacao } from '$lib/server/schema';
 import type { CamposDoEventoFuncional } from './historico';
 
-/** Os três atos que podem ser pedidos. Espelha `policial_historico.tipo`. */
-type TipoAcaoSolicitada = 'movimentacao' | 'afastamento' | 'desvinculacao';
+/**
+ * Os atos que podem ser pedidos.
+ *
+ * Os três primeiros espelham `policial_historico.tipo` — são atos sobre o
+ * SERVIDOR, e a aprovação os executa na linha do tempo dele.
+ *
+ * **`direcao` é de outra natureza, e por isso vale a ressalva** (16/09/2026):
+ * é ato sobre a UNIDADE — quem passa a dirigi-la, como titular ou respondente.
+ * Ele mora nesta fila porque os campos de que precisa já estavam aqui (unidade
+ * de destino, início da vigência, NUP, justificativa) e porque o rito de
+ * decisão e a trilha de auditoria são os mesmos; mas a aprovação NÃO o manda
+ * para `executarAcaoRH`, e sim para `registrarResponsavel`. Quem faz esse
+ * desvio é `decidirSolicitacaoAcao`.
+ */
+type TipoAcaoSolicitada = 'movimentacao' | 'afastamento' | 'desvinculacao' | 'direcao';
 
 /**
  * O pedido, na forma em que a aprovação vai executá-lo: os MESMOS campos do

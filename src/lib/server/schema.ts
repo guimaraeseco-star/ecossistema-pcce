@@ -1644,7 +1644,15 @@ export const policialAcaoSolicitacoes = sqliteTable(
 		policial_id: integer('policial_id')
 			.notNull()
 			.references(() => policiais.id, { onDelete: 'cascade' }),
-		tipo: text('tipo', { enum: ['movimentacao', 'afastamento', 'desvinculacao'] }).notNull(),
+		// `direcao` (16/09/2026): o admin de seccional PROPÕE quem dirige uma
+		// unidade da subárvore dele — titular ou respondente — e o Admin Geral
+		// homologa. Reaproveita esta fila em vez de abrir uma quarta: os campos de
+		// que o pedido precisa (unidade de destino, início da vigência, NUP,
+		// justificativa) já estão aqui, e com eles vêm o rito de decisão e a
+		// trilha de auditoria que já existem.
+		tipo: text('tipo', {
+			enum: ['movimentacao', 'afastamento', 'desvinculacao', 'direcao']
+		}).notNull(),
 		subtipo: text('subtipo'),
 		descricao: text('descricao'),
 		unidade_origem: text('unidade_origem'),
@@ -2295,6 +2303,12 @@ export const unidadeResponsaveis = sqliteTable(
 		papel: text('papel', { enum: ['titular', 'respondente'] }).notNull(),
 		data_inicio: text('data_inicio').notNull(),
 		data_fim: text('data_fim'),
+		/**
+		 * O NUP do processo que PEDE a designação (0090) — o número que existe
+		 * quando o delegado assume. A `portaria` é o ATO, que vem depois; são
+		 * campos distintos de propósito.
+		 */
+		nup: text('nup').notNull().default(''),
 		portaria: text('portaria').notNull().default(''),
 		observacao: text('observacao').notNull().default(''),
 		origem: text('origem', { enum: ['sistema', 'planilha'] })

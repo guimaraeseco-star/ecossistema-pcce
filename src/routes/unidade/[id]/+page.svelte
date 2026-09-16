@@ -13,6 +13,7 @@
 	import { rotuloTipoPlantao } from '$lib/unidades/plantao';
 	import { COR_SITUACAO } from '$lib/servidores/afastamentos';
 	import ModalEfetivo, { type PedidoEfetivo } from '../_components/ModalEfetivo.svelte';
+	import CartaoDirecao from './_components/CartaoDirecao.svelte';
 
 	const { data }: PageProps = $props();
 
@@ -140,6 +141,17 @@
 			</dl>
 		{/if}
 	</div>
+</div>
+
+<!-- Direção: vem ANTES do efetivo porque "quem dirige" é a primeira pergunta de
+     quem abre a ficha de uma unidade. -->
+<div class="mb-4">
+	<CartaoDirecao
+		unidadeNome={u.nome}
+		direcao={data.direcao}
+		sucessao={data.sucessao}
+		modo={data.modoDirecao}
+	/>
 </div>
 
 <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
