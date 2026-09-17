@@ -440,6 +440,42 @@ HISTORICO.xlsx --enviar --local`): 698/914 linhas casam com a base (os
       horizontal
 - [ ] Fila /solicitacoes com um pedido de direção: o tipo aparece como
       "Direção de unidade", e o detalhe mostra Unidade e Papel antes das datas
+- [ ] Férias — lançar (E56, migração 0091): na ficha do servidor, o cartão
+      "Férias" abaixo das solicitações; "Lançar fração" pede exercício, fração
+      (1ª/2ª/3ª), início e fim, mostra o período aquisitivo calculado da data
+      de posse e avisa fração menor que 10 dias; lançada, a fração aparece por
+      exercício com o status pela data (Programada / Em gozo / Gozada) e o
+      afastamento de férias surge na linha do tempo; lançar a mesma fração de
+      novo é recusado; "Excluir" some com o afastamento junto
+- [ ] Férias — o assistente: "Reprogramar" numa fração FUTURA diz SUSTAÇÃO em
+      letras grandes, com o motivo ("ainda não iniciou") e o artigo; numa
+      fração EM GOZO diz SUSPENSÃO e exige retorno ao serviço e justificativa;
+      na 2ª fração com a 1ª já gozada, diz sustação e avisa que o § 13 admite
+      suspensão. As novas datas são conferidas na hora: quantidade diferente
+      de dias, 1º dia em sábado/domingo/feriado e fração < 10 travam o botão;
+      "Gerar ofício" registra o pedido, mostra o ofício com botão Copiar, e o
+      pedido fica em amarelo "aguardando a COGEP" com NUP para anotar
+- [ ] Férias — homologar: "COGEP deferiu" na sustação faz a fração antiga
+      aparecer riscada (Sustada), a nova entrar como Programada (reprogramada)
+      e o afastamento antigo sumir; na suspensão, o afastamento antigo encurta
+      até a véspera do retorno; "Indeferiu" fecha o pedido sem mudar nada
+- [ ] Férias — alertas: com um pedido pendente, a linha do servidor em
+      /servidores mostra "⚠ Férias: pedido pendente"; a unidade dele, a
+      seccional e o departamento mostram "⚠ Férias: 1 pedido aguardando a
+      COGEP" em /unidade (tabela e celular) e no topo da ficha da unidade;
+      homologado, os alertas somem
+- [ ] Férias — abono (só Admin Geral): "Registrar abono" pede 10 iniciais ou
+      finais, decisão, datas e NUP; deferido, o afastamento passa a cobrir só o
+      gozo, o cartão mostra "aguardando ciência da unidade", os alertas dizem
+      "abono sem ciência" e, nos dias convertidos, /servidores mostra "Ativo ·
+      em abono até dd/mm"; "Estou ciente" (admin de unidade/seccional/geral)
+      apaga o alerta; janela fora de 60–90 dias e impedimentos do art. 13 saem
+      como aviso no toast, não travam
+- [ ] Férias — o ano da unidade: "Férias do ano →" na ficha da unidade abre
+      /unidade/[id]/ferias com os 12 meses; cada mês lista, por unidade, "N de
+      M · X %" com "⚠ acima do teto" em dourado quando passa de 15 %; numa
+      delegacia os nomes vêm abertos, na seccional recolhidos em "Ver os N
+      nomes"; ← ano / ano → navegam; férias vindas da carga aparecem também
 - [ ] Direção da unidade (E54, migração 0090) — Admin Geral: a ficha de
       `/unidade/[id]` tem o cartão "Direção" acima do efetivo. Unidade com
       titular mostra selo azul, nome com link para a ficha, matrícula, desde
