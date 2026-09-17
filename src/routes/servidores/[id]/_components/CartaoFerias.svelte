@@ -32,7 +32,7 @@
 	import { formatarData, hojeLocalISO } from '$lib/utils/datas';
 	import { formatarNUP } from '$lib/utils/formato';
 	import { MAX_JUSTIFICATIVA } from '$lib/cadastro-campos';
-	import { periodosDoPedido, type FeriasDoPolicial, type FracaoCompleta } from '$lib/db';
+	import type { FeriasDoPolicial, FracaoCompleta } from '$lib/db';
 	import {
 		criteriosDaSuspensao,
 		diasDaFracao,
@@ -41,6 +41,7 @@
 		fimDaFracao,
 		montarPeriodos,
 		periodoAquisitivo,
+		periodosDoPedido,
 		ROTULO_STATUS_FRACAO,
 		ROTULO_TIPO_REPROGRAMACAO,
 		rotuloDaDivisao,

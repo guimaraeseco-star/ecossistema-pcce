@@ -37,7 +37,6 @@ import {
 	excluirProgramacao,
 	listarFeriasDoPolicial,
 	listarHistoricoPolicial,
-	periodosDoPedido,
 	registrarAbono,
 	registrarProgramacao
 } from '$lib/db';
@@ -53,6 +52,7 @@ import {
 	diasRestantesNaSuspensao,
 	divisoesPossiveis,
 	montarPeriodos,
+	periodosDoPedido,
 	situacaoDaReprogramacao,
 	statusPelaData,
 	temErro,

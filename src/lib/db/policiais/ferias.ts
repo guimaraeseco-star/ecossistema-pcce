@@ -32,7 +32,9 @@ import { batchNonEmpty, type Database } from '../core';
 import type { BatchItem } from 'drizzle-orm/batch';
 import {
 	diasDaFracao,
+	fracoesDoPedido,
 	periodoGozadoComAbono,
+	periodosDoPedido,
 	type PeriodoMontado,
 	type PosicaoDoAbono,
 	type TipoReprogramacao
@@ -363,39 +365,6 @@ export async function abrirReprogramacao(
 		})
 		.returning({ id: feriasReprogramacoes.id });
 	return { ok: true, id: linha.id };
-}
-
-/** Os períodos pedidos, lidos do JSON da linha. */
-export function periodosDoPedido(
-	pedido: Pick<FeriasReprogramacao, 'novos_periodos'>
-): PeriodoMontado[] {
-	try {
-		const lista = JSON.parse(pedido.novos_periodos) as unknown;
-		if (!Array.isArray(lista)) return [];
-		return lista.filter(
-			(p): p is PeriodoMontado =>
-				typeof p === 'object' &&
-				p !== null &&
-				typeof (p as PeriodoMontado).inicio === 'string' &&
-				typeof (p as PeriodoMontado).fim === 'string' &&
-				typeof (p as PeriodoMontado).dias === 'number'
-		);
-	} catch {
-		return [];
-	}
-}
-
-/** As frações alcançadas por uma sustação, lidas do JSON da linha. */
-export function fracoesDoPedido(
-	pedido: Pick<FeriasReprogramacao, 'fracoes_ids' | 'fracao_id'>
-): number[] {
-	if (pedido.fracao_id) return [pedido.fracao_id];
-	try {
-		const lista = JSON.parse(pedido.fracoes_ids) as unknown;
-		return Array.isArray(lista) ? lista.filter((n): n is number => Number.isInteger(n)) : [];
-	} catch {
-		return [];
-	}
 }
 
 /** Anota o NUP depois de protocolado — o pedido nasce antes do número existir. */

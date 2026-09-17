@@ -272,6 +272,44 @@ export function diasRestantesNaSuspensao(
 	return { gozados, restantes: Math.max(0, diasDaFracao(fracao) - gozados) };
 }
 
+/* ── O pedido gravado: os JSONs da linha ────────────────────────────────── */
+
+/**
+ * Os períodos pedidos, lidos do JSON de `ferias_reprogramacoes.novos_periodos`.
+ * Mora aqui, e não na camada de dados, porque o cartão da ficha lê o pedido
+ * no NAVEGADOR — `$lib/db` é módulo de servidor e não pode ir para lá.
+ */
+export function periodosDoPedido(pedido: { novos_periodos: string }): PeriodoMontado[] {
+	try {
+		const lista = JSON.parse(pedido.novos_periodos) as unknown;
+		if (!Array.isArray(lista)) return [];
+		return lista.filter(
+			(p): p is PeriodoMontado =>
+				typeof p === 'object' &&
+				p !== null &&
+				typeof (p as PeriodoMontado).inicio === 'string' &&
+				typeof (p as PeriodoMontado).fim === 'string' &&
+				typeof (p as PeriodoMontado).dias === 'number'
+		);
+	} catch {
+		return [];
+	}
+}
+
+/** As frações alcançadas pelo pedido: a suspensa (`fracao_id`) ou as sustadas (`fracoes_ids`, JSON). */
+export function fracoesDoPedido(pedido: {
+	fracoes_ids: string;
+	fracao_id: number | null;
+}): number[] {
+	if (pedido.fracao_id) return [pedido.fracao_id];
+	try {
+		const lista = JSON.parse(pedido.fracoes_ids) as unknown;
+		return Array.isArray(lista) ? lista.filter((n): n is number => Number.isInteger(n)) : [];
+	} catch {
+		return [];
+	}
+}
+
 /* ── Reprogramação: sustação × suspensão ─────────────────────────────────── */
 
 export type TipoReprogramacao = 'sustacao' | 'suspensao';

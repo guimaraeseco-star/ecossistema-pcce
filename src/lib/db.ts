@@ -127,8 +127,6 @@ export {
 	buscarFracao,
 	registrarProgramacao,
 	excluirProgramacao,
-	periodosDoPedido,
-	fracoesDoPedido,
 	abrirReprogramacao,
 	anotarNupDaReprogramacao,
 	decidirReprogramacao,
