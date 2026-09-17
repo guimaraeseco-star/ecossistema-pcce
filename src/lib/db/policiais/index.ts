@@ -44,6 +44,20 @@ export {
 export type { NovoEventoHistorico, CamposDoEventoFuncional } from './historico';
 
 export { listarDesignacoes, designacaoAtiva } from './designacoes';
+
+export {
+	listarFeriasDoPolicial,
+	buscarFracao,
+	registrarFracao,
+	excluirFracao,
+	abrirReprogramacao,
+	anotarNupDaReprogramacao,
+	decidirReprogramacao,
+	registrarAbono,
+	darCienciaDoAbono,
+	pendenciasDeFerias
+} from './ferias';
+export type { FracaoCompleta, PendenciasDeFerias } from './ferias';
 export type { DesignacaoDaTela } from './designacoes';
 
 export { impedimentoParaExcluirPolicial } from './exclusao';

@@ -122,12 +122,24 @@ export {
 	buscarEventoHistorico,
 	afastamentoVigente,
 	listarDesignacoes,
-	designacaoAtiva
+	designacaoAtiva,
+	listarFeriasDoPolicial,
+	buscarFracao,
+	registrarFracao,
+	excluirFracao,
+	abrirReprogramacao,
+	anotarNupDaReprogramacao,
+	decidirReprogramacao,
+	registrarAbono,
+	darCienciaDoAbono,
+	pendenciasDeFerias
 } from './db/policiais';
 export type {
 	CampoSolicitacao,
 	CamposDoEventoFuncional,
 	DesignacaoDaTela,
+	FracaoCompleta,
+	PendenciasDeFerias,
 	MudancaSolicitada,
 	NovaAcaoSolicitada,
 	NovoEventoHistorico

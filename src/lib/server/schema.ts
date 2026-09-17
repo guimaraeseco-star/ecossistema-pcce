@@ -2326,9 +2326,137 @@ export const unidadeResponsaveis = sqliteTable(
 	]
 );
 
+// ---- Fase 2-C: férias — o que vem antes do gozo (0091) ----
+
+/**
+ * Uma fração programada de férias (1ª, 2ª ou 3ª de um exercício). A
+ * programação vem do GUARDIÃO, digitada pela unidade; o sistema não programa.
+ *
+ * `status` só guarda o que é decidido por ATO: `programada`, `sustada`
+ * (reprogramada antes de começar), `suspensa` (interrompida depois de
+ * começar). "Em gozo" e "gozada" saem da data — ver `statusPelaData` em
+ * `$lib/servidores/ferias`. `historico_id` é o evento de afastamento que a
+ * fração gera; é por ele que a situação de hoje continua sendo calculada sem
+ * saber que existe programação.
+ */
+export const feriasFracoes = sqliteTable(
+	'ferias_fracoes',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		policial_id: integer('policial_id')
+			.notNull()
+			.references(() => policiais.id),
+		/** O ano em que o período aquisitivo se completa (convenção da Seplag). */
+		exercicio: integer('exercicio').notNull(),
+		ordem: integer('ordem').notNull(),
+		data_inicio: text('data_inicio').notNull(),
+		data_fim: text('data_fim').notNull(),
+		status: text('status', { enum: ['programada', 'sustada', 'suspensa'] })
+			.notNull()
+			.default('programada'),
+		origem: text('origem', { enum: ['guardiao', 'reprogramacao'] })
+			.notNull()
+			.default('guardiao'),
+		/** A fração que a substituiu, quando sustada/suspensa — a sucessão fica inteira. */
+		substituida_por_id: integer('substituida_por_id'),
+		historico_id: integer('historico_id'),
+		observacao: text('observacao').notNull().default(''),
+		registrado_por_id: integer('registrado_por_id'),
+		registrado_por_nome: text('registrado_por_nome').notNull().default(''),
+		created_at: text('created_at')
+			.notNull()
+			.default(sql`(datetime('now', '-3 hours'))`)
+	},
+	(table) => [
+		index('idx_ferias_fracoes_policial').on(table.policial_id, table.exercicio),
+		index('idx_ferias_fracoes_inicio').on(table.data_inicio)
+	]
+);
+
+/**
+ * O pedido de reprogramação à COGEP. `tipo` sai dos FATOS (a fração já
+ * começou?), nunca de escolha do usuário — é o que impede o pedido errado.
+ * Pendente é ALERTA no cartão da unidade e no do servidor até a unidade
+ * homologar a resposta, favorável ou não.
+ */
+export const feriasReprogramacoes = sqliteTable(
+	'ferias_reprogramacoes',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		fracao_id: integer('fracao_id')
+			.notNull()
+			.references(() => feriasFracoes.id),
+		policial_id: integer('policial_id')
+			.notNull()
+			.references(() => policiais.id),
+		tipo: text('tipo', { enum: ['sustacao', 'suspensao'] }).notNull(),
+		novo_inicio: text('novo_inicio').notNull(),
+		novo_fim: text('novo_fim').notNull(),
+		/** Só na suspensão: o dia em que o servidor voltou ao serviço. */
+		data_suspensao: text('data_suspensao'),
+		justificativa: text('justificativa').notNull().default(''),
+		/** O ofício gerado, como foi ao NUP. */
+		texto_oficio: text('texto_oficio').notNull().default(''),
+		nup: text('nup').notNull().default(''),
+		status: text('status', { enum: ['pendente', 'deferida', 'indeferida'] })
+			.notNull()
+			.default('pendente'),
+		decidida_em: text('decidida_em'),
+		decidida_por_id: integer('decidida_por_id'),
+		decidida_por_nome: text('decidida_por_nome').notNull().default(''),
+		registrado_por_id: integer('registrado_por_id'),
+		registrado_por_nome: text('registrado_por_nome').notNull().default(''),
+		created_at: text('created_at')
+			.notNull()
+			.default(sql`(datetime('now', '-3 hours'))`)
+	},
+	(table) => [index('idx_ferias_reprog_policial').on(table.policial_id, table.status)]
+);
+
+/**
+ * O abono pecuniário: 10 dias da fração convertidos em dinheiro (Lei
+ * 19.472/2025; Dec. 37.363/2026). Só o Admin Geral registra, porque o servidor
+ * pede direto à COGEP — e é por isso que existe a CIÊNCIA da unidade: ela
+ * precisa saber que naqueles dias o servidor trabalha, senão ele recebe o
+ * dinheiro e tira as férias mesmo assim. Sem ciência, é alerta na unidade.
+ */
+export const feriasAbonos = sqliteTable(
+	'ferias_abonos',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		fracao_id: integer('fracao_id')
+			.notNull()
+			.references(() => feriasFracoes.id),
+		policial_id: integer('policial_id')
+			.notNull()
+			.references(() => policiais.id),
+		posicao: text('posicao', { enum: ['iniciais', 'finais'] }).notNull(),
+		abono_inicio: text('abono_inicio').notNull(),
+		abono_fim: text('abono_fim').notNull(),
+		nup: text('nup').notNull().default(''),
+		data_requerimento: text('data_requerimento'),
+		status: text('status', { enum: ['deferido', 'indeferido'] })
+			.notNull()
+			.default('deferido'),
+		decidido_em: text('decidido_em'),
+		ciencia_unidade_em: text('ciencia_unidade_em'),
+		ciencia_unidade_por_id: integer('ciencia_unidade_por_id'),
+		ciencia_unidade_por_nome: text('ciencia_unidade_por_nome').notNull().default(''),
+		registrado_por_id: integer('registrado_por_id'),
+		registrado_por_nome: text('registrado_por_nome').notNull().default(''),
+		created_at: text('created_at')
+			.notNull()
+			.default(sql`(datetime('now', '-3 hours'))`)
+	},
+	(table) => [index('idx_ferias_abonos_policial').on(table.policial_id, table.status)]
+);
+
 // ---- Tipos inferidos ----
 
 export type Policial = typeof policiais.$inferSelect;
+export type FeriasFracao = typeof feriasFracoes.$inferSelect;
+export type FeriasReprogramacao = typeof feriasReprogramacoes.$inferSelect;
+export type FeriasAbono = typeof feriasAbonos.$inferSelect;
 export type Designacao = typeof designacoes.$inferSelect;
 export type UnidadeResponsavel = typeof unidadeResponsaveis.$inferSelect;
 export type PolicialHistorico = typeof policialHistorico.$inferSelect;
