@@ -55,7 +55,8 @@ export {
 	decidirReprogramacao,
 	registrarAbono,
 	darCienciaDoAbono,
-	pendenciasDeFerias
+	pendenciasDeFerias,
+	contagemParaTeto
 } from './ferias';
 export type { FracaoCompleta, PendenciasDeFerias } from './ferias';
 export type { DesignacaoDaTela } from './designacoes';

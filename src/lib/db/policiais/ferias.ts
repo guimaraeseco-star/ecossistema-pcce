@@ -22,6 +22,7 @@ import {
 	feriasAbonos,
 	feriasFracoes,
 	feriasReprogramacoes,
+	policiais,
 	policialHistorico,
 	type FeriasAbono,
 	type FeriasFracao,
@@ -518,4 +519,44 @@ export async function pendenciasDeFerias(
 		}
 	}
 	return mapa;
+}
+
+/**
+ * Os números para o teto de 15 % (art. 6º I) no mês em que a nova fração
+ * começa: quantos da lotação já estarão em férias naquele mês e o efetivo
+ * ativo da lotação. Quem decide se avisa é `conferirNovoPeriodo`.
+ *
+ * "Em férias no mês" = tem evento de férias que toca o mês, contado UMA vez
+ * por servidor (duas frações no mesmo mês não são duas pessoas).
+ */
+export async function contagemParaTeto(
+	db: Database,
+	lotacao: string,
+	anoMes: string
+): Promise<{ emFerias: number; efetivo: number }> {
+	const inicioMes = `${anoMes}-01`;
+	const fimMes = `${anoMes}-31`;
+	const [emFerias, efetivo] = await Promise.all([
+		db
+			.select({ n: sql<number>`count(distinct ${policialHistorico.policial_id})` })
+			.from(policialHistorico)
+			.innerJoin(policiais, eq(policiais.id, policialHistorico.policial_id))
+			.where(
+				and(
+					eq(policiais.lotacao, lotacao),
+					eq(policiais.ativo, 1),
+					eq(policialHistorico.tipo, 'afastamento'),
+					eq(policialHistorico.subtipo, 'ferias'),
+					sql`${policialHistorico.data_inicio} <= ${fimMes}`,
+					sql`coalesce(nullif(${policialHistorico.data_fim}, ''), '9999-12-31') >= ${inicioMes}`
+				)
+			)
+			.get(),
+		db
+			.select({ n: sql<number>`count(*)` })
+			.from(policiais)
+			.where(and(eq(policiais.lotacao, lotacao), eq(policiais.ativo, 1)))
+			.get()
+	]);
+	return { emFerias: emFerias?.n ?? 0, efetivo: efetivo?.n ?? 0 };
 }

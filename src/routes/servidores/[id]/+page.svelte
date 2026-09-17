@@ -42,6 +42,7 @@
 	import CartaoPasskeyServidor from './_components/CartaoPasskeyServidor.svelte';
 	import CartaoAdminGeral from './_components/CartaoAdminGeral.svelte';
 	import SolicitacoesServidor from './_components/SolicitacoesServidor.svelte';
+	import CartaoFerias from './_components/CartaoFerias.svelte';
 	import BotaoVoltar from '$lib/components/BotaoVoltar.svelte';
 	import { COR_SITUACAO, rotuloAfastamento } from '$lib/servidores/afastamentos';
 	import { formatarData } from '$lib/utils/datas';
@@ -49,6 +50,8 @@
 	const { data }: PageProps = $props();
 
 	const isAdmin = $derived(data.isAdmin);
+	// Derivado gravável: espelha o load, mas admite o que a action devolve.
+	let feriasDaFicha = $derived(data.ferias);
 	const solicitando = $derived(data.modo === 'solicitacao');
 	const seccionaisParaPapel = $derived(
 		data.unidades.filter((u: { tipo: string }) => u.tipo === 'seccional')
@@ -580,6 +583,18 @@
 	campos={data.solicitacoesCampo}
 	acoes={data.solicitacoesAcao}
 />
+
+<!-- Férias: frações do Guardião, o assistente do NUP e o abono (E56). O que a
+     action devolve substitui `ferias` sem recarregar a ficha inteira. -->
+<div class="mt-4">
+	<CartaoFerias
+		bind:ferias={feriasDaFicha}
+		feriados={data.feriados}
+		dataPosse={data.dataPosse}
+		{isAdmin}
+		podeDarCiencia={true}
+	/>
+</div>
 
 <HistoricoServidor
 	historico={data.historico}

@@ -101,6 +101,7 @@ import {
 	auditar,
 	contextoDeEvento,
 	listarCredenciaisDoDono,
+	listarFeriasDoPolicial,
 	type MudancaSolicitada
 } from '$lib/db';
 import { descreverVinculoCredencial } from '$lib/server/assinatura/webauthn/authenticator-data';
@@ -139,9 +140,11 @@ import {
 import { decifrarCpfDoDB } from '$lib/crypto/cpf-cripto';
 import { limparCPF, limparMatricula, limparTelefone } from '$lib/utils/formato';
 import { resolverCredencial } from '$lib/server/auth/credencial';
-import { hojeBrasilISO } from '$lib/utils/datas';
+import { adicionarDias, hojeBrasilISO } from '$lib/utils/datas';
+import { feriadosNoIntervalo } from '$lib/db/diarias/feriados';
 import type { RequestEvent } from './$types';
 import { mensagemDeErro } from '$lib/utils/erro';
+import { actionsFerias } from './_actions/actions-ferias';
 
 const TAMANHO_MAX_PDF = 10 * 1024 * 1024; // 10 MB
 
@@ -262,7 +265,9 @@ export const load: PageServerLoad = async ({ locals, params, platform, depends }
 		historico,
 		credenciaisPasskey,
 		solicitacoesCampo,
-		solicitacoesAcao
+		solicitacoesAcao,
+		ferias,
+		feriados
 	] = await Promise.all([
 		// A lista de destinos de MOVIMENTAÇÃO é a corporação inteira nos dois
 		// modos, e para o admin com escopo isso é deliberado: transferir servidor
@@ -278,7 +283,11 @@ export const load: PageServerLoad = async ({ locals, params, platform, depends }
 		// linhas, e consultar pelo par cru mostraria "sem chave" para quem tem.
 		resolverCredencial(db, 'policial', id).then((c) => listarCredenciaisDoDono(db, c.dono)),
 		listarSolicitacoesDoPolicial(db, id),
-		listarSolicitacoesAcaoDoPolicial(db, id)
+		listarSolicitacoesAcaoDoPolicial(db, id),
+		listarFeriasDoPolicial(db, id),
+		// Os feriados dos próximos 18 meses, para o assistente de reprogramação
+		// conferir o primeiro dia na tela — a action confere de novo no envio.
+		feriadosNoIntervalo(db, hojeBrasilISO(), adicionarDias(hojeBrasilISO(), 540))
 	]);
 	const ehAdminGeral = modulosAdmin != null;
 
@@ -310,6 +319,10 @@ export const load: PageServerLoad = async ({ locals, params, platform, depends }
 		historico,
 		solicitacoesCampo,
 		solicitacoesAcao,
+		/** Férias: frações, pedidos à COGEP e abono (fase 2-C). */
+		ferias,
+		feriados: feriados.map((f) => f.data),
+		dataPosse: policial.data_posse,
 		afastamentoVigenteId: afastamentoAtual?.id ?? null,
 		/** Para o selo no cabeçalho: tipo e período em curso hoje (fase 2-C). */
 		afastamentoAtual: afastamentoAtual
@@ -956,7 +969,10 @@ export const actions: Actions = {
 			recarregar: () =>
 				modo === 'solicitacao' ? listarSolicitacoesAcaoDoPolicial(db, id) : Promise.resolve(null)
 		});
-	}
+	},
+
+	// ---- Férias: frações do Guardião, reprogramação à COGEP e abono ----
+	...actionsFerias
 };
 
 /** As três ações de RH divergem só nisto; o resto do caminho é comum. */

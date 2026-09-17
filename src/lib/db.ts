@@ -132,7 +132,8 @@ export {
 	decidirReprogramacao,
 	registrarAbono,
 	darCienciaDoAbono,
-	pendenciasDeFerias
+	pendenciasDeFerias,
+	contagemParaTeto
 } from './db/policiais';
 export type {
 	CampoSolicitacao,
