@@ -32,6 +32,7 @@ import {
 	type RecusaDaDirecao
 } from '$lib/db/unidades-responsaveis';
 import { modoDaDirecao, RECUSA_DIRECAO } from '$lib/server/unidades/direcao-permissao';
+import { pendenciasDeFeriasPorLotacao } from '$lib/db';
 import { MAX_JUSTIFICATIVA } from '$lib/cadastro-campos';
 import { dataIso, textoLimitado, inteiroNaFaixa } from '$lib/server/form-data';
 import { unidades } from '$lib/server/schema';
@@ -56,12 +57,14 @@ export const load: PageServerLoad = async ({ locals, platform, params }) => {
 	const unidade = await db.select().from(unidades).where(eq(unidades.id, id)).get();
 	if (!unidade) error(404, 'Unidade não encontrada');
 
-	const [efetivos, municipiosAtendidos, direcao, sucessao] = await Promise.all([
-		efetivoPorLotacao(db, hojeBrasilISO()),
-		municipiosDaUnidade(db, id),
-		responsavelVigente(db, id),
-		historicoDaDirecao(db, id)
-	]);
+	const [efetivos, municipiosAtendidos, direcao, sucessao, pendenciasPorLotacao] =
+		await Promise.all([
+			efetivoPorLotacao(db, hojeBrasilISO()),
+			municipiosDaUnidade(db, id),
+			responsavelVigente(db, id),
+			historicoDaDirecao(db, id),
+			pendenciasDeFeriasPorLotacao(db)
+		]);
 	const porNome = (n: NoUnidade) => efetivos.get(n.nome) ?? efetivoVazio();
 	const efetivo = porNome({ ...unidade });
 	const populacaoAtendida = municipiosAtendidos.reduce((n, m) => n + (m.populacao ?? 0), 0);
@@ -132,6 +135,21 @@ export const load: PageServerLoad = async ({ locals, platform, params }) => {
 		direcao,
 		sucessao,
 		modoDirecao: modoDaDirecao(u),
+		/**
+		 * Pendências de férias desta unidade e das vinculadas — alerta no topo
+		 * da ficha até a unidade resolver (pedido homologado, abono com ciência).
+		 */
+		pendenciasFerias: [unidade, ...descendentes].reduce(
+			(acc, d) => {
+				const p = pendenciasPorLotacao.get(d.nome);
+				if (p) {
+					acc.reprogramacoesPendentes += p.reprogramacoesPendentes;
+					acc.abonosSemCiencia += p.abonosSemCiencia;
+				}
+				return acc;
+			},
+			{ reprogramacoesPendentes: 0, abonosSemCiencia: 0 }
+		),
 		efetivo,
 		subtotal: somarEfetivos([porNome({ ...unidade }), ...descendentes.map(porNome)]),
 		filhas: filhas.map((f) => ({

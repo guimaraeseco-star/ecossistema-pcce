@@ -560,3 +560,144 @@ export async function contagemParaTeto(
 	]);
 	return { emFerias: emFerias?.n ?? 0, efetivo: efetivo?.n ?? 0 };
 }
+
+/**
+ * As pendências de férias agrupadas por LOTAÇÃO — o que a Gestão de unidade
+ * mostra como alerta no cartão de cada unidade, e que só some quando a
+ * unidade resolve (pedido homologado, abono com ciência). Uma consulta para o
+ * departamento inteiro; quem soma a subárvore é o chamador, que conhece a
+ * árvore.
+ */
+export async function pendenciasDeFeriasPorLotacao(
+	db: Database
+): Promise<Map<string, PendenciasDeFerias>> {
+	const mapa = new Map<string, PendenciasDeFerias>();
+	const pega = (lotacao: string) => {
+		const p = mapa.get(lotacao) ?? { reprogramacoesPendentes: 0, abonosSemCiencia: 0 };
+		mapa.set(lotacao, p);
+		return p;
+	};
+	const [reprogs, abonos] = await Promise.all([
+		db
+			.select({ lotacao: policiais.lotacao, n: sql<number>`count(*)` })
+			.from(feriasReprogramacoes)
+			.innerJoin(policiais, eq(policiais.id, feriasReprogramacoes.policial_id))
+			.where(eq(feriasReprogramacoes.status, 'pendente'))
+			.groupBy(policiais.lotacao),
+		db
+			.select({ lotacao: policiais.lotacao, n: sql<number>`count(*)` })
+			.from(feriasAbonos)
+			.innerJoin(policiais, eq(policiais.id, feriasAbonos.policial_id))
+			.where(and(eq(feriasAbonos.status, 'deferido'), isNull(feriasAbonos.ciencia_unidade_em)))
+			.groupBy(policiais.lotacao)
+	]);
+	for (const r of reprogs) pega(r.lotacao).reprogramacoesPendentes = r.n;
+	for (const a of abonos) pega(a.lotacao).abonosSemCiencia = a.n;
+	return mapa;
+}
+
+/**
+ * Quem está EM ABONO hoje — os 10 dias convertidos, em que o servidor
+ * trabalha. Ele conta como ativo (o evento de férias já não cobre esses dias);
+ * o rótulo existe para a unidade saber POR QUE ele está de pé e não de férias.
+ */
+export async function abonosVigentesDe(
+	db: Database,
+	policialIds: number[],
+	hojeISO: string
+): Promise<Map<number, { inicio: string; fim: string }>> {
+	const mapa = new Map<number, { inicio: string; fim: string }>();
+	for (let i = 0; i < policialIds.length; i += 90) {
+		const fatia = policialIds.slice(i, i + 90);
+		if (fatia.length === 0) continue;
+		const linhas = await db
+			.select({
+				policial_id: feriasAbonos.policial_id,
+				inicio: feriasAbonos.abono_inicio,
+				fim: feriasAbonos.abono_fim
+			})
+			.from(feriasAbonos)
+			.where(
+				and(
+					inArray(feriasAbonos.policial_id, fatia),
+					eq(feriasAbonos.status, 'deferido'),
+					sql`${feriasAbonos.abono_inicio} <= ${hojeISO}`,
+					sql`${feriasAbonos.abono_fim} >= ${hojeISO}`
+				)
+			);
+		for (const l of linhas) mapa.set(l.policial_id, { inicio: l.inicio, fim: l.fim });
+	}
+	return mapa;
+}
+
+/** Um servidor de férias num mês — o que a visão anual da unidade lista. */
+export interface FeriasNoMes {
+	policial_id: number;
+	nome: string;
+	cargo: string;
+	lotacao: string;
+	data_inicio: string;
+	data_fim: string;
+	/** A fração, quando o evento veio da programação; nula para férias só do histórico. */
+	fracao_id: number | null;
+	ordem: number | null;
+}
+
+/**
+ * As férias de várias lotações ao longo de um ANO — o que a Gestão de unidade
+ * mostra mês a mês, com o teto de 15 % (art. 6º I). Lê os EVENTOS de férias
+ * (a fonte única de "está de férias"), com a fração ao lado quando existe:
+ * assim as férias que vieram da carga, sem fração, também aparecem.
+ */
+export async function feriasDoAno(
+	db: Database,
+	lotacoes: string[],
+	ano: number
+): Promise<FeriasNoMes[]> {
+	const inicioAno = `${ano}-01-01`;
+	const fimAno = `${ano}-12-31`;
+	const linhas: FeriasNoMes[] = [];
+	for (let i = 0; i < lotacoes.length; i += 90) {
+		const fatia = lotacoes.slice(i, i + 90);
+		if (fatia.length === 0) continue;
+		const r = await db
+			.select({
+				policial_id: policialHistorico.policial_id,
+				nome: policiais.nome,
+				cargo: policiais.cargo,
+				lotacao: policiais.lotacao,
+				data_inicio: policialHistorico.data_inicio,
+				data_fim: policialHistorico.data_fim,
+				fracao_id: feriasFracoes.id,
+				ordem: feriasFracoes.ordem
+			})
+			.from(policialHistorico)
+			.innerJoin(policiais, eq(policiais.id, policialHistorico.policial_id))
+			.leftJoin(feriasFracoes, eq(feriasFracoes.historico_id, policialHistorico.id))
+			.where(
+				and(
+					inArray(policiais.lotacao, fatia),
+					eq(policiais.ativo, 1),
+					eq(policialHistorico.tipo, 'afastamento'),
+					eq(policialHistorico.subtipo, 'ferias'),
+					sql`${policialHistorico.data_inicio} <= ${fimAno}`,
+					sql`coalesce(nullif(${policialHistorico.data_fim}, ''), '9999-12-31') >= ${inicioAno}`
+				)
+			)
+			.orderBy(policialHistorico.data_inicio);
+		for (const l of r) {
+			if (!l.data_inicio) continue;
+			linhas.push({
+				policial_id: l.policial_id,
+				nome: l.nome,
+				cargo: l.cargo,
+				lotacao: l.lotacao,
+				data_inicio: l.data_inicio,
+				data_fim: l.data_fim || l.data_inicio,
+				fracao_id: l.fracao_id,
+				ordem: l.ordem
+			});
+		}
+	}
+	return linhas;
+}

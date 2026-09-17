@@ -56,9 +56,12 @@ export {
 	registrarAbono,
 	darCienciaDoAbono,
 	pendenciasDeFerias,
-	contagemParaTeto
+	contagemParaTeto,
+	pendenciasDeFeriasPorLotacao,
+	abonosVigentesDe,
+	feriasDoAno
 } from './ferias';
-export type { FracaoCompleta, PendenciasDeFerias } from './ferias';
+export type { FracaoCompleta, PendenciasDeFerias, FeriasNoMes } from './ferias';
 export type { DesignacaoDaTela } from './designacoes';
 
 export { impedimentoParaExcluirPolicial } from './exclusao';

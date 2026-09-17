@@ -121,6 +121,18 @@
 				>Sem titular</span
 			>
 		{/if}
+		{#if unidade.pendenciasFerias.reprogramacoesPendentes > 0 || unidade.pendenciasFerias.abonosSemCiencia > 0}
+			<span class="mt-0.5 block text-xs font-semibold text-warning-700 dark:text-warning-400">
+				⚠ Férias: {[
+					unidade.pendenciasFerias.reprogramacoesPendentes > 0 &&
+						`${unidade.pendenciasFerias.reprogramacoesPendentes} aguardando a COGEP`,
+					unidade.pendenciasFerias.abonosSemCiencia > 0 &&
+						`${unidade.pendenciasFerias.abonosSemCiencia} abono sem ciência`
+				]
+					.filter(Boolean)
+					.join(' · ')}
+			</span>
+		{/if}
 	</div>
 
 	<!-- O cabeçalho das três situações. Ele e os números compartilham a MESMA

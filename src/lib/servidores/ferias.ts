@@ -58,7 +58,7 @@ export interface Fracao {
  * As cinco formas de fracionar 30 dias (Dec. 32.907, art. 3º § 1º). Lista
  * FECHADA; a ordem importa (10+20 e 20+10 são opções distintas).
  */
-export const FRACIONAMENTOS_VALIDOS: readonly (readonly number[])[] = [
+const FRACIONAMENTOS_VALIDOS: readonly (readonly number[])[] = [
 	[30],
 	[10, 20],
 	[20, 10],
@@ -67,7 +67,7 @@ export const FRACIONAMENTOS_VALIDOS: readonly (readonly number[])[] = [
 ];
 
 /** Nenhuma fração pode ter menos que isto (Dec. 33.216/2019, art. 11, p. único). */
-export const MINIMO_DIAS_POR_FRACAO = 10;
+const MINIMO_DIAS_POR_FRACAO = 10;
 
 /** As frações de um exercício formam uma das cinco formas? */
 export function fracionamentoValido(diasPorFracao: readonly number[]): boolean {
@@ -397,10 +397,10 @@ export function textoDoOficio(d: DadosDoOficio): string {
 /* ── Abono pecuniário ────────────────────────────────────────────────────── */
 
 /** Dias convertíveis: 1/3 de 30 (Lei 19.472/2025; Dec. 37.363/2026, art. 1º). */
-export const DIAS_DO_ABONO = 10;
+const DIAS_DO_ABONO = 10;
 
 /** Janela do requerimento: entre 60 e 90 dias antes do início (art. 3º). */
-export const JANELA_ABONO_DIAS = { minimo: 60, maximo: 90 } as const;
+const JANELA_ABONO_DIAS = { minimo: 60, maximo: 90 } as const;
 
 export type PosicaoDoAbono = 'iniciais' | 'finais';
 

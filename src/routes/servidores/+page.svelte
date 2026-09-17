@@ -98,6 +98,8 @@
 		afastamento: { subtipo: string; data_inicio: string; data_fim: string | null } | null;
 		designacao: string | null;
 		designacao_simbolo: string | null;
+		pendenciasFerias: { reprogramacoesPendentes: number; abonosSemCiencia: number } | null;
+		abono: { inicio: string; fim: string } | null;
 	};
 	const policiais = $derived(data.policiais as LinhaServidor[]);
 
@@ -262,6 +264,11 @@
 {#snippet seloSituacao(p: LinhaServidor)}
 	{#if p.situacao === 'ativo'}
 		<span class="text-xs {COR_SITUACAO.ativo}">{ROTULO_SITUACAO.ativo}</span>
+		{#if p.abono}
+			<!-- Está de pé porque converteu os dias em dinheiro — a unidade precisa
+			     ver isso, senão pergunta por que ele não está de férias. -->
+			<span class="block text-3xs text-surface-500">em abono até {formatarData(p.abono.fim)}</span>
+		{/if}
 	{:else}
 		<span class="block text-xs font-semibold {COR_SITUACAO[p.situacao]}"
 			>{p.situacao === 'ferias' ? 'Férias' : rotuloAfastamento(p.afastamento?.subtipo ?? '')}</span
@@ -271,6 +278,31 @@
 				? `até ${formatarData(p.afastamento.data_fim)}`
 				: `desde ${formatarData(p.afastamento?.data_inicio ?? '')}`}</span
 		>
+	{/if}
+	{@render alertaFerias(p.pendenciasFerias)}
+{/snippet}
+
+<!-- Pendência de férias: pedido aguardando a COGEP ou abono sem ciência da
+     unidade. Fica até a unidade resolver na ficha — por isso é alerta, não
+     informação (decisão dele, 17/09). -->
+{#snippet alertaFerias(pend: { reprogramacoesPendentes: number; abonosSemCiencia: number } | null)}
+	{#if pend && (pend.reprogramacoesPendentes > 0 || pend.abonosSemCiencia > 0)}
+		<span
+			class="mt-0.5 block text-3xs font-semibold text-warning-700 dark:text-warning-400"
+			title={[
+				pend.reprogramacoesPendentes > 0 &&
+					`${pend.reprogramacoesPendentes} reprogramação de férias aguardando a COGEP`,
+				pend.abonosSemCiencia > 0 && `${pend.abonosSemCiencia} abono sem ciência da unidade`
+			]
+				.filter(Boolean)
+				.join(' · ')}
+		>
+			⚠ Férias: {pend.reprogramacoesPendentes > 0
+				? 'pedido pendente'
+				: ''}{pend.reprogramacoesPendentes > 0 && pend.abonosSemCiencia > 0
+				? ' · '
+				: ''}{pend.abonosSemCiencia > 0 ? 'abono sem ciência' : ''}
+		</span>
 	{/if}
 {/snippet}
 

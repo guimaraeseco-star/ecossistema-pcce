@@ -23,6 +23,7 @@ import {
 } from '$lib/db/efetivo';
 import { municipiosPorUnidade, populacaoPorIbge } from '$lib/db/cobertura';
 import { responsaveisVigentesDe, type ResponsavelDaUnidade } from '$lib/db/unidades-responsaveis';
+import { pendenciasDeFeriasPorLotacao } from '$lib/db';
 import { escopoDeUnidades } from '$lib/server/unidades/escopo';
 import { nivelTipoUnidade, rotuloTipoUnidade } from '$lib/unidades/tipos';
 import { hojeBrasilISO } from '$lib/utils/datas';
@@ -53,6 +54,12 @@ export interface LinhaUnidade {
 	 * o que a consulta de respondência procura (E54).
 	 */
 	direcao: { nome: string; papel: 'titular' | 'respondente'; policialId: number } | null;
+	/**
+	 * Pendências de férias da unidade COM a subárvore: pedidos aguardando a
+	 * COGEP e abonos deferidos sem ciência. É ALERTA no cartão até a unidade
+	 * resolver (decisão dele, 17/09).
+	 */
+	pendenciasFerias: { reprogramacoesPendentes: number; abonosSemCiencia: number };
 }
 
 export interface BlocoUnidade {
@@ -78,17 +85,19 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 	// Uma unidade só no escopo: a "lista" seria a própria ficha.
 	if (escopo.nos.length === 1) redirect(302, `/unidade/${escopo.raiz.id}`);
 
-	const [efetivos, ibgesPorUnidade, populacaoDe, direcoes] = await Promise.all([
-		efetivoPorLotacao(db, hojeBrasilISO()),
-		municipiosPorUnidade(db),
-		populacaoPorIbge(db),
-		// Quem dirige cada unidade, numa consulta só — é o que responde "quais
-		// delegacias estão sem titular" sem abrir ficha por ficha (E54).
-		responsaveisVigentesDe(
-			db,
-			escopo.nos.map((n) => n.id)
-		)
-	]);
+	const [efetivos, ibgesPorUnidade, populacaoDe, direcoes, pendenciasPorLotacao] =
+		await Promise.all([
+			efetivoPorLotacao(db, hojeBrasilISO()),
+			municipiosPorUnidade(db),
+			populacaoPorIbge(db),
+			// Quem dirige cada unidade, numa consulta só — é o que responde "quais
+			// delegacias estão sem titular" sem abrir ficha por ficha (E54).
+			responsaveisVigentesDe(
+				db,
+				escopo.nos.map((n) => n.id)
+			),
+			pendenciasDeFeriasPorLotacao(db)
+		]);
 	const filhosDe = (id: number) =>
 		escopo.nos
 			.filter((n) => n.seccional_id === id)
@@ -136,7 +145,18 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 			 * regra não tem titular, e delegacia sem titular é justamente o que a
 			 * consulta de respondência procura.
 			 */
-			direcao: resumoDaDirecao(direcoes.get(n.id))
+			direcao: resumoDaDirecao(direcoes.get(n.id)),
+			pendenciasFerias: [n, ...desc].reduce(
+				(acc, d) => {
+					const p = pendenciasPorLotacao.get(d.nome);
+					if (p) {
+						acc.reprogramacoesPendentes += p.reprogramacoesPendentes;
+						acc.abonosSemCiencia += p.abonosSemCiencia;
+					}
+					return acc;
+				},
+				{ reprogramacoesPendentes: 0, abonosSemCiencia: 0 }
+			)
 		};
 	};
 

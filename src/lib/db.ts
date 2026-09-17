@@ -133,7 +133,10 @@ export {
 	registrarAbono,
 	darCienciaDoAbono,
 	pendenciasDeFerias,
-	contagemParaTeto
+	contagemParaTeto,
+	pendenciasDeFeriasPorLotacao,
+	abonosVigentesDe,
+	feriasDoAno
 } from './db/policiais';
 export type {
 	CampoSolicitacao,
@@ -141,6 +144,7 @@ export type {
 	DesignacaoDaTela,
 	FracaoCompleta,
 	PendenciasDeFerias,
+	FeriasNoMes,
 	MudancaSolicitada,
 	NovaAcaoSolicitada,
 	NovoEventoHistorico

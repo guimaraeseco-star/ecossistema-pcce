@@ -294,7 +294,26 @@
 			>
 		{/if}
 		{@render linhaDirecao(u)}
+		{@render alertaFerias(u)}
 	</td>
+{/snippet}
+
+<!-- Pendência de férias: o que a unidade ainda tem de resolver (pedido à COGEP
+     sem homologação, abono sem ciência). Fica até sumir a causa. -->
+{#snippet alertaFerias(u: LinhaUnidade)}
+	{@const p = u.pendenciasFerias}
+	{#if p.reprogramacoesPendentes > 0 || p.abonosSemCiencia > 0}
+		<span class="block text-2xs font-semibold text-warning-700 dark:text-warning-400">
+			⚠ Férias: {[
+				p.reprogramacoesPendentes > 0 &&
+					`${p.reprogramacoesPendentes} pedido${p.reprogramacoesPendentes === 1 ? '' : 's'} aguardando a COGEP`,
+				p.abonosSemCiencia > 0 &&
+					`${p.abonosSemCiencia} abono${p.abonosSemCiencia === 1 ? '' : 's'} sem ciência`
+			]
+				.filter(Boolean)
+				.join(' · ')}
+		</span>
+	{/if}
 {/snippet}
 
 <!-- Quem dirige, embaixo do nome. Linha e não coluna: a tabela já tem onze, e
