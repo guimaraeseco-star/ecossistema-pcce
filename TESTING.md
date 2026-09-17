@@ -441,20 +441,34 @@ HISTORICO.xlsx --enviar --local`): 698/914 linhas casam com a base (os
 - [ ] Fila /solicitacoes com um pedido de direção: o tipo aparece como
       "Direção de unidade", e o detalhe mostra Unidade e Papel antes das datas
 - [ ] Férias — lançar (E56, migração 0091): na ficha do servidor, o cartão
-      "Férias" abaixo das solicitações; "Lançar fração" pede exercício, fração
-      (1ª/2ª/3ª), início e fim, mostra o período aquisitivo calculado da data
-      de posse e avisa fração menor que 10 dias; lançada, a fração aparece por
-      exercício com o status pela data (Programada / Em gozo / Gozada) e o
-      afastamento de férias surge na linha do tempo; lançar a mesma fração de
-      novo é recusado; "Excluir" some com o afastamento junto
-- [ ] Férias — o assistente: "Reprogramar" numa fração FUTURA diz SUSTAÇÃO em
-      letras grandes, com o motivo ("ainda não iniciou") e o artigo; numa
-      fração EM GOZO diz SUSPENSÃO e exige retorno ao serviço e justificativa;
-      na 2ª fração com a 1ª já gozada, diz sustação e avisa que o § 13 admite
-      suspensão. As novas datas são conferidas na hora: quantidade diferente
-      de dias, 1º dia em sábado/domingo/feriado e fração < 10 travam o botão;
-      "Gerar ofício" registra o pedido, mostra o ofício com botão Copiar, e o
-      pedido fica em amarelo "aguardando a COGEP" com NUP para anotar
+      "Férias" (dourado, borda e título — dá para achar de longe) abaixo das
+      solicitações; "Lançar programação" pede o exercício, mostra o período
+      aquisitivo calculado da data de posse e pergunta "Quantos períodos?"
+      (1 / 2 / 3); com 2 aparecem as formas 10 + 20, 20 + 10 e 15 + 15; depois
+      só o 1º dia de cada fração — o último dia aparece ao lado, calculado.
+      Um 1º dia em sábado/domingo (01/11/2026 é domingo) ou feriado trava o
+      botão com a frase em vermelho; 2ª fração começando antes de a 1ª
+      terminar também. Lançada, cada fração aparece com o status pela data
+      (Programada / Em gozo / Gozada) e os afastamentos de férias surgem na
+      linha do tempo; lançar o mesmo exercício de novo é recusado; "Excluir"
+      (só com a programação intacta) some com os afastamentos junto
+- [ ] Férias — sustar: o botão "Sustar a fração" / "Sustar as N frações" fica
+      no cabeçalho do exercício, e só quando há fração por começar; o
+      assistente diz SUSTAÇÃO em letras grandes, lista as frações alcançadas
+      (todas as não iniciadas — as férias são um período só) e oferece as
+      divisões possíveis para os dias que restam (30 sustados → 1, 2 ou 3
+      períodos; 20 → 20 ou 10 + 10), com a divisão atual pré-marcada; os
+      primeiros dias passam pela mesma régua do lançamento. "Gerar ofício"
+      registra o pedido, mostra o ofício (com todas as frações originais e os
+      novos períodos) com botão Copiar, e o pedido fica em amarelo "aguardando
+      a COGEP" no exercício, com NUP para anotar; enquanto pendente, os botões
+      de sustar/suspender/excluir somem
+- [ ] Férias — suspender: "Suspender" só aparece na fração EM GOZO hoje; o
+      formulário diz SUSPENSÃO, pede o retorno ao serviço (limitado ao período
+      da fração) e mostra "N gozados · restam M dias"; pede só o 1º dia do
+      período que resta e calcula o último; menos de 7 dias gozados trava,
+      reprogramar depois de 10 dias só avisa; justificativa obrigatória. As
+      frações seguintes não mudam
 - [ ] Férias — homologar: "COGEP deferiu" na sustação faz a fração antiga
       aparecer riscada (Sustada), a nova entrar como Programada (reprogramada)
       e o afastamento antigo sumir; na suspensão, o afastamento antigo encurta

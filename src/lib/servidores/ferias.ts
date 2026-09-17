@@ -20,9 +20,13 @@
  *   - a fração **já começou** → SUSPENSÃO. Exige imperiosa necessidade do
  *     serviço, ao menos 7 dias gozados e reprogramação em até 10 dias.
  *
- * O decreto ainda admite suspender a 2ª fração antes de ela começar, quando a
- * 1ª já foi gozada (art. 3º § 13, Dec. 33.739/2020) — o classificador aponta
- * isso como alternativa, sem trocar a resposta padrão.
+ * E as férias são UM período, ainda que fracionado (decisão dele, 17/09/2026):
+ * a programação entra pela divisão escolhida (uma das cinco formas) mais o 1º
+ * dia de cada fração — o último sai da regra —, a sustação alcança todas as
+ * frações não iniciadas de uma vez e pode redividi-las, e a suspensão é a
+ * exceção, porque o servidor já está de férias. O § 13 do Dec. 33.739/2020
+ * (suspender a 2ª antes de começar, com a 1ª gozada) fica fora: na prática da
+ * COGEP o que não começou se susta.
  */
 import { adicionarDias, diffDiasInclusivo, formatarData } from '$lib/utils/datas';
 import type { SubtipoAfastamento } from './afastamentos';
@@ -66,8 +70,10 @@ const FRACIONAMENTOS_VALIDOS: readonly (readonly number[])[] = [
 	[10, 10, 10]
 ];
 
-/** Nenhuma fração pode ter menos que isto (Dec. 33.216/2019, art. 11, p. único). */
-const MINIMO_DIAS_POR_FRACAO = 10;
+// O mínimo de 10 dias por fração (Dec. 33.216/2019, art. 11, p. único) não
+// precisa de checagem própria: toda divisão nasce de uma das cinco formas
+// acima, e a única fração menor que isso é o que resta de uma SUSPENSÃO —
+// que não é escolha de ninguém, é o que sobrou.
 
 /** As frações de um exercício formam uma das cinco formas? */
 export function fracionamentoValido(diasPorFracao: readonly number[]): boolean {
@@ -150,6 +156,122 @@ function isoSeguro(ano: number, mes: number, dia: number): string {
 	return `${ano}-${String(mes).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
+/* ── As férias são UM período: a divisão e o 1º dia de cada fração ──────── */
+
+/**
+ * As divisões possíveis para `dias` — o que o formulário oferece.
+ *
+ * Para 30 dias, as cinco formas. Para o que RESTA depois de uma sustação
+ * parcial (a 1ª fração já gozada, por exemplo), os sufixos das cinco formas
+ * que somam o restante: 20 → [20] ou [10, 10]; 15 → [15]; 10 → [10]. É a
+ * regra que se adapta, por construção — não há uma segunda tabela para
+ * manter (pedido dele, 17/09: "as férias são um período só, mesmo
+ * fracionadas").
+ */
+export function divisoesPossiveis(dias: number): readonly (readonly number[])[] {
+	const vistas = new Set<string>();
+	const saida: (readonly number[])[] = [];
+	for (const forma of FRACIONAMENTOS_VALIDOS) {
+		for (let i = 0; i < forma.length; i++) {
+			const sufixo = forma.slice(i);
+			if (sufixo.reduce((a, b) => a + b, 0) !== dias) continue;
+			const chave = sufixo.join('+');
+			if (vistas.has(chave)) continue;
+			vistas.add(chave);
+			saida.push(sufixo);
+		}
+	}
+	return saida;
+}
+
+/** "10 + 20" — como a divisão aparece na tela e viaja no formulário. */
+export function rotuloDaDivisao(divisao: readonly number[]): string {
+	return divisao.join(' + ');
+}
+
+/** O último dia de uma fração de `dias` a partir do 1º ("01/10" + 10 = "10/10"). */
+export function fimDaFracao(inicioISO: string, dias: number): string {
+	return adicionarDias(inicioISO, dias - 1);
+}
+
+/**
+ * O 1º dia de uma fração tem de ser dia útil: nem fim de semana, nem feriado
+ * nacional (regra do Guardião, que a unidade reproduz ao digitar aqui — o
+ * lançamento de 01/11/2026, um domingo, passou antes desta checagem).
+ */
+export function conferirPrimeiroDia(inicioISO: string, feriados: readonly string[]): Checagem {
+	const diaSemana = new Date(inicioISO + 'T00:00:00Z').getUTCDay();
+	const fimDeSemana = diaSemana === 0 || diaSemana === 6;
+	const feriado = feriados.includes(inicioISO);
+	return {
+		ok: !fimDeSemana && !feriado,
+		nivel: 'erro',
+		texto: fimDeSemana
+			? `${formatarData(inicioISO)} cai em fim de semana: o primeiro dia precisa ser dia útil.`
+			: feriado
+				? `${formatarData(inicioISO)} é feriado: o primeiro dia precisa ser dia útil.`
+				: `${formatarData(inicioISO)} é dia útil.`
+	};
+}
+
+/** Um período montado a partir do 1º dia e da quantidade de dias. */
+export interface PeriodoMontado {
+	inicio: string;
+	fim: string;
+	dias: number;
+}
+
+/**
+ * Monta os períodos de uma divisão a partir do 1º dia de cada fração, e
+ * confere o que o Guardião conferiria: cada 1º dia é dia útil, e as frações
+ * vêm em ordem, sem se sobrepor. Devolve os períodos e as checagens; com
+ * erro, o chamador não grava.
+ */
+export function montarPeriodos(
+	divisao: readonly number[],
+	inicios: readonly string[],
+	feriados: readonly string[]
+): { periodos: PeriodoMontado[]; checagens: Checagem[] } {
+	// Alinhado à divisão (`null` onde falta o 1º dia), para a sobreposição
+	// comparar cada fração com a ANTERIOR dela e não com a última válida.
+	const montados: (PeriodoMontado | null)[] = [];
+	const checagens: Checagem[] = [];
+	for (let i = 0; i < divisao.length; i++) {
+		const inicio = inicios[i] ?? '';
+		if (!/^\d{4}-\d{2}-\d{2}$/.test(inicio)) {
+			checagens.push({ ok: false, nivel: 'erro', texto: `Informe o 1º dia da ${i + 1}ª fração.` });
+			montados.push(null);
+			continue;
+		}
+		const dias = divisao[i];
+		const fim = fimDaFracao(inicio, dias);
+		montados.push({ inicio, fim, dias });
+		const primeiroDia = conferirPrimeiroDia(inicio, feriados);
+		checagens.push({ ...primeiroDia, texto: `${i + 1}ª fração: ${primeiroDia.texto}` });
+		const anterior = montados[i - 1];
+		if (anterior && inicio <= anterior.fim) {
+			checagens.push({
+				ok: false,
+				nivel: 'erro',
+				texto: `A ${i + 1}ª fração (${formatarData(inicio)}) começa antes de a ${i}ª terminar (${formatarData(anterior.fim)}).`
+			});
+		}
+	}
+	return { periodos: montados.filter((p): p is PeriodoMontado => p !== null), checagens };
+}
+
+/**
+ * Na SUSPENSÃO, o que resta da fração em gozo depois do retorno ao serviço:
+ * é isso que a fração nova precisa ter — não a quantidade original.
+ */
+export function diasRestantesNaSuspensao(
+	fracao: Pick<Fracao, 'data_inicio' | 'data_fim'>,
+	dataSuspensaoISO: string
+): { gozados: number; restantes: number } {
+	const gozados = diffDiasInclusivo(fracao.data_inicio, adicionarDias(dataSuspensaoISO, -1));
+	return { gozados, restantes: Math.max(0, diasDaFracao(fracao) - gozados) };
+}
+
 /* ── Reprogramação: sustação × suspensão ─────────────────────────────────── */
 
 export type TipoReprogramacao = 'sustacao' | 'suspensao';
@@ -167,54 +289,82 @@ export interface Checagem {
 	texto: string;
 }
 
-export interface Classificacao {
-	tipo: TipoReprogramacao;
-	/** Por que é este e não o outro — a frase que o usuário precisa ler. */
-	motivo: string;
-	/** Fundamento legal, para o texto do NUP. */
-	base: string;
+/** Fundamento legal de cada instituto, para o texto do NUP. */
+const BASE_LEGAL: Record<TipoReprogramacao, string> = {
+	sustacao: 'Dec. 32.907/2018, art. 3º §§ 10 e 14 (red. Dec. 34.495/2021)',
+	suspensao:
+		'Dec. 32.907/2018, art. 3º § 12 (red. Dec. 33.739/2020) e art. 6º III (red. Dec. 34.495/2021)'
+};
+
+/** O que cabe pedir num exercício HOJE — decidido pelos fatos, não por escolha. */
+export interface SituacaoDaReprogramacao {
 	/**
-	 * A 2ª fração antes de começar, com a 1ª já gozada, admite SUSPENSÃO
-	 * também (art. 3º § 13). Não troca a resposta: informa a alternativa.
+	 * SUSTAÇÃO: as frações ainda não iniciadas, todas de uma vez — as férias
+	 * são UM período. `diasRestantes` é o que a nova divisão redistribui;
+	 * `divisoes` traz a divisão atual primeiro e depois as outras formas do
+	 * decreto que somam o mesmo. `null` quando nada resta por começar.
 	 */
-	admiteSuspensaoPeloParagrafo13: boolean;
+	sustacao: {
+		fracoes: Fracao[];
+		diasRestantes: number;
+		divisoes: readonly (readonly number[])[];
+		motivo: string;
+	} | null;
+	/**
+	 * SUSPENSÃO: a fração em gozo hoje — a única exceção à regra do período
+	 * único, porque o servidor já está de férias. `null` quando ninguém
+	 * está em gozo.
+	 */
+	suspensao: { fracao: Fracao; motivo: string } | null;
 }
 
 /**
- * Sustação ou suspensão? Decide pelos FATOS — a data de início da fração e a
- * data de hoje —, não por escolha do usuário. É o que impede o pedido errado.
+ * Sustação ou suspensão? Decide pelos FATOS — as datas das frações e a data
+ * de hoje —, não por escolha do usuário. É o que impede o pedido errado: o
+ * chefe imediato vê o nome do caso e o motivo antes de escrever o NUP.
  *
- * Lança para fração já gozada, sustada ou suspensa: não há o que reprogramar.
+ * A sustação alcança TODAS as frações que ainda não começaram (decisão do
+ * responsável, 17/09/2026: "as férias são um período só, mesmo fracionadas;
+ * precisam ser sustadas juntas"), e pode redividi-las. A suspensão mira só a
+ * fração em gozo; as futuras ficam como estão.
  */
-export function classificarReprogramacao(
-	fracao: Fracao,
-	hojeISO: string,
-	fracoesDoExercicio: readonly Fracao[] = []
-): Classificacao {
-	const status = statusPelaData(fracao, hojeISO);
-	if (status === 'gozada') throw new Error('Fração já gozada: não há o que reprogramar.');
-	if (status === 'sustada' || status === 'suspensa') {
-		throw new Error(`Fração já ${status}: reprograme a fração que a substituiu.`);
-	}
+export function situacaoDaReprogramacao(
+	fracoesDoExercicio: readonly Fracao[],
+	hojeISO: string
+): SituacaoDaReprogramacao {
+	const vivas = fracoesDoExercicio.filter((f) => f.status === 'programada');
+	const sustaveis = vivas.filter((f) => statusPelaData(f, hojeISO) === 'programada');
+	const emGozo = vivas.find((f) => statusPelaData(f, hojeISO) === 'em_gozo') ?? null;
 
-	if (status === 'em_gozo') {
-		return {
-			tipo: 'suspensao',
-			motivo: `A fração começou em ${formatarData(fracao.data_inicio)} e está em gozo: só cabe SUSPENSÃO, por imperiosa necessidade do serviço.`,
-			base: 'Dec. 32.907/2018, art. 3º § 12 (red. Dec. 33.739/2020) e art. 6º III (red. Dec. 34.495/2021)',
-			admiteSuspensaoPeloParagrafo13: false
+	let sustacao: SituacaoDaReprogramacao['sustacao'] = null;
+	if (sustaveis.length > 0) {
+		const diasRestantes = sustaveis.reduce((n, f) => n + diasDaFracao(f), 0);
+		const atual = sustaveis.map(diasDaFracao);
+		const igual = (d: readonly number[]) => d.join('+') === atual.join('+');
+		// A divisão atual sempre cabe (mesmo quando não é uma das cinco formas —
+		// o que resta depois de uma suspensão pode somar 22, por exemplo); as
+		// outras são as formas do decreto que somam o mesmo.
+		const divisoes = [atual, ...divisoesPossiveis(diasRestantes).filter((d) => !igual(d))];
+		const lista = sustaveis.map((f) => `${f.ordem}ª (${formatarData(f.data_inicio)})`).join(', ');
+		sustacao = {
+			fracoes: sustaveis,
+			diasRestantes,
+			divisoes,
+			motivo:
+				sustaveis.length === 1
+					? `A ${lista} fração ainda não começou: é SUSTAÇÃO. Não precisa de motivo, e os ${diasRestantes} dias podem voltar divididos de outro jeito.`
+					: `As frações ${lista} ainda não começaram: é SUSTAÇÃO, das ${sustaveis.length} juntas — as férias são um período só. Não precisa de motivo, e os ${diasRestantes} dias podem voltar divididos de outro jeito.`
 		};
 	}
 
-	const anteriorGozada = fracoesDoExercicio.some(
-		(f) => f.ordem < fracao.ordem && statusPelaData(f, hojeISO) === 'gozada'
-	);
-	return {
-		tipo: 'sustacao',
-		motivo: `A fração só começa em ${formatarData(fracao.data_inicio)} e ainda não iniciou: é SUSTAÇÃO. Não precisa de motivo.`,
-		base: 'Dec. 32.907/2018, art. 3º §§ 10 e 14 (red. Dec. 34.495/2021)',
-		admiteSuspensaoPeloParagrafo13: anteriorGozada
-	};
+	const suspensao: SituacaoDaReprogramacao['suspensao'] = emGozo
+		? {
+				fracao: emGozo,
+				motivo: `A ${emGozo.ordem}ª fração começou em ${formatarData(emGozo.data_inicio)} e está em gozo: só cabe SUSPENSÃO, por imperiosa necessidade do serviço. As frações seguintes não mudam.`
+			}
+		: null;
+
+	return { sustacao, suspensao };
 }
 
 /**
@@ -257,81 +407,27 @@ export function percentualEmFerias(emFerias: number, efetivo: number): number {
 }
 
 /**
- * Confere as NOVAS datas de uma reprogramação — o que a COGEP olharia e o
- * que o Guardião exigiria:
- *
- * - a mesma quantidade de dias da fração original (não se ganha nem se perde
- *   dia ao reprogramar);
- * - primeiro dia útil: não cai em fim de semana nem em feriado (regra do
- *   Guardião, informada pelo responsável); `feriados` é a lista de datas ISO
- *   que o chamador tem — hoje, o calendário nacional;
- * - fração de ao menos 10 dias;
- * - o teto de 15 % da unidade no mês — AVISO, e só quando é o 1º período
- *   (é assim que a COGEP aplica, segundo o responsável).
+ * O teto de 15 % da unidade no mês do 1º período (art. 6º I) — AVISO, nunca
+ * recusa: o decreto tem exceções e a decisão é do gestor. Só se aplica ao
+ * PRIMEIRO período, porque é assim que a COGEP confere (segundo o
+ * responsável). `null` quando não há o que dizer.
  */
-export function conferirNovoPeriodo(entrada: {
-	fracaoOriginal: Fracao;
-	novoInicio: string;
-	novoFim: string;
-	feriados: readonly string[];
-	/** Quantos da unidade já estarão em férias no mês do novo início, contando este. */
-	emFeriasNoMes?: number;
-	efetivoDaUnidade?: number;
-}): Checagem[] {
-	const { fracaoOriginal, novoInicio, novoFim, feriados } = entrada;
-	const diasOriginais = diasDaFracao(fracaoOriginal);
-	const diasNovos = diffDiasInclusivo(novoInicio, novoFim);
-	const checagens: Checagem[] = [];
-
-	checagens.push({
-		ok: diasNovos === diasOriginais,
-		nivel: 'erro',
+export function avisoDoTeto(entrada: {
+	ordem: number;
+	/** Quantos da unidade já estarão em férias no mês, contando este. */
+	emFeriasNoMes: number;
+	efetivoDaUnidade: number;
+}): Checagem | null {
+	if (entrada.ordem !== 1 || entrada.efetivoDaUnidade <= 0) return null;
+	const pct = percentualEmFerias(entrada.emFeriasNoMes, entrada.efetivoDaUnidade);
+	return {
+		ok: pct <= TETO_PERCENTUAL_EM_FERIAS,
+		nivel: 'aviso',
 		texto:
-			diasNovos === diasOriginais
-				? `${diasNovos} dias, como a fração original.`
-				: `${diasNovos} dia(s) no novo período, mas a fração original tem ${diasOriginais}: reprogramar não muda a quantidade.`
-	});
-
-	const diaSemana = new Date(novoInicio + 'T00:00:00Z').getUTCDay();
-	const fimDeSemana = diaSemana === 0 || diaSemana === 6;
-	const feriado = feriados.includes(novoInicio);
-	checagens.push({
-		ok: !fimDeSemana && !feriado,
-		nivel: 'erro',
-		texto: fimDeSemana
-			? `${formatarData(novoInicio)} cai em fim de semana: o primeiro dia precisa ser dia útil.`
-			: feriado
-				? `${formatarData(novoInicio)} é feriado: o primeiro dia precisa ser dia útil.`
-				: `${formatarData(novoInicio)} é dia útil.`
-	});
-
-	checagens.push({
-		ok: diasNovos >= MINIMO_DIAS_POR_FRACAO,
-		nivel: 'erro',
-		texto:
-			diasNovos >= MINIMO_DIAS_POR_FRACAO
-				? `Fração de ${diasNovos} dias (mínimo ${MINIMO_DIAS_POR_FRACAO}).`
-				: `Fração de ${diasNovos} dia(s) — o mínimo é ${MINIMO_DIAS_POR_FRACAO} (Dec. 33.216/2019, art. 11).`
-	});
-
-	if (
-		fracaoOriginal.ordem === 1 &&
-		entrada.emFeriasNoMes != null &&
-		entrada.efetivoDaUnidade != null &&
-		entrada.efetivoDaUnidade > 0
-	) {
-		const pct = percentualEmFerias(entrada.emFeriasNoMes, entrada.efetivoDaUnidade);
-		checagens.push({
-			ok: pct <= TETO_PERCENTUAL_EM_FERIAS,
-			nivel: 'aviso',
-			texto:
-				pct <= TETO_PERCENTUAL_EM_FERIAS
-					? `${pct} % da unidade em férias no mês (teto ${TETO_PERCENTUAL_EM_FERIAS} %).`
-					: `${pct} % da unidade em férias no mês — acima do teto de ${TETO_PERCENTUAL_EM_FERIAS} % (art. 6º I). A COGEP confere isto no 1º período.`
-		});
-	}
-
-	return checagens;
+			pct <= TETO_PERCENTUAL_EM_FERIAS
+				? `${pct} % da unidade em férias no mês (teto ${TETO_PERCENTUAL_EM_FERIAS} %).`
+				: `${pct} % da unidade em férias no mês — acima do teto de ${TETO_PERCENTUAL_EM_FERIAS} % (art. 6º I). A COGEP confere isto no 1º período.`
+	};
 }
 
 /** Há erro que impede? (Avisos deixam passar.) */
@@ -343,14 +439,12 @@ export function temErro(checagens: readonly Checagem[]): boolean {
 
 export interface DadosDoOficio {
 	servidor: { nome: string; matricula: string; cargo: string; lotacao: string };
-	classificacao: Classificacao;
-	fracaoOriginal: Fracao;
-	novoInicio: string;
-	novoFim: string;
+	tipo: TipoReprogramacao;
+	/** As frações alcançadas: todas as sustadas, ou só a suspensa. */
+	fracoesOriginais: readonly Fracao[];
+	novosPeriodos: readonly PeriodoMontado[];
 	/** Obrigatória na suspensão: a imperiosa necessidade do serviço. */
 	justificativa?: string;
-	/** Na sustação por licença, o afastamento que coincide (opcional). */
-	afastamentoQueCoincide?: { rotulo: string; inicio: string; fim: string | null };
 	dataSuspensao?: string;
 }
 
@@ -360,37 +454,38 @@ export interface DadosDoOficio {
  */
 export function textoDoOficio(d: DadosDoOficio): string {
 	const s = d.servidor;
-	const tipo = ROTULO_TIPO_REPROGRAMACAO[d.classificacao.tipo].toUpperCase();
-	const dias = diasDaFracao(d.fracaoOriginal);
+	const tipo = ROTULO_TIPO_REPROGRAMACAO[d.tipo].toUpperCase();
+	const periodo = (inicio: string, fim: string, dias: number) =>
+		`de ${formatarData(inicio)} a ${formatarData(fim)} (${dias} dias)`;
+	const plural = (n: number) => (n === 1 ? '' : 's');
 	const linhas = [
 		`Assunto: ${tipo} de férias — ${s.nome}`,
 		'',
 		`Servidor(a): ${s.nome}, ${s.cargo}, matrícula ${s.matricula}, lotado(a) na ${s.lotacao}.`,
 		'',
-		`Período programado: ${d.fracaoOriginal.ordem}ª fração, de ${formatarData(d.fracaoOriginal.data_inicio)} a ${formatarData(d.fracaoOriginal.data_fim)} (${dias} dias).`,
-		`Período de reprogramação: de ${formatarData(d.novoInicio)} a ${formatarData(d.novoFim)} (${diffDiasInclusivo(d.novoInicio, d.novoFim)} dias).`,
+		`Período${plural(d.fracoesOriginais.length)} programado${plural(d.fracoesOriginais.length)}:`,
+		...d.fracoesOriginais.map(
+			(f) => `  - ${f.ordem}ª fração, ${periodo(f.data_inicio, f.data_fim, diasDaFracao(f))}`
+		),
+		`Período${plural(d.novosPeriodos.length)} de reprogramação:`,
+		...d.novosPeriodos.map((p, k) => `  - ${k + 1}º período, ${periodo(p.inicio, p.fim, p.dias)}`),
 		''
 	];
-	if (d.classificacao.tipo === 'sustacao') {
+	if (d.tipo === 'sustacao') {
 		linhas.push(
 			`Trata-se de SUSTAÇÃO: o período programado ainda não teve início.`,
-			...(d.afastamentoQueCoincide
-				? [
-						`Motivo: ${d.afastamentoQueCoincide.rotulo} de ${formatarData(d.afastamentoQueCoincide.inicio)}${d.afastamentoQueCoincide.fim ? ` a ${formatarData(d.afastamentoQueCoincide.fim)}` : ' (em curso)'}, coincidente com o período programado.`
-					]
-				: []),
 			...(d.justificativa?.trim() ? [`Observação: ${d.justificativa.trim()}`] : [])
 		);
 	} else {
-		const gozados = d.dataSuspensao
-			? diffDiasInclusivo(d.fracaoOriginal.data_inicio, adicionarDias(d.dataSuspensao, -1))
-			: null;
+		const f = d.fracoesOriginais[0];
+		const gozados =
+			d.dataSuspensao && f ? diasRestantesNaSuspensao(f, d.dataSuspensao).gozados : null;
 		linhas.push(
 			`Trata-se de SUSPENSÃO de férias já iniciadas${d.dataSuspensao ? `, com retorno ao serviço em ${formatarData(d.dataSuspensao)}` : ''}${gozados != null ? ` (${gozados} dias gozados)` : ''}, por imperiosa necessidade do serviço.`,
 			`Justificativa: ${d.justificativa?.trim() || '(informar a necessidade do serviço)'}`
 		);
 	}
-	linhas.push('', `Fundamento: ${d.classificacao.base}.`);
+	linhas.push('', `Fundamento: ${BASE_LEGAL[d.tipo]}.`);
 	return linhas.join('\n');
 }
 

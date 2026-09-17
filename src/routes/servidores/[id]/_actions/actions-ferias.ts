@@ -1,22 +1,25 @@
 /**
  * As actions de FÉRIAS da ficha do servidor (`/servidores/[id]`) — o que a
- * unidade faz com as frações que vieram do Guardião e com os pedidos à COGEP,
- * e o que só o DPI SUL faz com o abono.
+ * unidade faz com a programação que veio do Guardião e com os pedidos à
+ * COGEP, e o que só o DPI SUL faz com o abono.
  *
  * Quem pode (decisões do responsável, 17/09/2026):
  *
- *   - **lançar, excluir, reprogramar, anotar o NUP e homologar a resposta da
- *     COGEP**: qualquer perfil que abre a ficha dentro do escopo — a unidade
- *     em primeiro lugar, porque é ela quem monta o pedido; a seccional e o
- *     Admin Geral também. O portão é `carregarFichaDoPolicial`, o mesmo das
- *     ações de RH, e é ele que recusa o id de outra seccional;
+ *   - **lançar, excluir, sustar, suspender, anotar o NUP e homologar a
+ *     resposta da COGEP**: qualquer perfil que abre a ficha dentro do escopo —
+ *     a unidade em primeiro lugar, porque é ela quem monta o pedido; a
+ *     seccional e o Admin Geral também. O portão é `carregarFichaDoPolicial`,
+ *     o mesmo das ações de RH, e é ele que recusa o id de outra seccional;
  *   - **registrar o abono**: só o Admin Geral, porque o servidor pede direto à
  *     COGEP e é o DPI SUL que recebe a decisão;
  *   - **dar ciência do abono**: a unidade (o Admin Geral também).
  *
- * As REGRAS (sustação × suspensão, critérios, ofício) são de
- * `$lib/servidores/ferias` e rodam AQUI de novo, ainda que a tela já as tenha
- * mostrado: o POST direto não passa pela tela. A classificação nunca vem do
+ * As férias são UM período, ainda que fracionado: a programação entra
+ * inteira (a divisão escolhida + o 1º dia de cada fração; o último dia sai da
+ * regra), a sustação alcança todas as frações não iniciadas de uma vez e pode
+ * redividi-las, e a suspensão é a exceção — mira a fração em gozo. As REGRAS
+ * (`$lib/servidores/ferias`) rodam AQUI de novo, ainda que a tela já as tenha
+ * mostrado: o POST direto não passa pela tela. O tipo do pedido nunca vem do
  * formulário — vem dos fatos, e é isso que impede o pedido errado.
  */
 import { fail } from '@sveltejs/kit';
@@ -31,11 +34,12 @@ import {
 	contagemParaTeto,
 	darCienciaDoAbono,
 	decidirReprogramacao,
-	excluirFracao,
+	excluirProgramacao,
 	listarFeriasDoPolicial,
 	listarHistoricoPolicial,
+	periodosDoPedido,
 	registrarAbono,
-	registrarFracao
+	registrarProgramacao
 } from '$lib/db';
 import { feriadosNoIntervalo } from '$lib/db/diarias/feriados';
 import { isAdminGeral } from '$lib/auth';
@@ -43,18 +47,22 @@ import { carregarFichaDoPolicial } from '$lib/server/policiais/ficha-permissao';
 import { dataIso, inteiroNaFaixa, textoLimitado } from '$lib/server/form-data';
 import { MAX_JUSTIFICATIVA } from '$lib/cadastro-campos';
 import {
-	classificarReprogramacao,
+	avisoDoTeto,
 	conferirAbono,
-	conferirNovoPeriodo,
 	criteriosDaSuspensao,
+	diasRestantesNaSuspensao,
+	divisoesPossiveis,
+	montarPeriodos,
+	situacaoDaReprogramacao,
 	statusPelaData,
 	temErro,
 	textoDoOficio,
 	type Checagem,
 	type Fracao,
+	type PeriodoMontado,
 	type PosicaoDoAbono
 } from '$lib/servidores/ferias';
-import { hojeBrasilISO } from '$lib/utils/datas';
+import { adicionarDias, hojeBrasilISO } from '$lib/utils/datas';
 
 type Event = RequestEvent<{ id: string }>;
 
@@ -78,20 +86,57 @@ function primeiroErro(checagens: Checagem[]): string | null {
 	return checagens.find((c) => !c.ok && c.nivel === 'erro')?.texto ?? null;
 }
 
-/** Fração pertence ao servidor da URL? Id de fração também chega de fora. */
-async function fracaoDoServidor(db: ReturnType<typeof getDB>, fd: FormData, policialId: number) {
-	const fracaoId = inteiroNaFaixa(fd, 'fracao_id', 1, 99_999_999);
-	if (!fracaoId) return { erro: fail(400, { error: 'Fração inválida.' }) };
-	const fracao = await buscarFracao(db, fracaoId);
-	if (!fracao || fracao.policial_id !== policialId) {
-		return { erro: fail(404, { error: 'Fração não encontrada para este servidor.' }) };
+/**
+ * A divisão escolhida (`divisao`, "10+20") e os primeiros dias (`inicio_1`,
+ * `inicio_2`, `inicio_3`) viram períodos montados pela regra — dia útil no 1º
+ * dia, sem sobreposição. A divisão precisa estar entre as `admitidas`: é o
+ * que impede o POST direto de inventar "5+25".
+ */
+async function lerPeriodos(
+	db: ReturnType<typeof getDB>,
+	fd: FormData,
+	admitidas: readonly (readonly number[])[]
+): Promise<{ periodos: PeriodoMontado[] } | { erro: ReturnType<typeof fail> }> {
+	const divisaoBruta = textoLimitado(fd, 'divisao', 20);
+	const divisao = admitidas.find((d) => d.join('+') === divisaoBruta.replace(/\s/g, ''));
+	if (!divisao) return { erro: fail(400, { error: 'Escolha como dividir as férias.' }) };
+	const inicios = divisao.map((_, k) => dataIso(fd, `inicio_${k + 1}`) ?? '');
+	const validos = inicios.filter(Boolean).sort();
+	const feriados =
+		validos.length > 0
+			? await feriadosNoIntervalo(db, validos[0], adicionarDias(validos[validos.length - 1], 1))
+			: [];
+	const { periodos, checagens } = montarPeriodos(
+		divisao,
+		inicios,
+		feriados.map((f) => f.data)
+	);
+	if (temErro(checagens) || periodos.length !== divisao.length) {
+		return {
+			erro: fail(400, { error: primeiroErro(checagens) ?? 'Informe o 1º dia de cada fração.' })
+		};
 	}
-	return { fracao };
+	return { periodos };
+}
+
+/** O aviso do teto de 15 % no mês em que o 1º período começa — só avisa. */
+async function avisoDoTetoNoMes(
+	db: ReturnType<typeof getDB>,
+	lotacao: string,
+	ordem: number,
+	inicioISO: string
+): Promise<Checagem | null> {
+	const teto = await contagemParaTeto(db, lotacao, inicioISO.slice(0, 7));
+	return avisoDoTeto({
+		ordem,
+		emFeriasNoMes: teto.emFerias + 1,
+		efetivoDaUnidade: teto.efetivo
+	});
 }
 
 export const actionsFerias = {
-	/** A unidade lança uma fração homologada no Guardião. */
-	registrarFracao: async (event: Event) => {
+	/** A unidade lança a programação de um exercício, homologada no Guardião. */
+	registrarProgramacao: async (event: Event) => {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
 			event.locals.usuario,
@@ -102,30 +147,24 @@ export const actionsFerias = {
 
 		const fd = await event.request.formData();
 		const exercicio = inteiroNaFaixa(fd, 'exercicio', 2000, 2100);
-		const ordem = inteiroNaFaixa(fd, 'ordem', 1, 3);
-		const inicio = dataIso(fd, 'data_inicio');
-		const fim = dataIso(fd, 'data_fim');
 		const observacao = textoLimitado(fd, 'observacao', MAX_JUSTIFICATIVA);
-		if (!exercicio || !ordem || !inicio || !fim) {
-			return fail(400, { error: 'Informe exercício, fração, início e fim.' });
-		}
-		if (fim < inicio) return fail(400, { error: 'O fim não pode ser anterior ao início.' });
+		if (!exercicio) return fail(400, { error: 'Informe o exercício.' });
+		const lidos = await lerPeriodos(db, fd, divisoesPossiveis(30));
+		if ('erro' in lidos) return lidos.erro;
+		const { periodos } = lidos;
 
-		const r = await registrarFracao(
+		const r = await registrarProgramacao(
 			db,
-			{
-				policial_id: id,
-				exercicio,
-				ordem: ordem as 1 | 2 | 3,
-				data_inicio: inicio,
-				data_fim: fim,
-				observacao
-			},
+			{ policial_id: id, exercicio, periodos, observacao },
 			{ id: u.id, nome: u.nome }
 		);
 		if (!r.ok) {
-			return fail(409, { error: `A ${ordem}ª fração de ${exercicio} já está lançada.` });
+			return fail(409, {
+				error: `O exercício ${exercicio} já está lançado. Para mudar, exclua a programação ou reprograme.`
+			});
 		}
+		const aviso = await avisoDoTetoNoMes(db, alvo.lotacao, 1, periodos[0].inicio);
+		const avisos = aviso && !aviso.ok ? [aviso.texto] : [];
 
 		const { contexto, env } = contextoDeEvento(event);
 		await auditar(
@@ -138,16 +177,17 @@ export const actionsFerias = {
 				alvo_tipo: 'policial',
 				alvo_id: id,
 				alvo_nome: alvo.nome,
-				detalhes: `${ordem}ª fração ${exercicio}: ${inicio} a ${fim}`,
+				detalhes: `Exercício ${exercicio}: ${periodos.map((p) => `${p.inicio} a ${p.fim} (${p.dias})`).join('; ')}`,
+				metadados: { avisos },
 				...contexto
 			},
 			{ env }
 		);
-		return { success: true, ferias: await listarFeriasDoPolicial(db, id) };
+		return { success: true, ferias: await listarFeriasDoPolicial(db, id), avisos };
 	},
 
-	/** Fração digitada errada: some, com o evento junto. Só enquanto programada e sem vínculo. */
-	excluirFracao: async (event: Event) => {
+	/** Programação digitada errada: some, com os eventos junto. Só sem vínculo. */
+	excluirProgramacao: async (event: Event) => {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
 			event.locals.usuario,
@@ -157,16 +197,16 @@ export const actionsFerias = {
 		const { u, db, id, alvo } = auth;
 
 		const fd = await event.request.formData();
-		const achada = await fracaoDoServidor(db, fd, id);
-		if ('erro' in achada) return achada.erro;
+		const exercicio = inteiroNaFaixa(fd, 'exercicio', 2000, 2100);
+		if (!exercicio) return fail(400, { error: 'Informe o exercício.' });
 
-		const r = await excluirFracao(db, achada.fracao.id);
+		const r = await excluirProgramacao(db, id, exercicio);
 		if (!r.ok) {
 			return fail(409, {
 				error:
 					r.motivo === 'tem_vinculo'
-						? 'Esta fração tem pedido ou abono ligado a ela e não pode ser excluída.'
-						: 'Só uma fração ainda programada pode ser excluída.'
+						? 'Este exercício tem pedido ou abono ligado a ele e não pode ser excluído.'
+						: 'Só uma programação ainda intacta (sem sustação nem suspensão) pode ser excluída.'
 			});
 		}
 		const { contexto, env } = contextoDeEvento(event);
@@ -180,7 +220,7 @@ export const actionsFerias = {
 				alvo_tipo: 'policial',
 				alvo_id: id,
 				alvo_nome: alvo.nome,
-				detalhes: `${achada.fracao.ordem}ª fração ${achada.fracao.exercicio} excluída (${achada.fracao.data_inicio} a ${achada.fracao.data_fim})`,
+				detalhes: `Programação do exercício ${exercicio} excluída`,
 				...contexto
 			},
 			{ env }
@@ -189,12 +229,12 @@ export const actionsFerias = {
 	},
 
 	/**
-	 * A unidade abre o pedido à COGEP. O TIPO não vem do formulário: sai de
-	 * `classificarReprogramacao`, pelos fatos. As datas novas passam por
-	 * `conferirNovoPeriodo`; na suspensão, também por `criteriosDaSuspensao`.
-	 * Aviso deixa passar; erro recusa.
+	 * SUSTAÇÃO: a unidade abre o pedido à COGEP para TODAS as frações ainda não
+	 * iniciadas do exercício, com a nova divisão e os novos primeiros dias. As
+	 * frações alcançadas não vêm do formulário — vêm dos fatos
+	 * (`situacaoDaReprogramacao`), como a lista de divisões admitidas.
 	 */
-	reprogramar: async (event: Event) => {
+	sustar: async (event: Event) => {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
 			event.locals.usuario,
@@ -204,55 +244,26 @@ export const actionsFerias = {
 		const { u, db, id, alvo } = auth;
 
 		const fd = await event.request.formData();
-		const achada = await fracaoDoServidor(db, fd, id);
-		if ('erro' in achada) return achada.erro;
-		const { fracao } = achada;
-		const novoInicio = dataIso(fd, 'novo_inicio');
-		const novoFim = dataIso(fd, 'novo_fim');
-		const dataSuspensao = dataIso(fd, 'data_suspensao');
+		const exercicio = inteiroNaFaixa(fd, 'exercicio', 2000, 2100);
 		const justificativa = textoLimitado(fd, 'justificativa', MAX_JUSTIFICATIVA);
-		if (!novoInicio || !novoFim) return fail(400, { error: 'Informe o novo período.' });
+		if (!exercicio) return fail(400, { error: 'Informe o exercício.' });
 
 		const hoje = hojeBrasilISO();
-		const todas = (await listarFeriasDoPolicial(db, id))
-			.filter((f) => f.exercicio === fracao.exercicio)
-			.map(comoFracao);
-		let classificacao;
-		try {
-			classificacao = classificarReprogramacao(comoFracao(fracao), hoje, todas);
-		} catch (e) {
-			return fail(409, { error: e instanceof Error ? e.message : 'Fração não reprogramável.' });
+		const { fracoes } = await listarFeriasDoPolicial(db, id);
+		const doExercicio = fracoes.filter((f) => f.exercicio === exercicio);
+		const situacao = situacaoDaReprogramacao(doExercicio.map(comoFracao), hoje);
+		if (!situacao.sustacao) {
+			return fail(409, { error: 'Não há fração por começar neste exercício: nada a sustar.' });
 		}
+		const alvos = doExercicio.filter(
+			(f) => f.status === 'programada' && statusPelaData(comoFracao(f), hoje) === 'programada'
+		);
+		const lidos = await lerPeriodos(db, fd, situacao.sustacao.divisoes);
+		if ('erro' in lidos) return lidos.erro;
+		const { periodos } = lidos;
 
-		if (classificacao.tipo === 'suspensao') {
-			if (!dataSuspensao) {
-				return fail(400, { error: 'Na suspensão, informe o dia do retorno ao serviço.' });
-			}
-			if (!justificativa.trim()) {
-				return fail(400, {
-					error: 'A suspensão exige a imperiosa necessidade do serviço, justificada.'
-				});
-			}
-			const erro = primeiroErro(criteriosDaSuspensao(fracao, dataSuspensao, novoInicio));
-			if (erro) return fail(400, { error: erro });
-		}
-
-		const anoMes = novoInicio.slice(0, 7);
-		const [feriados, teto] = await Promise.all([
-			feriadosNoIntervalo(db, novoInicio, novoInicio),
-			contagemParaTeto(db, alvo.lotacao, anoMes)
-		]);
-		const checagens = conferirNovoPeriodo({
-			fracaoOriginal: comoFracao(fracao),
-			novoInicio,
-			novoFim,
-			feriados: feriados.map((f) => f.data),
-			emFeriasNoMes: teto.emFerias + 1,
-			efetivoDaUnidade: teto.efetivo
-		});
-		if (temErro(checagens))
-			return fail(400, { error: primeiroErro(checagens) ?? 'Período inválido.' });
-
+		const aviso = await avisoDoTetoNoMes(db, alvo.lotacao, alvos[0].ordem, periodos[0].inicio);
+		const avisos = aviso && !aviso.ok ? [aviso.texto] : [];
 		const texto = textoDoOficio({
 			servidor: {
 				nome: alvo.nome,
@@ -260,36 +271,26 @@ export const actionsFerias = {
 				cargo: alvo.cargo,
 				lotacao: alvo.lotacao
 			},
-			classificacao,
-			fracaoOriginal: comoFracao(fracao),
-			novoInicio,
-			novoFim,
-			justificativa,
-			dataSuspensao: dataSuspensao ?? undefined
+			tipo: 'sustacao',
+			fracoesOriginais: alvos.map(comoFracao),
+			novosPeriodos: periodos,
+			justificativa
 		});
 
 		const r = await abrirReprogramacao(
 			db,
 			{
-				fracao_id: fracao.id,
 				policial_id: id,
-				tipo: classificacao.tipo,
-				novo_inicio: novoInicio,
-				novo_fim: novoFim,
-				data_suspensao: dataSuspensao,
+				exercicio,
+				tipo: 'sustacao',
+				fracoes_ids: alvos.map((f) => f.id),
+				novos_periodos: periodos,
 				justificativa,
 				texto_oficio: texto
 			},
 			{ id: u.id, nome: u.nome }
 		);
-		if (!r.ok) {
-			return fail(409, {
-				error:
-					r.motivo === 'ja_pendente'
-						? 'Já há um pedido desta fração aguardando a COGEP.'
-						: 'Esta fração não está mais programada.'
-			});
-		}
+		if (!r.ok) return fail(409, { error: MOTIVO_RECUSA[r.motivo] });
 
 		const { contexto, env } = contextoDeEvento(event);
 		await auditar(
@@ -302,11 +303,112 @@ export const actionsFerias = {
 				alvo_tipo: 'policial',
 				alvo_id: id,
 				alvo_nome: alvo.nome,
-				detalhes: `${classificacao.tipo} da ${fracao.ordem}ª fração ${fracao.exercicio}: ${fracao.data_inicio}–${fracao.data_fim} → ${novoInicio}–${novoFim}`,
-				metadados: {
-					tipo: classificacao.tipo,
-					avisos: checagens.filter((c) => !c.ok).map((c) => c.texto)
-				},
+				detalhes: `sustação do exercício ${exercicio}: ${alvos.map((f) => `${f.ordem}ª ${f.data_inicio}–${f.data_fim}`).join(', ')} → ${periodos.map((p) => `${p.inicio}–${p.fim}`).join(', ')}`,
+				metadados: { tipo: 'sustacao', avisos },
+				...contexto
+			},
+			{ env }
+		);
+		return { success: true, ferias: await listarFeriasDoPolicial(db, id), texto, avisos };
+	},
+
+	/**
+	 * SUSPENSÃO: a fração em gozo é interrompida por imperiosa necessidade do
+	 * serviço, e o que RESTA dela volta num período novo. Exige o dia do
+	 * retorno, a justificativa e os critérios do art. 6º III. As frações
+	 * seguintes não mudam.
+	 */
+	suspender: async (event: Event) => {
+		const auth = await carregarFichaDoPolicial(
+			getDB(event.platform),
+			event.locals.usuario,
+			event.params.id
+		);
+		if ('erro' in auth) return auth.erro;
+		const { u, db, id, alvo } = auth;
+
+		const fd = await event.request.formData();
+		const fracaoId = inteiroNaFaixa(fd, 'fracao_id', 1, 99_999_999);
+		const dataSuspensao = dataIso(fd, 'data_suspensao');
+		const novoInicio = dataIso(fd, 'novo_inicio');
+		const justificativa = textoLimitado(fd, 'justificativa', MAX_JUSTIFICATIVA);
+		if (!fracaoId) return fail(400, { error: 'Fração inválida.' });
+		if (!dataSuspensao) {
+			return fail(400, { error: 'Na suspensão, informe o dia do retorno ao serviço.' });
+		}
+		if (!novoInicio) return fail(400, { error: 'Informe o 1º dia do período que resta.' });
+		if (!justificativa.trim()) {
+			return fail(400, {
+				error: 'A suspensão exige a imperiosa necessidade do serviço, justificada.'
+			});
+		}
+		// Posse: a fração precisa ser deste servidor.
+		const fracao = await buscarFracao(db, fracaoId);
+		if (!fracao || fracao.policial_id !== id) {
+			return fail(404, { error: 'Fração não encontrada para este servidor.' });
+		}
+		const hoje = hojeBrasilISO();
+		const { fracoes } = await listarFeriasDoPolicial(db, id);
+		const situacao = situacaoDaReprogramacao(
+			fracoes.filter((f) => f.exercicio === fracao.exercicio).map(comoFracao),
+			hoje
+		);
+		if (!situacao.suspensao || situacao.suspensao.fracao.data_inicio !== fracao.data_inicio) {
+			return fail(409, {
+				error: 'Só a fração em gozo hoje pode ser suspensa. Fração ainda por começar se SUSTA.'
+			});
+		}
+
+		const erro = primeiroErro(criteriosDaSuspensao(fracao, dataSuspensao, novoInicio));
+		if (erro) return fail(400, { error: erro });
+		const { restantes } = diasRestantesNaSuspensao(fracao, dataSuspensao);
+		if (restantes < 1) return fail(400, { error: 'Não resta dia a reprogramar.' });
+		const lidos = await lerPeriodosDaSuspensao(db, novoInicio, restantes);
+		if ('erro' in lidos) return lidos.erro;
+		const { periodos } = lidos;
+
+		const texto = textoDoOficio({
+			servidor: {
+				nome: alvo.nome,
+				matricula: alvo.matricula,
+				cargo: alvo.cargo,
+				lotacao: alvo.lotacao
+			},
+			tipo: 'suspensao',
+			fracoesOriginais: [comoFracao(fracao)],
+			novosPeriodos: periodos,
+			justificativa,
+			dataSuspensao
+		});
+		const r = await abrirReprogramacao(
+			db,
+			{
+				policial_id: id,
+				exercicio: fracao.exercicio,
+				tipo: 'suspensao',
+				fracao_id: fracao.id,
+				novos_periodos: periodos,
+				data_suspensao: dataSuspensao,
+				justificativa,
+				texto_oficio: texto
+			},
+			{ id: u.id, nome: u.nome }
+		);
+		if (!r.ok) return fail(409, { error: MOTIVO_RECUSA[r.motivo] });
+
+		const { contexto, env } = contextoDeEvento(event);
+		await auditar(
+			db,
+			{
+				acao: 'ferias_reprogramar',
+				usuario: u,
+				entidade: 'policial',
+				entidade_id: id,
+				alvo_tipo: 'policial',
+				alvo_id: id,
+				alvo_nome: alvo.nome,
+				detalhes: `suspensão da ${fracao.ordem}ª fração ${fracao.exercicio} em ${dataSuspensao}: ${fracao.data_inicio}–${fracao.data_fim} → ${periodos[0].inicio}–${periodos[0].fim} (${restantes} dias)`,
+				metadados: { tipo: 'suspensao' },
 				...contexto
 			},
 			{ env }
@@ -329,9 +431,10 @@ export const actionsFerias = {
 		const nup = textoLimitado(fd, 'nup', 40);
 		if (!reprogId || !nup.trim()) return fail(400, { error: 'Informe o NUP.' });
 		// Posse: o pedido precisa ser deste servidor.
-		const ferias = await listarFeriasDoPolicial(db, id);
-		const dono = ferias.some((f) => f.reprogramacoes.some((r) => r.id === reprogId));
-		if (!dono) return fail(404, { error: 'Pedido não encontrado para este servidor.' });
+		const { pedidos } = await listarFeriasDoPolicial(db, id);
+		if (!pedidos.some((r) => r.id === reprogId)) {
+			return fail(404, { error: 'Pedido não encontrado para este servidor.' });
+		}
 
 		await anotarNupDaReprogramacao(db, reprogId, nup.trim());
 		return { success: true, ferias: await listarFeriasDoPolicial(db, id) };
@@ -353,9 +456,10 @@ export const actionsFerias = {
 		if (!reprogId || (decisao !== 'deferida' && decisao !== 'indeferida')) {
 			return fail(400, { error: 'Informe a decisão da COGEP.' });
 		}
-		const ferias = await listarFeriasDoPolicial(db, id);
-		const dono = ferias.some((f) => f.reprogramacoes.some((r) => r.id === reprogId));
-		if (!dono) return fail(404, { error: 'Pedido não encontrado para este servidor.' });
+		const { pedidos } = await listarFeriasDoPolicial(db, id);
+		if (!pedidos.some((r) => r.id === reprogId)) {
+			return fail(404, { error: 'Pedido não encontrado para este servidor.' });
+		}
 
 		const r = await decidirReprogramacao(
 			db,
@@ -377,7 +481,11 @@ export const actionsFerias = {
 				alvo_tipo: 'policial',
 				alvo_id: id,
 				alvo_nome: alvo.nome,
-				detalhes: `${r.tipo} ${decisao} pela COGEP${r.nup ? ` (NUP ${r.nup})` : ''}: ${r.novo_inicio} a ${r.novo_fim}`,
+				detalhes: `${r.tipo} ${decisao} pela COGEP${r.nup ? ` (NUP ${r.nup})` : ''}: ${periodosDoPedido(
+					r
+				)
+					.map((p) => `${p.inicio} a ${p.fim}`)
+					.join(', ')}`,
 				...contexto
 			},
 			{ env }
@@ -406,9 +514,12 @@ export const actionsFerias = {
 		}
 
 		const fd = await event.request.formData();
-		const achada = await fracaoDoServidor(db, fd, id);
-		if ('erro' in achada) return achada.erro;
-		const { fracao } = achada;
+		const fracaoId = inteiroNaFaixa(fd, 'fracao_id', 1, 99_999_999);
+		if (!fracaoId) return fail(400, { error: 'Fração inválida.' });
+		const fracao = await buscarFracao(db, fracaoId);
+		if (!fracao || fracao.policial_id !== id) {
+			return fail(404, { error: 'Fração não encontrada para este servidor.' });
+		}
 		const posicaoBruta = String(fd.get('posicao') ?? '');
 		const posicao: PosicaoDoAbono | null =
 			posicaoBruta === 'iniciais' || posicaoBruta === 'finais' ? posicaoBruta : null;
@@ -423,9 +534,9 @@ export const actionsFerias = {
 		}
 
 		const historico = await listarHistoricoPolicial(db, id);
-		const ferias = await listarFeriasDoPolicial(db, id);
+		const { fracoes } = await listarFeriasDoPolicial(db, id);
 		const anoDaFracao = fracao.data_inicio.slice(0, 4);
-		const abonosNoAno = ferias.filter(
+		const abonosNoAno = fracoes.filter(
 			(f) => f.abono?.status === 'deferido' && f.data_inicio.startsWith(anoDaFracao)
 		).length;
 		const checagens = conferirAbono({
@@ -501,11 +612,39 @@ export const actionsFerias = {
 		const fd = await event.request.formData();
 		const abonoId = inteiroNaFaixa(fd, 'abono_id', 1, 99_999_999);
 		if (!abonoId) return fail(400, { error: 'Abono inválido.' });
-		const ferias = await listarFeriasDoPolicial(db, id);
-		const dono = ferias.some((f) => f.abono?.id === abonoId);
-		if (!dono) return fail(404, { error: 'Abono não encontrado para este servidor.' });
+		const { fracoes } = await listarFeriasDoPolicial(db, id);
+		if (!fracoes.some((f) => f.abono?.id === abonoId)) {
+			return fail(404, { error: 'Abono não encontrado para este servidor.' });
+		}
 
 		await darCienciaDoAbono(db, abonoId, { id: u.id, nome: u.nome }, hojeBrasilISO());
 		return { success: true, ferias: await listarFeriasDoPolicial(db, id) };
 	}
 };
+
+const MOTIVO_RECUSA = {
+	ja_pendente: 'Já há um pedido deste exercício aguardando a COGEP.',
+	fracao_fechada: 'Alguma das frações não está mais programada.',
+	tem_abono: 'Há abono registrado numa das frações: resolva o abono antes de reprogramar.'
+} as const;
+
+/**
+ * Na suspensão o período novo é UM só, com os dias que restam — não passa
+ * pela escolha de divisão. Mesma conferência do 1º dia (dia útil).
+ */
+async function lerPeriodosDaSuspensao(
+	db: ReturnType<typeof getDB>,
+	novoInicio: string,
+	restantes: number
+): Promise<{ periodos: PeriodoMontado[] } | { erro: ReturnType<typeof fail> }> {
+	const feriados = await feriadosNoIntervalo(db, novoInicio, novoInicio);
+	const { periodos, checagens } = montarPeriodos(
+		[restantes],
+		[novoInicio],
+		feriados.map((f) => f.data)
+	);
+	if (temErro(checagens) || periodos.length !== 1) {
+		return { erro: fail(400, { error: primeiroErro(checagens) ?? 'Período inválido.' }) };
+	}
+	return { periodos };
+}

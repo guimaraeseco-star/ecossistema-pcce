@@ -33,6 +33,7 @@ import type { BatchItem } from 'drizzle-orm/batch';
 import {
 	diasDaFracao,
 	periodoGozadoComAbono,
+	type PeriodoMontado,
 	type PosicaoDoAbono,
 	type TipoReprogramacao
 } from '$lib/servidores/ferias';
@@ -44,37 +45,54 @@ export interface Registrador {
 	nome: string;
 }
 
-/** Uma fração com o que orbita nela: a reprogramação pendente e o abono. */
+/** Uma fração com o abono que orbita nela. */
 export interface FracaoCompleta extends FeriasFracao {
-	reprogramacoes: FeriasReprogramacao[];
 	abono: FeriasAbono | null;
 }
 
-/** As férias de um servidor, por exercício, mais recente primeiro. */
+/**
+ * As férias de um servidor: as frações (por exercício, mais recente primeiro)
+ * e os pedidos à COGEP, que são do EXERCÍCIO — uma sustação alcança várias
+ * frações de uma vez, então o pedido não pendura numa só.
+ */
+export interface FeriasDoPolicial {
+	fracoes: FracaoCompleta[];
+	pedidos: FeriasReprogramacao[];
+}
+
 export async function listarFeriasDoPolicial(
 	db: Database,
 	policialId: number
-): Promise<FracaoCompleta[]> {
-	const fracoes = await db
-		.select()
-		.from(feriasFracoes)
-		.where(eq(feriasFracoes.policial_id, policialId))
-		.orderBy(desc(feriasFracoes.exercicio), feriasFracoes.ordem, feriasFracoes.id);
-	if (fracoes.length === 0) return [];
-	const ids = fracoes.map((f) => f.id);
-	const [reprogs, abonos] = await Promise.all([
+): Promise<FeriasDoPolicial> {
+	const [fracoes, pedidos] = await Promise.all([
+		db
+			.select()
+			.from(feriasFracoes)
+			.where(eq(feriasFracoes.policial_id, policialId))
+			.orderBy(desc(feriasFracoes.exercicio), feriasFracoes.ordem, feriasFracoes.id),
 		db
 			.select()
 			.from(feriasReprogramacoes)
-			.where(inArray(feriasReprogramacoes.fracao_id, ids))
-			.orderBy(desc(feriasReprogramacoes.id)),
-		db.select().from(feriasAbonos).where(inArray(feriasAbonos.fracao_id, ids))
+			.where(eq(feriasReprogramacoes.policial_id, policialId))
+			.orderBy(desc(feriasReprogramacoes.id))
 	]);
-	return fracoes.map((f) => ({
-		...f,
-		reprogramacoes: reprogs.filter((r) => r.fracao_id === f.id),
-		abono: abonos.find((a) => a.fracao_id === f.id) ?? null
-	}));
+	if (fracoes.length === 0) return { fracoes: [], pedidos };
+	const abonos = await db
+		.select()
+		.from(feriasAbonos)
+		.where(
+			inArray(
+				feriasAbonos.fracao_id,
+				fracoes.map((f) => f.id)
+			)
+		);
+	return {
+		fracoes: fracoes.map((f) => ({
+			...f,
+			abono: abonos.find((a) => a.fracao_id === f.id) ?? null
+		})),
+		pedidos
+	};
 }
 
 /** Uma fração por id — com o dono, para o portão de escopo conferir. */
@@ -107,101 +125,158 @@ function eventoDeFerias(
 	};
 }
 
-/** Os dados de uma fração nova, como a unidade a digita do Guardião. */
-export interface NovaFracao {
+/**
+ * Grava frações `programada` a partir de períodos já montados, cada uma com
+ * o seu evento, e devolve os ids das frações na ordem dos períodos. Os
+ * eventos entram num lote e as frações noutro — a fração precisa do id do
+ * evento, e o D1 não devolve ids de dentro de um lote.
+ */
+async function inserirFracoes(
+	db: Database,
+	base: {
+		policial_id: number;
+		exercicio: number;
+		ordemInicial: number;
+		origem: 'guardiao' | 'reprogramacao';
+		observacao: string;
+		rotulo: string;
+	},
+	periodos: readonly PeriodoMontado[],
+	quem: Registrador
+): Promise<number[]> {
+	if (periodos.length === 0) return [];
+	const [e1, ...eN] = periodos.map((p, k) =>
+		db
+			.insert(policialHistorico)
+			.values(
+				eventoDeFerias(
+					base.policial_id,
+					p.inicio,
+					p.fim,
+					quem,
+					`Férias — ${base.ordemInicial + k}ª fração do exercício ${base.exercicio}${base.rotulo}`
+				)
+			)
+			.returning({ id: policialHistorico.id })
+	);
+	const eventos = await db.batch([e1, ...eN]);
+	const [f1, ...fN] = periodos.map((p, k) =>
+		db
+			.insert(feriasFracoes)
+			.values({
+				policial_id: base.policial_id,
+				exercicio: base.exercicio,
+				ordem: (base.ordemInicial + k) as 1 | 2 | 3,
+				data_inicio: p.inicio,
+				data_fim: p.fim,
+				status: 'programada',
+				origem: base.origem,
+				historico_id: eventos[k][0].id,
+				observacao: base.observacao,
+				registrado_por_id: quem.id,
+				registrado_por_nome: quem.nome
+			})
+			.returning({ id: feriasFracoes.id })
+	);
+	const fracoes = await db.batch([f1, ...fN]);
+	return fracoes.map((r) => r[0].id);
+}
+
+/** A programação de um exercício, como a unidade a digita do Guardião. */
+export interface NovaProgramacao {
 	policial_id: number;
 	exercicio: number;
-	ordem: 1 | 2 | 3;
-	data_inicio: string;
-	data_fim: string;
+	/** Os períodos já montados pela regra (`montarPeriodos`): 1, 2 ou 3. */
+	periodos: readonly PeriodoMontado[];
 	observacao?: string;
 }
 
 /**
- * Registra uma fração programada no Guardião e o evento de afastamento que
- * ela gera, no mesmo lote. Devolve o id da fração.
+ * Registra a programação de um exercício — TODAS as frações de uma vez, cada
+ * uma com o evento de afastamento que ela gera. As férias são um período só,
+ * e é assim que entram.
  *
- * Recusa a segunda fração de mesma ordem no mesmo exercício que ainda esteja
- * `programada`: a unidade digitando duas vezes é o erro mais provável, e o
- * banco não tem UNIQUE aqui de propósito — a fração sustada/suspensa e a que
- * a substitui têm a MESMA ordem, e as duas ficam.
+ * Recusa quando o exercício já tem fração: a unidade digitando duas vezes é o
+ * erro mais provável, e o caminho para mudar o que está lançado é excluir a
+ * programação (se ninguém mexeu nela) ou reprogramar.
  */
-export async function registrarFracao(
+export async function registrarProgramacao(
 	db: Database,
-	dados: NovaFracao,
+	dados: NovaProgramacao,
 	quem: Registrador
-): Promise<{ ok: true; id: number } | { ok: false; motivo: 'duplicada' }> {
+): Promise<{ ok: true; ids: number[] } | { ok: false; motivo: 'ja_programado' }> {
 	const existente = await db
 		.select({ id: feriasFracoes.id })
 		.from(feriasFracoes)
 		.where(
 			and(
 				eq(feriasFracoes.policial_id, dados.policial_id),
-				eq(feriasFracoes.exercicio, dados.exercicio),
-				eq(feriasFracoes.ordem, dados.ordem),
-				eq(feriasFracoes.status, 'programada')
+				eq(feriasFracoes.exercicio, dados.exercicio)
 			)
 		)
 		.get();
-	if (existente) return { ok: false, motivo: 'duplicada' };
+	if (existente) return { ok: false, motivo: 'ja_programado' };
 
-	const [evento] = await db
-		.insert(policialHistorico)
-		.values(
-			eventoDeFerias(
-				dados.policial_id,
-				dados.data_inicio,
-				dados.data_fim,
-				quem,
-				`Férias — ${dados.ordem}ª fração do exercício ${dados.exercicio}`
-			)
-		)
-		.returning({ id: policialHistorico.id });
-	const [fracao] = await db
-		.insert(feriasFracoes)
-		.values({
+	const ids = await inserirFracoes(
+		db,
+		{
 			policial_id: dados.policial_id,
 			exercicio: dados.exercicio,
-			ordem: dados.ordem,
-			data_inicio: dados.data_inicio,
-			data_fim: dados.data_fim,
-			status: 'programada',
+			ordemInicial: 1,
 			origem: 'guardiao',
-			historico_id: evento.id,
 			observacao: dados.observacao ?? '',
-			registrado_por_id: quem.id,
-			registrado_por_nome: quem.nome
-		})
-		.returning({ id: feriasFracoes.id });
-	return { ok: true, id: fracao.id };
+			rotulo: ''
+		},
+		dados.periodos,
+		quem
+	);
+	return { ok: true, ids };
 }
 
 /**
- * Apaga uma fração digitada errada — só enquanto `programada` e sem pedido
- * pendente nem abono. Leva o evento junto: o que nunca foi programado não
- * pode constar como férias.
+ * Apaga a programação de um exercício digitada errada — só enquanto TODAS as
+ * frações estão `programada` e nenhuma tem abono nem pedido. Leva os eventos
+ * junto: o que nunca foi programado não pode constar como férias. Exercício
+ * que já passou por sustação/suspensão não se apaga: a sucessão é registro.
  */
-export async function excluirFracao(
+export async function excluirProgramacao(
 	db: Database,
-	id: number
+	policialId: number,
+	exercicio: number
 ): Promise<{ ok: true } | { ok: false; motivo: 'nao_programada' | 'tem_vinculo' }> {
-	const f = await buscarFracao(db, id);
-	if (!f || f.status !== 'programada') return { ok: false, motivo: 'nao_programada' };
-	const vinculo = await db
-		.select({ n: sql<number>`count(*)` })
-		.from(feriasReprogramacoes)
-		.where(eq(feriasReprogramacoes.fracao_id, id))
-		.get();
-	const abono = await db
-		.select({ n: sql<number>`count(*)` })
-		.from(feriasAbonos)
-		.where(eq(feriasAbonos.fracao_id, id))
-		.get();
-	if ((vinculo?.n ?? 0) > 0 || (abono?.n ?? 0) > 0) return { ok: false, motivo: 'tem_vinculo' };
+	const fracoes = await db
+		.select()
+		.from(feriasFracoes)
+		.where(and(eq(feriasFracoes.policial_id, policialId), eq(feriasFracoes.exercicio, exercicio)));
+	if (fracoes.length === 0 || fracoes.some((f) => f.status !== 'programada')) {
+		return { ok: false, motivo: 'nao_programada' };
+	}
+	const ids = fracoes.map((f) => f.id);
+	const [pedidos, abonos] = await Promise.all([
+		db
+			.select({ n: sql<number>`count(*)` })
+			.from(feriasReprogramacoes)
+			.where(
+				and(
+					eq(feriasReprogramacoes.policial_id, policialId),
+					eq(feriasReprogramacoes.exercicio, exercicio)
+				)
+			)
+			.get(),
+		db
+			.select({ n: sql<number>`count(*)` })
+			.from(feriasAbonos)
+			.where(inArray(feriasAbonos.fracao_id, ids))
+			.get()
+	]);
+	if ((pedidos?.n ?? 0) > 0 || (abonos?.n ?? 0) > 0) return { ok: false, motivo: 'tem_vinculo' };
 
-	const passos: BatchItem<'sqlite'>[] = [db.delete(feriasFracoes).where(eq(feriasFracoes.id, id))];
-	if (f.historico_id) {
-		passos.push(db.delete(policialHistorico).where(eq(policialHistorico.id, f.historico_id)));
+	const eventos = fracoes.map((f) => f.historico_id).filter((h): h is number => h != null);
+	const passos: BatchItem<'sqlite'>[] = [
+		db.delete(feriasFracoes).where(inArray(feriasFracoes.id, ids))
+	];
+	if (eventos.length > 0) {
+		passos.push(db.delete(policialHistorico).where(inArray(policialHistorico.id, eventos)));
 	}
 	await batchNonEmpty(db, passos);
 	return { ok: true };
@@ -209,11 +284,14 @@ export async function excluirFracao(
 
 /** O pedido de reprogramação, como a unidade o abre. */
 export interface NovaReprogramacao {
-	fracao_id: number;
 	policial_id: number;
+	exercicio: number;
 	tipo: TipoReprogramacao;
-	novo_inicio: string;
-	novo_fim: string;
+	/** Sustação: as frações alcançadas (todas as não iniciadas). */
+	fracoes_ids?: number[];
+	/** Suspensão: a fração em gozo. */
+	fracao_id?: number;
+	novos_periodos: readonly PeriodoMontado[];
 	data_suspensao?: string | null;
 	justificativa?: string;
 	texto_oficio: string;
@@ -222,22 +300,44 @@ export interface NovaReprogramacao {
 
 /**
  * Abre o pedido. Fica `pendente` — e pendente é alerta — até a unidade
- * homologar a resposta da COGEP. Recusa segundo pedido pendente para a mesma
- * fração: a COGEP recebe um processo por vez.
+ * homologar a resposta da COGEP. Recusa segundo pedido pendente no mesmo
+ * exercício: a COGEP recebe um processo por vez. Recusa também quando alguma
+ * fração alcançada não é deste servidor/exercício, não está `programada` ou
+ * tem abono — nesse caso o abono precisa ser resolvido antes.
  */
 export async function abrirReprogramacao(
 	db: Database,
 	dados: NovaReprogramacao,
 	quem: Registrador
-): Promise<{ ok: true; id: number } | { ok: false; motivo: 'ja_pendente' | 'fracao_fechada' }> {
-	const f = await buscarFracao(db, dados.fracao_id);
-	if (!f || f.status !== 'programada') return { ok: false, motivo: 'fracao_fechada' };
+): Promise<
+	{ ok: true; id: number } | { ok: false; motivo: 'ja_pendente' | 'fracao_fechada' | 'tem_abono' }
+> {
+	const alvo = dados.tipo === 'sustacao' ? (dados.fracoes_ids ?? []) : [dados.fracao_id ?? 0];
+	if (alvo.length === 0) return { ok: false, motivo: 'fracao_fechada' };
+	const fracoes = await db.select().from(feriasFracoes).where(inArray(feriasFracoes.id, alvo));
+	const todasValidas =
+		fracoes.length === alvo.length &&
+		fracoes.every(
+			(f) =>
+				f.policial_id === dados.policial_id &&
+				f.exercicio === dados.exercicio &&
+				f.status === 'programada'
+		);
+	if (!todasValidas) return { ok: false, motivo: 'fracao_fechada' };
+	const abono = await db
+		.select({ n: sql<number>`count(*)` })
+		.from(feriasAbonos)
+		.where(inArray(feriasAbonos.fracao_id, alvo))
+		.get();
+	if ((abono?.n ?? 0) > 0) return { ok: false, motivo: 'tem_abono' };
+
 	const pendente = await db
 		.select({ id: feriasReprogramacoes.id })
 		.from(feriasReprogramacoes)
 		.where(
 			and(
-				eq(feriasReprogramacoes.fracao_id, dados.fracao_id),
+				eq(feriasReprogramacoes.policial_id, dados.policial_id),
+				eq(feriasReprogramacoes.exercicio, dados.exercicio),
 				eq(feriasReprogramacoes.status, 'pendente')
 			)
 		)
@@ -247,11 +347,12 @@ export async function abrirReprogramacao(
 	const [linha] = await db
 		.insert(feriasReprogramacoes)
 		.values({
-			fracao_id: dados.fracao_id,
 			policial_id: dados.policial_id,
+			exercicio: dados.exercicio,
 			tipo: dados.tipo,
-			novo_inicio: dados.novo_inicio,
-			novo_fim: dados.novo_fim,
+			fracao_id: dados.tipo === 'suspensao' ? (dados.fracao_id ?? null) : null,
+			fracoes_ids: JSON.stringify(dados.tipo === 'sustacao' ? alvo : []),
+			novos_periodos: JSON.stringify(dados.novos_periodos),
 			data_suspensao: dados.data_suspensao ?? null,
 			justificativa: dados.justificativa ?? '',
 			texto_oficio: dados.texto_oficio,
@@ -264,6 +365,39 @@ export async function abrirReprogramacao(
 	return { ok: true, id: linha.id };
 }
 
+/** Os períodos pedidos, lidos do JSON da linha. */
+export function periodosDoPedido(
+	pedido: Pick<FeriasReprogramacao, 'novos_periodos'>
+): PeriodoMontado[] {
+	try {
+		const lista = JSON.parse(pedido.novos_periodos) as unknown;
+		if (!Array.isArray(lista)) return [];
+		return lista.filter(
+			(p): p is PeriodoMontado =>
+				typeof p === 'object' &&
+				p !== null &&
+				typeof (p as PeriodoMontado).inicio === 'string' &&
+				typeof (p as PeriodoMontado).fim === 'string' &&
+				typeof (p as PeriodoMontado).dias === 'number'
+		);
+	} catch {
+		return [];
+	}
+}
+
+/** As frações alcançadas por uma sustação, lidas do JSON da linha. */
+export function fracoesDoPedido(
+	pedido: Pick<FeriasReprogramacao, 'fracoes_ids' | 'fracao_id'>
+): number[] {
+	if (pedido.fracao_id) return [pedido.fracao_id];
+	try {
+		const lista = JSON.parse(pedido.fracoes_ids) as unknown;
+		return Array.isArray(lista) ? lista.filter((n): n is number => Number.isInteger(n)) : [];
+	} catch {
+		return [];
+	}
+}
+
 /** Anota o NUP depois de protocolado — o pedido nasce antes do número existir. */
 export async function anotarNupDaReprogramacao(db: Database, id: number, nup: string) {
 	await db.update(feriasReprogramacoes).set({ nup }).where(eq(feriasReprogramacoes.id, id));
@@ -272,15 +406,17 @@ export async function anotarNupDaReprogramacao(db: Database, id: number, nup: st
 /**
  * A homologação da resposta da COGEP, pela unidade.
  *
- * DEFERIDA: a fração antiga vira `sustada` ou `suspensa` e passa a apontar
- * para a nova, que nasce `programada` com origem `reprogramacao` e o próprio
- * evento de afastamento. O evento antigo muda conforme o instituto:
+ * DEFERIDA: as frações alcançadas viram `sustada` ou `suspensa` e passam a
+ * apontar para a primeira das novas, que nascem `programada` com origem
+ * `reprogramacao` e o próprio evento de afastamento. A ordem das novas
+ * continua de onde as sustadas começavam (a 1ª gozada fica 1ª; 2ª+3ª
+ * sustadas que voltam como uma só viram a 2ª). O evento antigo muda conforme
+ * o instituto:
  *   - sustação: some — aquelas férias não aconteceram;
  *   - suspensão: encurta até a véspera do retorno — os dias gozados foram
  *     afastamento de verdade e ficam.
- * Tudo num lote só: fração antiga, fração nova, evento novo, evento antigo.
  *
- * INDEFERIDA: só fecha o pedido; a fração original permanece como estava.
+ * INDEFERIDA: só fecha o pedido; as frações permanecem como estavam.
  *
  * Devolve `null` quando o pedido já não estava pendente (segundo clique).
  */
@@ -313,39 +449,29 @@ export async function decidirReprogramacao(
 		return { ...pedido, status: 'indeferida' };
 	}
 
-	const antiga = await buscarFracao(db, pedido.fracao_id);
-	if (!antiga) return null;
+	const alvoIds = fracoesDoPedido(pedido);
+	const antigas =
+		alvoIds.length > 0
+			? await db.select().from(feriasFracoes).where(inArray(feriasFracoes.id, alvoIds))
+			: [];
+	if (antigas.length === 0) return null;
+	antigas.sort((a, b) => a.ordem - b.ordem);
 
-	// A nova fração e o evento dela — inseridos primeiro, porque a antiga
-	// precisa do id da nova para apontar a sucessão.
-	const [eventoNovo] = await db
-		.insert(policialHistorico)
-		.values(
-			eventoDeFerias(
-				antiga.policial_id,
-				pedido.novo_inicio,
-				pedido.novo_fim,
-				quem,
-				`Férias — ${antiga.ordem}ª fração do exercício ${antiga.exercicio} (reprogramada por ${pedido.tipo === 'sustacao' ? 'sustação' : 'suspensão'}${pedido.nup ? `, NUP ${pedido.nup}` : ''})`
-			)
-		)
-		.returning({ id: policialHistorico.id });
-	const [nova] = await db
-		.insert(feriasFracoes)
-		.values({
-			policial_id: antiga.policial_id,
-			exercicio: antiga.exercicio,
-			ordem: antiga.ordem as 1 | 2 | 3,
-			data_inicio: pedido.novo_inicio,
-			data_fim: pedido.novo_fim,
-			status: 'programada',
+	// As novas frações e os eventos delas — inseridas primeiro, porque as
+	// antigas precisam do id da primeira nova para apontar a sucessão.
+	const novosIds = await inserirFracoes(
+		db,
+		{
+			policial_id: pedido.policial_id,
+			exercicio: pedido.exercicio,
+			ordemInicial: antigas[0].ordem,
 			origem: 'reprogramacao',
-			historico_id: eventoNovo.id,
 			observacao: pedido.nup ? `NUP ${pedido.nup}` : '',
-			registrado_por_id: quem.id,
-			registrado_por_nome: quem.nome
-		})
-		.returning({ id: feriasFracoes.id });
+			rotulo: ` (reprogramada por ${pedido.tipo === 'sustacao' ? 'sustação' : 'suspensão'}${pedido.nup ? `, NUP ${pedido.nup}` : ''})`
+		},
+		periodosDoPedido(pedido),
+		quem
+	);
 
 	const passos: BatchItem<'sqlite'>[] = [
 		fechar,
@@ -353,11 +479,12 @@ export async function decidirReprogramacao(
 			.update(feriasFracoes)
 			.set({
 				status: pedido.tipo === 'sustacao' ? 'sustada' : 'suspensa',
-				substituida_por_id: nova.id
+				substituida_por_id: novosIds[0] ?? null
 			})
-			.where(eq(feriasFracoes.id, antiga.id))
+			.where(inArray(feriasFracoes.id, alvoIds))
 	];
-	if (antiga.historico_id) {
+	for (const antiga of antigas) {
+		if (!antiga.historico_id) continue;
 		if (pedido.tipo === 'sustacao') {
 			passos.push(
 				db.delete(policialHistorico).where(eq(policialHistorico.id, antiga.historico_id))

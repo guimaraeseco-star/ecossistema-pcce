@@ -1,16 +1,27 @@
 <script lang="ts">
 	/**
-	 * O cartão FÉRIAS da ficha do servidor — as frações programadas no Guardião,
-	 * o assistente de reprogramação à COGEP e o abono.
+	 * O cartão FÉRIAS da ficha do servidor — a programação homologada no
+	 * Guardião, o assistente de reprogramação à COGEP e o abono.
+	 *
+	 * As férias são UM período, ainda que fracionado (decisão do responsável,
+	 * 17/09/2026). É isso que dá a forma ao cartão:
+	 *
+	 *   - LANÇAR pergunta primeiro "quantos períodos?" e oferece as cinco formas
+	 *     do decreto; depois só o 1º dia de cada fração — o último dia sai da
+	 *     regra (`fimDaFracao`), e o 1º dia tem de ser útil (nem fim de semana,
+	 *     nem feriado — o caso do 01/11/2026, domingo, que passou);
+	 *   - SUSTAR alcança todas as frações ainda não iniciadas do exercício, de
+	 *     uma vez, e pode redividi-las (30 sustados voltam como 10 + 20);
+	 *   - SUSPENDER é a exceção: mira a fração em gozo, e o que resta dela volta
+	 *     num período só.
 	 *
 	 * O que este cartão precisa fazer bem, e a razão de existir: dizer ao chefe
 	 * imediato se o pedido é SUSTAÇÃO ou SUSPENSÃO antes de ele escrever o NUP.
-	 * A classificação sai dos fatos (`classificarReprogramacao`), aparece em
-	 * linguagem clara com o motivo, e o ofício sai pronto com o instituto certo.
-	 * A action refaz tudo no envio; aqui é a prévia, para o usuário ver o que vai
-	 * mandar.
+	 * A resposta sai dos fatos (`situacaoDaReprogramacao`), em linguagem clara
+	 * com o motivo, e o ofício sai pronto com o instituto certo. A action refaz
+	 * tudo no envio; aqui é a prévia, para o usuário ver o que vai mandar.
 	 *
-	 * Quem vê o quê: qualquer perfil que abre a ficha lança fração, reprograma,
+	 * Quem vê o quê: qualquer perfil que abre a ficha lança, susta, suspende,
 	 * anota o NUP e homologa a resposta; só o Admin Geral registra abono; a
 	 * unidade dá ciência dele. Esconder o botão não é autorização — as actions
 	 * recusam por conta própria.
@@ -21,19 +32,22 @@
 	import { formatarData, hojeLocalISO } from '$lib/utils/datas';
 	import { formatarNUP } from '$lib/utils/formato';
 	import { MAX_JUSTIFICATIVA } from '$lib/cadastro-campos';
-	import type { FracaoCompleta } from '$lib/db';
+	import { periodosDoPedido, type FeriasDoPolicial, type FracaoCompleta } from '$lib/db';
 	import {
-		classificarReprogramacao,
-		conferirNovoPeriodo,
 		criteriosDaSuspensao,
 		diasDaFracao,
+		diasRestantesNaSuspensao,
+		divisoesPossiveis,
+		fimDaFracao,
+		montarPeriodos,
 		periodoAquisitivo,
 		ROTULO_STATUS_FRACAO,
 		ROTULO_TIPO_REPROGRAMACAO,
+		rotuloDaDivisao,
+		situacaoDaReprogramacao,
 		statusPelaData,
 		temErro,
 		type Checagem,
-		type Classificacao,
 		type Fracao
 	} from '$lib/servidores/ferias';
 
@@ -44,7 +58,7 @@
 		isAdmin,
 		podeDarCiencia
 	}: {
-		ferias: FracaoCompleta[];
+		ferias: FeriasDoPolicial;
 		feriados: string[];
 		dataPosse: string | null;
 		/** Admin Geral: registra abono. */
@@ -68,12 +82,19 @@
 		// Map local ao derived, montado e devolvido — não é estado vivo.
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity
 		const mapa = new Map<number, FracaoCompleta[]>();
-		for (const f of ferias) mapa.set(f.exercicio, [...(mapa.get(f.exercicio) ?? []), f]);
+		for (const f of ferias.fracoes) mapa.set(f.exercicio, [...(mapa.get(f.exercicio) ?? []), f]);
 		return [...mapa.entries()].sort((a, b) => b[0] - a[0]);
 	});
 
-	const pendentesDe = (f: FracaoCompleta) =>
-		f.reprogramacoes.filter((r) => r.status === 'pendente');
+	const pedidosDe = (exercicio: number) => ferias.pedidos.filter((r) => r.exercicio === exercicio);
+	const pendenteDe = (exercicio: number) =>
+		pedidosDe(exercicio).find((r) => r.status === 'pendente') ?? null;
+	const situacaoDe = (fracoes: FracaoCompleta[]) =>
+		situacaoDaReprogramacao(fracoes.map(comoFracao), hoje);
+	/** Programação intacta: tudo `programada`, sem pedido nem abono — dá para excluir. */
+	const intacta = (exercicio: number, fracoes: FracaoCompleta[]) =>
+		fracoes.every((f) => f.status === 'programada' && !f.abono) &&
+		pedidosDe(exercicio).length === 0;
 
 	const COR_STATUS: Record<string, string> = {
 		programada: 'text-primary-700 dark:text-primary-400',
@@ -85,62 +106,73 @@
 
 	/* ── formulários abertos ─────────────────────────────────────────────── */
 	let lancando = $state(false);
-	let reprogramando = $state<FracaoCompleta | null>(null);
+	let sustando = $state<{ exercicio: number; fracoes: FracaoCompleta[] } | null>(null);
+	let suspendendo = $state<FracaoCompleta | null>(null);
 	let abonando = $state<FracaoCompleta | null>(null);
 	let enviando = $state(false);
 	/** O ofício devolvido pela action, para copiar no NUP. */
 	let oficioGerado = $state('');
 
-	/* ── lançar fração ───────────────────────────────────────────────────── */
-	let novoExercicio = $state(new Date().getFullYear());
-	let novaOrdem = $state<1 | 2 | 3>(1);
-	let novoInicio = $state('');
-	let novoFim = $state('');
-	const diasNovaFracao = $derived(
-		novoInicio && novoFim ? diasDaFracao({ data_inicio: novoInicio, data_fim: novoFim }) : 0
+	/* ── a divisão e os primeiros dias — o mesmo motor para lançar e sustar ── */
+	let qtdPeriodos = $state<1 | 2 | 3>(1);
+	let divisaoEscolhida = $state<readonly number[]>([30]);
+	let inicios = $state<string[]>(['', '', '']);
+
+	/** As divisões admitidas no formulário aberto: as cinco ao lançar; ao sustar, as que somam o restante. */
+	const divisoesAdmitidas = $derived.by((): readonly (readonly number[])[] => {
+		if (sustando) {
+			return situacaoDe(sustando.fracoes).sustacao?.divisoes ?? [];
+		}
+		return divisoesPossiveis(30);
+	});
+	const quantidadesPossiveis = $derived(
+		[...new Set(divisoesAdmitidas.map((d) => d.length))].sort() as (1 | 2 | 3)[]
 	);
+	const divisoesDaQuantidade = $derived(divisoesAdmitidas.filter((d) => d.length === qtdPeriodos));
+
+	const mesmaDivisao = (a: readonly number[], b: readonly number[]) => a.join('+') === b.join('+');
+
+	function escolherQuantidade(n: 1 | 2 | 3) {
+		qtdPeriodos = n;
+		const primeira = divisoesAdmitidas.find((d) => d.length === n);
+		if (primeira) divisaoEscolhida = primeira;
+	}
+
+	/** A prévia: os períodos montados e o que a regra diz de cada 1º dia. */
+	const previa = $derived(montarPeriodos(divisaoEscolhida, inicios, feriados));
+	const podeEnviarPeriodos = $derived(
+		previa.periodos.length === divisaoEscolhida.length && !temErro(previa.checagens)
+	);
+
+	/* ── lançar ──────────────────────────────────────────────────────────── */
+	let novoExercicio = $state(new Date().getFullYear());
 	const aquisitivo = $derived(dataPosse ? periodoAquisitivo(dataPosse, novoExercicio) : null);
 
-	/* ── reprogramar: a prévia do que a action vai conferir ───────────────── */
-	let rInicio = $state('');
-	let rFim = $state('');
-	let rSuspensao = $state('');
-	let rJustificativa = $state('');
-
-	const classificacao = $derived.by((): Classificacao | { erro: string } | null => {
-		if (!reprogramando) return null;
-		const doExercicio = ferias
-			.filter((f) => f.exercicio === reprogramando!.exercicio)
-			.map(comoFracao);
-		try {
-			return classificarReprogramacao(comoFracao(reprogramando), hoje, doExercicio);
-		} catch (e) {
-			return { erro: e instanceof Error ? e.message : 'Não reprogramável.' };
-		}
-	});
-	const ehSuspensao = $derived(
-		classificacao && !('erro' in classificacao) && classificacao.tipo === 'suspensao'
+	/* ── suspender ───────────────────────────────────────────────────────── */
+	let sSuspensao = $state('');
+	let sInicio = $state('');
+	let sJustificativa = $state('');
+	const restoDaSuspensao = $derived(
+		suspendendo && sSuspensao ? diasRestantesNaSuspensao(suspendendo, sSuspensao) : null
 	);
-
-	const checagens = $derived.by((): Checagem[] => {
-		if (!reprogramando || !rInicio || !rFim) return [];
-		const lista = conferirNovoPeriodo({
-			fracaoOriginal: comoFracao(reprogramando),
-			novoInicio: rInicio,
-			novoFim: rFim,
-			feriados
-		});
-		if (ehSuspensao && rSuspensao) {
-			lista.push(...criteriosDaSuspensao(reprogramando, rSuspensao, rInicio));
+	const checagensSuspensao = $derived.by((): Checagem[] => {
+		if (!suspendendo || !sSuspensao) return [];
+		const lista: Checagem[] = [];
+		if (sInicio) {
+			lista.push(...criteriosDaSuspensao(suspendendo, sSuspensao, sInicio));
+			if (restoDaSuspensao && restoDaSuspensao.restantes > 0) {
+				lista.push(...montarPeriodos([restoDaSuspensao.restantes], [sInicio], feriados).checagens);
+			}
 		}
 		return lista;
 	});
-	const podeEnviarReprogramacao = $derived(
-		!!reprogramando &&
-			!!rInicio &&
-			!!rFim &&
-			!temErro(checagens) &&
-			(!ehSuspensao || (!!rSuspensao && rJustificativa.trim().length > 0))
+	const podeEnviarSuspensao = $derived(
+		!!suspendendo &&
+			!!sSuspensao &&
+			!!sInicio &&
+			(restoDaSuspensao?.restantes ?? 0) > 0 &&
+			!temErro(checagensSuspensao) &&
+			sJustificativa.trim().length > 0
 	);
 
 	/* ── abono ───────────────────────────────────────────────────────────── */
@@ -149,10 +181,28 @@
 
 	function fecharTudo() {
 		lancando = false;
-		reprogramando = null;
+		sustando = null;
+		suspendendo = null;
 		abonando = null;
-		rInicio = rFim = rSuspensao = rJustificativa = '';
-		novoInicio = novoFim = '';
+		inicios = ['', '', ''];
+		sSuspensao = sInicio = sJustificativa = '';
+	}
+
+	function abrirLancar() {
+		fecharTudo();
+		lancando = true;
+		escolherQuantidade(1);
+	}
+
+	function abrirSustar(exercicio: number, fracoes: FracaoCompleta[]) {
+		fecharTudo();
+		sustando = { exercicio, fracoes };
+		// A divisão atual vem primeiro na lista — é a escolha padrão.
+		const atual = divisoesAdmitidas[0];
+		if (atual) {
+			qtdPeriodos = atual.length as 1 | 2 | 3;
+			divisaoEscolhida = atual;
+		}
 	}
 
 	function aoResponder(mensagemOk: string) {
@@ -160,7 +210,11 @@
 		return async ({ result }: { result: ActionResult }) => {
 			enviando = false;
 			if (result.type === 'success') {
-				const d = result.data as { ferias?: FracaoCompleta[]; texto?: string; avisos?: string[] };
+				const d = result.data as {
+					ferias?: FeriasDoPolicial;
+					texto?: string;
+					avisos?: string[];
+				};
 				if (d?.ferias) ferias = d.ferias;
 				if (d?.texto) oficioGerado = d.texto;
 				toaster.create({
@@ -184,24 +238,31 @@
 			toaster.create({ title: 'Selecione o texto e copie manualmente', type: 'info' });
 		}
 	}
+
+	const classeChecagem = (ch: Checagem) =>
+		ch.ok
+			? 'text-success-700 dark:text-success-400'
+			: ch.nivel === 'erro'
+				? 'text-error-600'
+				: 'text-warning-600 dark:text-warning-400';
+	const marcaChecagem = (ch: Checagem) => (ch.ok ? '✔' : ch.nivel === 'erro' ? '✖' : '⚠');
 </script>
 
-<div class="card-elevated rounded-2xl shadow-sm p-4 sm:p-6">
+<!-- O dourado é a cor de "de férias" no sistema inteiro (COR_SITUACAO.ferias);
+     o cartão a veste para ser achado de longe — pedido dele, 17/09. -->
+<div
+	class="card-elevated rounded-2xl border-2 border-warning-500/60 bg-warning-500/5 p-4 shadow-sm sm:p-6"
+>
 	<div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
 		<div>
-			<h2 class="text-base font-bold text-surface-700 dark:text-surface-300">Férias</h2>
+			<h2 class="text-base font-bold text-warning-700 dark:text-warning-400">☀ Férias</h2>
 			<p class="text-xs text-surface-600 dark:text-surface-400">
 				Programação homologada no Guardião, lançada pela unidade. Reprogramações vão à COGEP por NUP
 				— o sistema diz se é sustação ou suspensão e monta o ofício.
 			</p>
 		</div>
-		<button
-			type="button"
-			class="btn btn-sm preset-outlined-surface-500"
-			onclick={() => {
-				fecharTudo();
-				lancando = true;
-			}}>Lançar fração</button
+		<button type="button" class="btn btn-sm preset-filled-warning-500" onclick={abrirLancar}
+			>Lançar programação</button
 		>
 	</div>
 
@@ -230,15 +291,16 @@
 		</div>
 	{/if}
 
-	<!-- Lançar fração -->
+	<!-- Lançar a programação de um exercício -->
 	{#if lancando}
 		<form
 			method="POST"
-			action="?/registrarFracao"
-			use:enhance={() => aoResponder('Fração lançada')}
-			class="mb-4 space-y-3 rounded-xl border border-surface-200 p-3 dark:border-white/10"
+			action="?/registrarProgramacao"
+			use:enhance={() => aoResponder('Programação lançada')}
+			class="mb-4 space-y-3 rounded-xl border border-surface-200 bg-white/70 p-3 dark:border-white/10 dark:bg-surface-900/60"
 		>
-			<div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+			<h3 class="text-sm font-bold">Lançar a programação</h3>
+			<div class="grid grid-cols-1 gap-3 sm:grid-cols-[8rem_1fr]">
 				<label class="label">
 					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70">Exercício</span>
 					<input
@@ -251,50 +313,17 @@
 						required
 					/>
 				</label>
-				<label class="label">
-					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70">Fração</span>
-					<select class="select px-3 py-1 text-sm" name="ordem" bind:value={novaOrdem}>
-						<option value={1}>1ª</option>
-						<option value={2}>2ª</option>
-						<option value={3}>3ª</option>
-					</select>
-				</label>
-				<label class="label">
-					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70">Início</span>
-					<input
-						class="input px-3 py-1 text-sm"
-						type="date"
-						name="data_inicio"
-						bind:value={novoInicio}
-						required
-					/>
-				</label>
-				<label class="label">
-					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70">Fim</span>
-					<input
-						class="input px-3 py-1 text-sm"
-						type="date"
-						name="data_fim"
-						bind:value={novoFim}
-						required
-					/>
-				</label>
-			</div>
-			<p class="text-2xs text-surface-500">
-				{#if aquisitivo}
-					Período aquisitivo do exercício {novoExercicio}: {formatarData(aquisitivo.inicio)} a {formatarData(
-						aquisitivo.fim
-					)} (posse em {formatarData(dataPosse ?? '')}).
-				{:else}
-					Sem data de posse no cadastro — o período aquisitivo não pode ser calculado.
-				{/if}
-				{#if diasNovaFracao > 0}
-					· {diasNovaFracao} dia{diasNovaFracao === 1 ? '' : 's'}
-					{#if diasNovaFracao < 10}
-						<span class="text-warning-600"> — fração menor que 10 dias</span>
+				<p class="self-end pb-1 text-2xs text-surface-500">
+					{#if aquisitivo}
+						Aquisitivo do exercício {novoExercicio}: {formatarData(aquisitivo.inicio)} a {formatarData(
+							aquisitivo.fim
+						)} (posse em {formatarData(dataPosse ?? '')}).
+					{:else}
+						Sem data de posse no cadastro — o período aquisitivo não pode ser calculado.
 					{/if}
-				{/if}
-			</p>
+				</p>
+			</div>
+			{@render escolhaDePeriodos()}
 			<div class="flex justify-end gap-2">
 				<button type="button" class="btn btn-sm preset-outlined-surface-500" onclick={fecharTudo}
 					>Cancelar</button
@@ -302,28 +331,63 @@
 				<button
 					type="submit"
 					class="btn btn-sm preset-filled-primary-500 disabled:opacity-40"
-					disabled={enviando || !novoInicio || !novoFim}>Lançar</button
+					disabled={enviando || !podeEnviarPeriodos}>Lançar</button
 				>
 			</div>
 		</form>
 	{/if}
 
-	<!-- As frações -->
-	{#if ferias.length === 0}
-		<p class="text-sm text-surface-500">Nenhuma fração lançada.</p>
+	<!-- Os exercícios -->
+	{#if ferias.fracoes.length === 0}
+		<p class="text-sm text-surface-500">Nenhuma programação lançada.</p>
 	{:else}
 		{#each porExercicio as [exercicio, fracoes] (exercicio)}
 			{@const aq = dataPosse ? periodoAquisitivo(dataPosse, exercicio) : null}
+			{@const situacao = situacaoDe(fracoes)}
+			{@const pendente = pendenteDe(exercicio)}
 			<div class="mb-4">
-				<p class="mb-1 text-2xs font-semibold tracking-[0.18em] text-surface-500 uppercase">
-					Exercício {exercicio}{#if aq}
-						· aquisitivo {formatarData(aq.inicio)} – {formatarData(aq.fim)}{/if}
-				</p>
+				<div class="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+					<p class="text-2xs font-semibold tracking-[0.18em] text-surface-500 uppercase">
+						Exercício {exercicio}{#if aq}
+							· aquisitivo {formatarData(aq.inicio)} – {formatarData(aq.fim)}{/if}
+					</p>
+					{#if !pendente}
+						<div class="flex gap-1">
+							{#if situacao.sustacao}
+								<button
+									type="button"
+									class="btn btn-sm preset-outlined-surface-500"
+									onclick={() => abrirSustar(exercicio, fracoes)}
+									>Sustar {situacao.sustacao.fracoes.length === 1
+										? 'a fração'
+										: `as ${situacao.sustacao.fracoes.length} frações`}</button
+								>
+							{/if}
+							{#if intacta(exercicio, fracoes)}
+								<form
+									method="POST"
+									action="?/excluirProgramacao"
+									use:enhance={() => aoResponder('Programação excluída')}
+								>
+									<input type="hidden" name="exercicio" value={exercicio} />
+									<button
+										type="submit"
+										class="btn btn-sm preset-outlined-error-500"
+										title="Lançada errada? Some com os afastamentos junto"
+										disabled={enviando}>Excluir</button
+									>
+								</form>
+							{/if}
+						</div>
+					{/if}
+				</div>
+
 				<ul class="space-y-2">
 					{#each fracoes as f (f.id)}
 						{@const status = statusPelaData(comoFracao(f), hoje)}
-						{@const pend = pendentesDe(f)}
-						<li class="rounded-xl border border-surface-200 p-3 text-sm dark:border-white/10">
+						<li
+							class="rounded-xl border border-surface-200 bg-white/60 p-3 text-sm dark:border-white/10 dark:bg-surface-900/40"
+						>
 							<div class="flex flex-wrap items-baseline justify-between gap-2">
 								<div class="flex flex-wrap items-baseline gap-x-2">
 									<span class="font-semibold">{f.ordem}ª fração</span>
@@ -338,16 +402,16 @@
 										<span class="text-2xs text-surface-500">(reprogramada)</span>
 									{/if}
 								</div>
-								{#if f.status === 'programada' && status !== 'gozada'}
+								{#if f.status === 'programada' && status !== 'gozada' && !pendente}
 									<div class="flex gap-1">
-										{#if pend.length === 0}
+										{#if status === 'em_gozo'}
 											<button
 												type="button"
 												class="btn btn-sm preset-outlined-surface-500"
 												onclick={() => {
 													fecharTudo();
-													reprogramando = f;
-												}}>Reprogramar</button
+													suspendendo = f;
+												}}>Suspender</button
 											>
 										{/if}
 										{#if isAdmin && !f.abono}
@@ -359,21 +423,6 @@
 													abonando = f;
 												}}>Registrar abono</button
 											>
-										{/if}
-										{#if pend.length === 0 && !f.abono}
-											<form
-												method="POST"
-												action="?/excluirFracao"
-												use:enhance={() => aoResponder('Fração excluída')}
-											>
-												<input type="hidden" name="fracao_id" value={f.id} />
-												<button
-													type="submit"
-													class="btn btn-sm preset-outlined-error-500"
-													title="Lançada errada? Some com o afastamento junto"
-													disabled={enviando}>Excluir</button
-												>
-											</form>
 										{/if}
 									</div>
 								{/if}
@@ -416,195 +465,131 @@
 									{/if}
 								</div>
 							{/if}
-
-							<!-- Pedidos à COGEP -->
-							{#each f.reprogramacoes as r (r.id)}
-								<div
-									class="mt-2 rounded-lg p-2 text-xs {r.status === 'pendente'
-										? 'bg-warning-500/10'
-										: 'bg-surface-100 dark:bg-surface-800/60'}"
-								>
-									<span class="font-semibold">{ROTULO_TIPO_REPROGRAMACAO[r.tipo]}</span>
-									→ {formatarData(r.novo_inicio)} – {formatarData(r.novo_fim)}
-									{#if r.nup}
-										· NUP {formatarNUP(r.nup)}{/if}
-									{#if r.status === 'pendente'}
-										<span class="ml-1 font-semibold text-warning-700 dark:text-warning-400"
-											>· aguardando a COGEP</span
-										>
-										<div class="mt-2 flex flex-wrap items-end gap-2">
-											{#if !r.nup}
-												<form
-													method="POST"
-													action="?/anotarNup"
-													use:enhance={() => aoResponder('NUP anotado')}
-													class="flex items-end gap-1"
-												>
-													<input type="hidden" name="reprogramacao_id" value={r.id} />
-													<label class="label">
-														<span class="label-text text-2xs font-bold uppercase opacity-70"
-															>NUP do processo</span
-														>
-														<input
-															class="input w-52 px-2 py-1 text-xs"
-															name="nup"
-															maxlength="40"
-															placeholder="00000.000000/0000-00"
-														/>
-													</label>
-													<button
-														type="submit"
-														class="btn btn-sm preset-outlined-surface-500"
-														disabled={enviando}>Anotar</button
-													>
-												</form>
-											{/if}
-											<form
-												method="POST"
-												action="?/decidirReprogramacao"
-												use:enhance={() => aoResponder('Resposta da COGEP homologada')}
-												class="flex gap-1"
-											>
-												<input type="hidden" name="reprogramacao_id" value={r.id} />
-												<button
-													type="submit"
-													name="decisao"
-													value="deferida"
-													class="btn btn-sm preset-filled-success-500"
-													disabled={enviando}>COGEP deferiu</button
-												>
-												<button
-													type="submit"
-													name="decisao"
-													value="indeferida"
-													class="btn btn-sm preset-outlined-error-500"
-													disabled={enviando}>Indeferiu</button
-												>
-											</form>
-										</div>
-									{:else}
-										<span class="text-surface-500">
-											· {r.status} em {formatarData(r.decidida_em ?? '')}</span
-										>
-									{/if}
-								</div>
-							{/each}
 						</li>
 					{/each}
 				</ul>
+
+				<!-- Os pedidos do exercício à COGEP -->
+				{#each pedidosDe(exercicio) as r (r.id)}
+					{@const periodos = periodosDoPedido(r)}
+					<div
+						class="mt-2 rounded-lg p-2 text-xs {r.status === 'pendente'
+							? 'bg-warning-500/15'
+							: 'bg-surface-100 dark:bg-surface-800/60'}"
+					>
+						<span class="font-semibold">{ROTULO_TIPO_REPROGRAMACAO[r.tipo]}</span>
+						{#if r.data_suspensao}
+							· retorno em {formatarData(r.data_suspensao)}{/if}
+						→ {periodos
+							.map((p) => `${formatarData(p.inicio)} – ${formatarData(p.fim)}`)
+							.join(' · ')}
+						{#if r.nup}
+							· NUP {formatarNUP(r.nup)}{/if}
+						{#if r.status === 'pendente'}
+							<span class="ml-1 font-semibold text-warning-700 dark:text-warning-400"
+								>· aguardando a COGEP</span
+							>
+							<div class="mt-2 flex flex-wrap items-end gap-2">
+								{#if !r.nup}
+									<form
+										method="POST"
+										action="?/anotarNup"
+										use:enhance={() => aoResponder('NUP anotado')}
+										class="flex items-end gap-1"
+									>
+										<input type="hidden" name="reprogramacao_id" value={r.id} />
+										<label class="label">
+											<span class="label-text text-2xs font-bold uppercase opacity-70"
+												>NUP do processo</span
+											>
+											<input
+												class="input w-52 px-2 py-1 text-xs"
+												name="nup"
+												maxlength="40"
+												placeholder="00000.000000/0000-00"
+											/>
+										</label>
+										<button
+											type="submit"
+											class="btn btn-sm preset-outlined-surface-500"
+											disabled={enviando}>Anotar</button
+										>
+									</form>
+								{/if}
+								<form
+									method="POST"
+									action="?/decidirReprogramacao"
+									use:enhance={() => aoResponder('Resposta da COGEP homologada')}
+									class="flex gap-1"
+								>
+									<input type="hidden" name="reprogramacao_id" value={r.id} />
+									<button
+										type="submit"
+										name="decisao"
+										value="deferida"
+										class="btn btn-sm preset-filled-success-500"
+										disabled={enviando}>COGEP deferiu</button
+									>
+									<button
+										type="submit"
+										name="decisao"
+										value="indeferida"
+										class="btn btn-sm preset-outlined-error-500"
+										disabled={enviando}>Indeferiu</button
+									>
+								</form>
+							</div>
+						{:else}
+							<span class="text-surface-500">
+								· {r.status} em {formatarData(r.decidida_em ?? '')}</span
+							>
+						{/if}
+					</div>
+				{/each}
 			</div>
 		{/each}
 	{/if}
 
-	<!-- O assistente de reprogramação -->
-	{#if reprogramando}
-		{@const c = classificacao}
+	<!-- SUSTAÇÃO: todas as frações por começar, de uma vez, redivididas ou não -->
+	{#if sustando}
+		{@const s = situacaoDe(sustando.fracoes).sustacao}
 		<form
 			method="POST"
-			action="?/reprogramar"
+			action="?/sustar"
 			use:enhance={() => aoResponder('Pedido registrado')}
 			class="mt-4 space-y-3 rounded-xl border border-primary-500/30 bg-primary-500/5 p-4"
 		>
-			<input type="hidden" name="fracao_id" value={reprogramando.id} />
-			<h3 class="text-sm font-bold">
-				Reprogramar a {reprogramando.ordem}ª fração de {reprogramando.exercicio}
-				<span class="font-normal text-surface-500">
-					({formatarData(reprogramando.data_inicio)} – {formatarData(reprogramando.data_fim)})</span
-				>
-			</h3>
-
-			{#if c && 'erro' in c}
-				<p class="text-sm text-error-600">{c.erro}</p>
-			{:else if c}
+			<input type="hidden" name="exercicio" value={sustando.exercicio} />
+			<h3 class="text-sm font-bold">Sustar as férias do exercício {sustando.exercicio}</h3>
+			{#if s}
 				<!-- O nome do caso, decidido pelos fatos — é isto que evita o NUP errado. -->
 				<div class="rounded-lg bg-white/70 p-3 text-sm dark:bg-surface-900/60">
-					<p class="text-lg font-bold text-primary-700 dark:text-primary-400">
-						{ROTULO_TIPO_REPROGRAMACAO[c.tipo].toUpperCase()}
-					</p>
-					<p class="text-surface-700 dark:text-surface-300">{c.motivo}</p>
-					<p class="mt-1 text-2xs text-surface-500">{c.base}</p>
-					{#if c.admiteSuspensaoPeloParagrafo13}
-						<p class="mt-1 text-2xs text-surface-600 dark:text-surface-400">
-							A 1ª fração já foi gozada: pelo § 13 a COGEP também admite SUSPENSÃO desta, se o
-							motivo for necessidade do serviço.
-						</p>
-					{/if}
-				</div>
-
-				<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-					{#if c.tipo === 'suspensao'}
-						<label class="label">
-							<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70"
-								>Retorno ao serviço</span
-							>
-							<input
-								class="input px-3 py-1 text-sm"
-								type="date"
-								name="data_suspensao"
-								bind:value={rSuspensao}
-								required
-							/>
-						</label>
-					{/if}
-					<label class="label">
-						<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70">Novo início</span>
-						<input
-							class="input px-3 py-1 text-sm"
-							type="date"
-							name="novo_inicio"
-							bind:value={rInicio}
-							required
-						/>
-					</label>
-					<label class="label">
-						<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70">Novo fim</span>
-						<input
-							class="input px-3 py-1 text-sm"
-							type="date"
-							name="novo_fim"
-							bind:value={rFim}
-							required
-						/>
-					</label>
-				</div>
-
-				{#if checagens.length > 0}
-					<ul class="space-y-0.5 text-xs">
-						{#each checagens as ch (ch.texto)}
-							<li
-								class={ch.ok
-									? 'text-success-700 dark:text-success-400'
-									: ch.nivel === 'erro'
-										? 'text-error-600'
-										: 'text-warning-600 dark:text-warning-400'}
-							>
-								{ch.ok ? '✔' : ch.nivel === 'erro' ? '✖' : '⚠'}
-								{ch.texto}
+					<p class="text-lg font-bold text-primary-700 dark:text-primary-400">SUSTAÇÃO</p>
+					<p class="text-surface-700 dark:text-surface-300">{s.motivo}</p>
+					<ul class="mt-1 text-xs text-surface-600 dark:text-surface-400">
+						{#each s.fracoes as f (f.ordem + f.data_inicio)}
+							<li>
+								{f.ordem}ª fração: {formatarData(f.data_inicio)} – {formatarData(f.data_fim)} ({diasDaFracao(
+									f
+								)} dias)
 							</li>
 						{/each}
-						<li class="text-surface-500">
-							O teto de 15 % da unidade é conferido no envio (só avisa, só no 1º período).
-						</li>
 					</ul>
-				{/if}
-
+				</div>
+				{@render escolhaDePeriodos()}
 				<label class="label">
-					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70">
-						{c.tipo === 'suspensao' ? 'Imperiosa necessidade do serviço' : 'Observação (opcional)'}
-					</span>
+					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70"
+						>Observação (opcional)</span
+					>
 					<textarea
 						class="textarea px-3 py-1 text-sm"
 						name="justificativa"
-						bind:value={rJustificativa}
 						rows="2"
-						maxlength={MAX_JUSTIFICATIVA}
-						required={c.tipo === 'suspensao'}
-						placeholder={c.tipo === 'suspensao'
-							? 'Ex.: operação de grande porte na região, sem efetivo para substituição'
-							: ''}></textarea>
+						maxlength={MAX_JUSTIFICATIVA}></textarea>
 				</label>
+			{:else}
+				<p class="text-sm text-error-600">Não há fração por começar neste exercício.</p>
 			{/if}
-
 			<div class="flex justify-end gap-2">
 				<button type="button" class="btn btn-sm preset-outlined-surface-500" onclick={fecharTudo}
 					>Cancelar</button
@@ -612,7 +597,104 @@
 				<button
 					type="submit"
 					class="btn btn-sm preset-filled-primary-500 disabled:opacity-40"
-					disabled={enviando || !podeEnviarReprogramacao}>Gerar ofício e registrar pedido</button
+					disabled={enviando || !s || !podeEnviarPeriodos}>Gerar ofício e registrar pedido</button
+				>
+			</div>
+		</form>
+	{/if}
+
+	<!-- SUSPENSÃO: a fração em gozo é interrompida; o que resta volta num período só -->
+	{#if suspendendo}
+		<form
+			method="POST"
+			action="?/suspender"
+			use:enhance={() => aoResponder('Pedido registrado')}
+			class="mt-4 space-y-3 rounded-xl border border-primary-500/30 bg-primary-500/5 p-4"
+		>
+			<input type="hidden" name="fracao_id" value={suspendendo.id} />
+			<h3 class="text-sm font-bold">
+				Suspender a {suspendendo.ordem}ª fração de {suspendendo.exercicio}
+				<span class="font-normal text-surface-500">
+					({formatarData(suspendendo.data_inicio)} – {formatarData(suspendendo.data_fim)}, {diasDaFracao(
+						suspendendo
+					)} dias)</span
+				>
+			</h3>
+			<div class="rounded-lg bg-white/70 p-3 text-sm dark:bg-surface-900/60">
+				<p class="text-lg font-bold text-primary-700 dark:text-primary-400">SUSPENSÃO</p>
+				<p class="text-surface-700 dark:text-surface-300">
+					A fração está em gozo: só cabe suspensão, por imperiosa necessidade do serviço. Os dias já
+					gozados ficam; os que restam voltam num período novo. As frações seguintes não mudam.
+				</p>
+			</div>
+			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+				<label class="label">
+					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70"
+						>Retorno ao serviço</span
+					>
+					<input
+						class="input px-3 py-1 text-sm"
+						type="date"
+						name="data_suspensao"
+						bind:value={sSuspensao}
+						min={suspendendo.data_inicio}
+						max={suspendendo.data_fim}
+						required
+					/>
+					{#if restoDaSuspensao}
+						<span class="ml-1 text-2xs text-surface-500"
+							>{restoDaSuspensao.gozados} gozados · restam {restoDaSuspensao.restantes} dias</span
+						>
+					{/if}
+				</label>
+				<label class="label">
+					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70"
+						>1º dia do período que resta</span
+					>
+					<input
+						class="input px-3 py-1 text-sm"
+						type="date"
+						name="novo_inicio"
+						bind:value={sInicio}
+						min={sSuspensao || undefined}
+						required
+					/>
+					{#if sInicio && restoDaSuspensao && restoDaSuspensao.restantes > 0}
+						<span class="ml-1 text-2xs text-surface-500"
+							>até {formatarData(fimDaFracao(sInicio, restoDaSuspensao.restantes))}</span
+						>
+					{/if}
+				</label>
+			</div>
+			{#if checagensSuspensao.length > 0}
+				<ul class="space-y-0.5 text-xs">
+					{#each checagensSuspensao as ch (ch.texto)}
+						<li class={classeChecagem(ch)}>{marcaChecagem(ch)} {ch.texto}</li>
+					{/each}
+				</ul>
+			{/if}
+			<label class="label">
+				<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70"
+					>Imperiosa necessidade do serviço</span
+				>
+				<textarea
+					class="textarea px-3 py-1 text-sm"
+					name="justificativa"
+					bind:value={sJustificativa}
+					rows="2"
+					maxlength={MAX_JUSTIFICATIVA}
+					required
+					placeholder="Ex.: operação de grande porte na região, sem efetivo para substituição"
+				></textarea>
+			</label>
+			<div class="flex justify-end gap-2">
+				<button type="button" class="btn btn-sm preset-outlined-surface-500" onclick={fecharTudo}
+					>Cancelar</button
+				>
+				<button
+					type="submit"
+					class="btn btn-sm preset-filled-primary-500 disabled:opacity-40"
+					disabled={enviando || !podeEnviarSuspensao}>Gerar ofício e registrar pedido</button
 				>
 			</div>
 		</form>
@@ -689,3 +771,78 @@
 		</form>
 	{/if}
 </div>
+
+<!-- "Quantos períodos?" → a forma → o 1º dia de cada fração. O último dia sai
+     da regra; o 1º dia tem de ser útil. Serve ao lançamento e à sustação, que
+     só diferem na lista de divisões admitidas. -->
+{#snippet escolhaDePeriodos()}
+	<fieldset class="space-y-2">
+		<legend class="ml-1 text-2xs font-bold uppercase opacity-70">Quantos períodos?</legend>
+		<div class="flex flex-wrap gap-2">
+			{#each quantidadesPossiveis as n (n)}
+				<button
+					type="button"
+					class="btn btn-sm {qtdPeriodos === n
+						? 'preset-filled-primary-500'
+						: 'preset-outlined-surface-500'}"
+					onclick={() => escolherQuantidade(n)}>{n} {n === 1 ? 'período' : 'períodos'}</button
+				>
+			{/each}
+		</div>
+		{#if divisoesDaQuantidade.length > 1}
+			<div class="flex flex-wrap gap-2">
+				{#each divisoesDaQuantidade as d (rotuloDaDivisao(d))}
+					<label
+						class="flex cursor-pointer items-center gap-1 rounded-lg border px-2 py-1 text-xs {mesmaDivisao(
+							divisaoEscolhida,
+							d
+						)
+							? 'border-primary-500 bg-primary-500/10 font-semibold'
+							: 'border-surface-300 dark:border-white/10'}"
+					>
+						<input
+							type="radio"
+							class="radio"
+							value={d}
+							checked={mesmaDivisao(divisaoEscolhida, d)}
+							onchange={() => (divisaoEscolhida = d)}
+						/>
+						{rotuloDaDivisao(d)} dias
+					</label>
+				{/each}
+			</div>
+		{/if}
+		<input type="hidden" name="divisao" value={divisaoEscolhida.join('+')} />
+		<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+			{#each divisaoEscolhida as dias, k (k)}
+				<label class="label">
+					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70"
+						>1º dia da {k + 1}ª fração ({dias} dias)</span
+					>
+					<input
+						class="input px-3 py-1 text-sm"
+						type="date"
+						name="inicio_{k + 1}"
+						bind:value={inicios[k]}
+						required
+					/>
+					{#if inicios[k]}
+						<span class="ml-1 text-2xs text-surface-500"
+							>até {formatarData(fimDaFracao(inicios[k], dias))}</span
+						>
+					{/if}
+				</label>
+			{/each}
+		</div>
+		{#if previa.checagens.length > 0}
+			<ul class="space-y-0.5 text-xs">
+				{#each previa.checagens as ch (ch.texto)}
+					<li class={classeChecagem(ch)}>{marcaChecagem(ch)} {ch.texto}</li>
+				{/each}
+				<li class="text-surface-500">
+					O teto de 15 % da unidade é conferido no envio (só avisa, só no 1º período).
+				</li>
+			</ul>
+		{/if}
+	</fieldset>
+{/snippet}

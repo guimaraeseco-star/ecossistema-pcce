@@ -7,9 +7,14 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-	classificarReprogramacao,
 	conferirAbono,
-	conferirNovoPeriodo,
+	conferirPrimeiroDia,
+	diasRestantesNaSuspensao,
+	divisoesPossiveis,
+	fimDaFracao,
+	montarPeriodos,
+	situacaoDaReprogramacao,
+	avisoDoTeto,
 	criteriosDaSuspensao,
 	fracionamentoValido,
 	impedimentosDoAbono,
@@ -22,12 +27,12 @@ import {
 	type Fracao
 } from '../ferias';
 
-const fracao = (ordem: 1 | 2 | 3, inicio: string, fim: string): Fracao => ({
-	ordem,
-	data_inicio: inicio,
-	data_fim: fim,
-	status: 'programada'
-});
+const fracao = (
+	ordem: 1 | 2 | 3,
+	inicio: string,
+	fim: string,
+	status: Fracao['status'] = 'programada'
+): Fracao => ({ ordem, data_inicio: inicio, data_fim: fim, status });
 
 describe('fracionamento (Dec. 32.907, art. 3º § 1º)', () => {
 	it('aceita só as cinco formas, na ordem', () => {
@@ -95,31 +100,51 @@ describe('status pela data', () => {
 });
 
 describe('sustação × suspensão — decidido pelos fatos', () => {
-	it('fração que ainda não começou é SUSTAÇÃO, sem exigir motivo', () => {
-		const c = classificarReprogramacao(fracao(1, '2026-12-01', '2026-12-15'), '2026-11-20');
-		expect(c.tipo).toBe('sustacao');
-		expect(c.motivo).toContain('ainda não iniciou');
-		expect(c.admiteSuspensaoPeloParagrafo13).toBe(false);
+	it('nada começou: só SUSTAÇÃO, de todas as frações juntas', () => {
+		const ex = [fracao(1, '2026-12-01', '2026-12-10'), fracao(2, '2027-01-11', '2027-01-30')];
+		const s = situacaoDaReprogramacao(ex, '2026-11-20');
+		expect(s.suspensao).toBeNull();
+		expect(s.sustacao?.fracoes.map((f) => f.ordem)).toEqual([1, 2]);
+		expect(s.sustacao?.diasRestantes).toBe(30);
+		expect(s.sustacao?.motivo).toContain('juntas');
+		// A divisão atual (10+20) vem primeiro; depois as outras quatro formas.
+		expect(s.sustacao?.divisoes.map((d) => d.join('+'))).toEqual([
+			'10+20',
+			'30',
+			'20+10',
+			'15+15',
+			'10+10+10'
+		]);
 	});
 
-	it('fração já iniciada é SUSPENSÃO', () => {
-		const c = classificarReprogramacao(fracao(1, '2026-07-01', '2026-07-30'), '2026-07-10');
-		expect(c.tipo).toBe('suspensao');
-		expect(c.motivo).toContain('necessidade do serviço');
+	it('1ª em gozo e 2ª futura: SUSPENSÃO da 1ª e SUSTAÇÃO da 2ª, cada uma no seu lugar', () => {
+		const ex = [fracao(1, '2026-07-01', '2026-07-30'), fracao(2, '2026-12-01', '2026-12-10')];
+		const s = situacaoDaReprogramacao(ex, '2026-07-10');
+		expect(s.suspensao?.fracao.ordem).toBe(1);
+		expect(s.suspensao?.motivo).toContain('necessidade do serviço');
+		expect(s.sustacao?.fracoes.map((f) => f.ordem)).toEqual([2]);
+		expect(s.sustacao?.divisoes.map((d) => d.join('+'))).toEqual(['10']);
 	});
 
-	it('2ª fração antes de começar, com a 1ª gozada: sustação, mas avisa o § 13', () => {
-		const primeira = fracao(1, '2026-03-01', '2026-03-15');
-		const segunda = fracao(2, '2026-12-01', '2026-12-15');
-		const c = classificarReprogramacao(segunda, '2026-11-01', [primeira, segunda]);
-		expect(c.tipo).toBe('sustacao');
-		expect(c.admiteSuspensaoPeloParagrafo13).toBe(true);
+	it('depois de uma suspensão o que resta pode não ser uma das cinco formas — a divisão atual ainda cabe', () => {
+		// Continuação de 12 dias (ordem 2) mais a 3ª de 10: 22 não é forma do decreto.
+		const ex = [fracao(2, '2026-10-01', '2026-10-12'), fracao(3, '2026-12-01', '2026-12-10')];
+		const s = situacaoDaReprogramacao(ex, '2026-09-01');
+		expect(s.sustacao?.divisoes.map((d) => d.join('+'))).toEqual(['12+10']);
 	});
 
-	it('fração gozada não se reprograma', () => {
-		expect(() =>
-			classificarReprogramacao(fracao(1, '2026-01-05', '2026-01-19'), '2026-06-01')
-		).toThrow(/já gozada/);
+	it('tudo gozado: não há o que reprogramar', () => {
+		const s = situacaoDaReprogramacao([fracao(1, '2026-01-05', '2026-02-03')], '2026-06-01');
+		expect(s).toEqual({ sustacao: null, suspensao: null });
+	});
+
+	it('fração sustada não conta: reprograma-se a que a substituiu', () => {
+		const s = situacaoDaReprogramacao(
+			[fracao(1, '2026-12-01', '2026-12-30', 'sustada'), fracao(1, '2027-02-01', '2027-03-02')],
+			'2026-11-20'
+		);
+		expect(s.sustacao?.fracoes).toHaveLength(1);
+		expect(s.sustacao?.fracoes[0].data_inicio).toBe('2027-02-01');
 	});
 });
 
@@ -140,53 +165,15 @@ describe('critérios da suspensão (art. 6º III)', () => {
 	});
 });
 
-describe('novas datas (o que o Guardião e a COGEP conferem)', () => {
-	const original = fracao(1, '2026-07-01', '2026-07-15'); // 15 dias
-	const base = { fracaoOriginal: original, feriados: ['2026-09-07'] };
-
-	it('mesma quantidade de dias, 1º dia útil, fração ≥ 10: tudo ok', () => {
-		const c = conferirNovoPeriodo({ ...base, novoInicio: '2026-09-08', novoFim: '2026-09-22' });
-		expect(temErro(c)).toBe(false);
-	});
-
-	it('quantidade diferente é erro', () => {
-		const c = conferirNovoPeriodo({ ...base, novoInicio: '2026-09-08', novoFim: '2026-09-17' });
-		expect(c[0].ok).toBe(false);
-		expect(temErro(c)).toBe(true);
-	});
-
-	it('1º dia em fim de semana ou feriado é erro', () => {
-		// 2026-09-05 é sábado; 2026-09-07 está na lista de feriados.
-		expect(
-			conferirNovoPeriodo({ ...base, novoInicio: '2026-09-05', novoFim: '2026-09-19' })[1].ok
-		).toBe(false);
-		expect(
-			conferirNovoPeriodo({ ...base, novoInicio: '2026-09-07', novoFim: '2026-09-21' })[1].ok
-		).toBe(false);
-	});
-
-	it('teto de 15 % só AVISA, e só no 1º período', () => {
-		const acima = conferirNovoPeriodo({
-			...base,
-			novoInicio: '2026-09-08',
-			novoFim: '2026-09-22',
-			emFeriasNoMes: 3,
-			efetivoDaUnidade: 12
-		});
-		const aviso = acima.find((c) => c.texto.includes('%'));
-		expect(aviso?.ok).toBe(false);
-		expect(aviso?.nivel).toBe('aviso');
-		expect(temErro(acima)).toBe(false);
-
-		const segundo = conferirNovoPeriodo({
-			fracaoOriginal: fracao(2, '2026-07-01', '2026-07-15'),
-			feriados: [],
-			novoInicio: '2026-09-08',
-			novoFim: '2026-09-22',
-			emFeriasNoMes: 3,
-			efetivoDaUnidade: 12
-		});
-		expect(segundo.some((c) => c.texto.includes('%'))).toBe(false);
+describe('teto de 15 % (art. 6º I)', () => {
+	it('só AVISA, e só no 1º período', () => {
+		const acima = avisoDoTeto({ ordem: 1, emFeriasNoMes: 3, efetivoDaUnidade: 12 });
+		expect(acima?.ok).toBe(false);
+		expect(acima?.nivel).toBe('aviso');
+		expect(temErro([acima!])).toBe(false);
+		expect(avisoDoTeto({ ordem: 1, emFeriasNoMes: 1, efetivoDaUnidade: 12 })?.ok).toBe(true);
+		expect(avisoDoTeto({ ordem: 2, emFeriasNoMes: 3, efetivoDaUnidade: 12 })).toBeNull();
+		expect(avisoDoTeto({ ordem: 1, emFeriasNoMes: 3, efetivoDaUnidade: 0 })).toBeNull();
 	});
 });
 
@@ -197,34 +184,38 @@ describe('o ofício do NUP sai com o instituto certo', () => {
 		cargo: 'OIP',
 		lotacao: 'Delegacia de Polícia Civil de Aurora'
 	};
-	it('sustação', () => {
-		const f = fracao(2, '2026-12-01', '2026-12-15');
+	it('sustação de duas frações que voltam como uma', () => {
 		const texto = textoDoOficio({
 			servidor,
-			classificacao: classificarReprogramacao(f, '2026-11-01'),
-			fracaoOriginal: f,
-			novoInicio: '2027-01-12',
-			novoFim: '2027-01-26'
+			tipo: 'sustacao',
+			fracoesOriginais: [
+				fracao(2, '2026-12-01', '2026-12-10'),
+				fracao(3, '2027-01-04', '2027-01-13')
+			],
+			novosPeriodos: [{ inicio: '2027-02-01', fim: '2027-02-20', dias: 20 }]
 		});
 		expect(texto).toContain('SUSTAÇÃO');
 		expect(texto).not.toContain('SUSPENSÃO');
-		expect(texto).toContain('2ª fração, de 01/12/2026 a 15/12/2026 (15 dias)');
+		expect(texto).toContain('Períodos programados:');
+		expect(texto).toContain('2ª fração, de 01/12/2026 a 10/12/2026 (10 dias)');
+		expect(texto).toContain('3ª fração, de 04/01/2027 a 13/01/2027 (10 dias)');
+		expect(texto).toContain('1º período, de 01/02/2027 a 20/02/2027 (20 dias)');
 		expect(texto).toContain('§§ 10 e 14');
 	});
 	it('suspensão traz a justificativa e os dias gozados', () => {
 		const f = fracao(1, '2026-07-01', '2026-07-30');
 		const texto = textoDoOficio({
 			servidor,
-			classificacao: classificarReprogramacao(f, '2026-07-10'),
-			fracaoOriginal: f,
-			novoInicio: '2026-08-03',
-			novoFim: '2026-08-23',
+			tipo: 'suspensao',
+			fracoesOriginais: [f],
+			novosPeriodos: [{ inicio: '2026-08-03', fim: '2026-08-23', dias: 21 }],
 			justificativa: 'Operação Carnaval fora de época na região.',
 			dataSuspensao: '2026-07-10'
 		});
 		expect(texto).toContain('SUSPENSÃO');
 		expect(texto).toContain('9 dias gozados');
 		expect(texto).toContain('Operação Carnaval');
+		expect(texto).toContain('§ 12');
 	});
 });
 
@@ -311,5 +302,58 @@ describe('abono pecuniário (Dec. 37.363/2026)', () => {
 		});
 		// Fração de exatamente 10 dias: converte inteira, nada a gozar.
 		expect(periodoGozadoComAbono(fracao(3, '2026-12-01', '2026-12-10'), 'finais').gozo).toBeNull();
+	});
+});
+
+describe('as férias são UM período: divisão, 1º dia e sustação do exercício', () => {
+	it('30 dias admitem as cinco formas', () => {
+		expect(divisoesPossiveis(30).map((d) => d.join('+'))).toEqual([
+			'30',
+			'10+20',
+			'20+10',
+			'15+15',
+			'10+10+10'
+		]);
+	});
+
+	it('o restante depois de uma fração gozada só admite os sufixos que somam', () => {
+		expect(divisoesPossiveis(20).map((d) => d.join('+'))).toEqual(['20', '10+10']);
+		expect(divisoesPossiveis(15).map((d) => d.join('+'))).toEqual(['15']);
+		expect(divisoesPossiveis(10).map((d) => d.join('+'))).toEqual(['10']);
+		expect(divisoesPossiveis(7)).toEqual([]);
+	});
+
+	it('o último dia sai do primeiro', () => {
+		expect(fimDaFracao('2026-10-01', 10)).toBe('2026-10-10');
+		expect(fimDaFracao('2026-10-01', 30)).toBe('2026-10-30');
+	});
+
+	it('1º dia em domingo ou feriado é erro — o caso do 01/11/2026', () => {
+		expect(conferirPrimeiroDia('2026-11-01', []).ok).toBe(false); // domingo
+		expect(conferirPrimeiroDia('2026-11-02', ['2026-11-02']).ok).toBe(false); // Finados
+		expect(conferirPrimeiroDia('2026-11-03', ['2026-11-02']).ok).toBe(true);
+	});
+
+	it('monta os períodos da divisão e recusa sobreposição', () => {
+		const ok = montarPeriodos([10, 20], ['2026-10-01', '2026-11-03'], ['2026-11-02']);
+		expect(ok.periodos).toEqual([
+			{ inicio: '2026-10-01', fim: '2026-10-10', dias: 10 },
+			{ inicio: '2026-11-03', fim: '2026-11-22', dias: 20 }
+		]);
+		expect(temErro(ok.checagens)).toBe(false);
+
+		const sobreposto = montarPeriodos([10, 20], ['2026-10-01', '2026-10-05'], []);
+		expect(temErro(sobreposto.checagens)).toBe(true);
+		expect(sobreposto.checagens.some((c) => c.texto.includes('começa antes'))).toBe(true);
+
+		const faltando = montarPeriodos([15, 15], ['2026-10-01'], []);
+		expect(faltando.checagens.some((c) => c.texto.includes('2ª fração'))).toBe(true);
+	});
+
+	it('na suspensão, a fração nova tem o que RESTA, não o original', () => {
+		expect(diasRestantesNaSuspensao(fracao(1, '2026-10-01', '2026-10-30'), '2026-10-11')).toEqual({
+			gozados: 10,
+			restantes: 20
+		});
 	});
 });

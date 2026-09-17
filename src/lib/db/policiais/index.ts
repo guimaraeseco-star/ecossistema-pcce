@@ -48,8 +48,10 @@ export { listarDesignacoes, designacaoAtiva } from './designacoes';
 export {
 	listarFeriasDoPolicial,
 	buscarFracao,
-	registrarFracao,
-	excluirFracao,
+	registrarProgramacao,
+	excluirProgramacao,
+	periodosDoPedido,
+	fracoesDoPedido,
 	abrirReprogramacao,
 	anotarNupDaReprogramacao,
 	decidirReprogramacao,
@@ -61,7 +63,7 @@ export {
 	abonosVigentesDe,
 	feriasDoAno
 } from './ferias';
-export type { FracaoCompleta, PendenciasDeFerias, FeriasNoMes } from './ferias';
+export type { FracaoCompleta, FeriasDoPolicial, PendenciasDeFerias, FeriasNoMes } from './ferias';
 export type { DesignacaoDaTela } from './designacoes';
 
 export { impedimentoParaExcluirPolicial } from './exclusao';

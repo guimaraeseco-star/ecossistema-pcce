@@ -23,6 +23,13 @@
 --    `pendente` até a unidade homologar a resposta, e enquanto pendente é
 --    ALERTA no cartão da unidade e no do servidor.
 --
+--    As férias são UM período, ainda que fracionado (decisão do responsável,
+--    17/09/2026): a SUSTAÇÃO alcança todas as frações ainda não iniciadas do
+--    exercício de uma vez (`fracoes_ids`), e o pedido pode redividir os dias
+--    que restam (`novos_periodos` — 30 dias sustados podem voltar como
+--    10+20). A SUSPENSÃO é a exceção: mira a fração em gozo (`fracao_id`), e
+--    os dias que voltam são só os que faltavam.
+--
 -- 3. `ferias_abonos`: os 10 dias convertidos em pecúnia (Lei 19.472/2025,
 --    Dec. 37.363/2026). Registrado só pelo Admin Geral, porque o servidor pede
 --    direto à COGEP — e é por isso que existe `ciencia_unidade_em`: a unidade
@@ -49,11 +56,15 @@ CREATE INDEX idx_ferias_fracoes_inicio ON ferias_fracoes(data_inicio);
 
 CREATE TABLE ferias_reprogramacoes (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	fracao_id INTEGER NOT NULL REFERENCES ferias_fracoes(id),
 	policial_id INTEGER NOT NULL REFERENCES policiais(id),
+	exercicio INTEGER NOT NULL,
 	tipo TEXT NOT NULL CHECK (tipo IN ('sustacao', 'suspensao')),
-	novo_inicio TEXT NOT NULL,
-	novo_fim TEXT NOT NULL,
+	-- Só na suspensão: a fração em gozo.
+	fracao_id INTEGER REFERENCES ferias_fracoes(id),
+	-- Só na sustação: as frações alcançadas, todas de uma vez (JSON de ids).
+	fracoes_ids TEXT NOT NULL DEFAULT '[]',
+	-- Os períodos pedidos, JSON [{inicio, fim, dias}] — um ou mais.
+	novos_periodos TEXT NOT NULL DEFAULT '[]',
 	-- Só na suspensão: o dia em que o servidor voltou ao serviço.
 	data_suspensao TEXT,
 	justificativa TEXT NOT NULL DEFAULT '',

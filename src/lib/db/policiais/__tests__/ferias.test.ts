@@ -1,9 +1,12 @@
 /**
  * A camada de férias mantém o EVENTO de afastamento em dia — é dele que a
  * situação de hoje lê. Cada operação aqui tem de deixar `policial_historico`
- * dizendo a verdade: fração programada = evento; sustada = evento some;
- * suspensa = evento encurta até a véspera do retorno; abono = evento cobre só
- * o gozo. Contra SQLite real, porque o que se testa são lotes e FKs.
+ * dizendo a verdade: programação = um evento por fração; sustada = evento
+ * some; suspensa = evento encurta até a véspera do retorno; abono = evento
+ * cobre só o gozo. Contra SQLite real, porque o que se testa são lotes e FKs.
+ *
+ * As férias são UM período: a programação entra inteira, a sustação alcança
+ * todas as frações não iniciadas e pode redividi-las; a suspensão é a exceção.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { Database } from '$lib/db';
@@ -12,11 +15,11 @@ import {
 	abrirReprogramacao,
 	darCienciaDoAbono,
 	decidirReprogramacao,
-	excluirFracao,
+	excluirProgramacao,
 	listarFeriasDoPolicial,
 	pendenciasDeFerias,
 	registrarAbono,
-	registrarFracao
+	registrarProgramacao
 } from '../ferias';
 
 let db: Database;
@@ -40,103 +43,105 @@ const eventosDeFerias = () =>
 		)
 		.all(POL) as { data_inicio: string; data_fim: string; qtd_dias: number }[];
 
-describe('fração programada', () => {
-	it('cria a fração E o evento de afastamento, ligados', async () => {
-		const r = await registrarFracao(
+const P = (inicio: string, fim: string, dias: number) => ({ inicio, fim, dias });
+
+describe('programação do exercício', () => {
+	it('cria TODAS as frações e os eventos, ligados, num lançamento só', async () => {
+		const r = await registrarProgramacao(
 			db,
 			{
 				policial_id: POL,
 				exercicio: 2026,
-				ordem: 1,
-				data_inicio: '2026-07-01',
-				data_fim: '2026-07-15'
+				periodos: [P('2026-07-01', '2026-07-10', 10), P('2026-12-01', '2026-12-20', 20)]
 			},
 			QUEM
 		);
 		expect(r.ok).toBe(true);
-		const [f] = await listarFeriasDoPolicial(db, POL);
-		expect(f.status).toBe('programada');
-		expect(f.historico_id).not.toBeNull();
+		const { fracoes } = await listarFeriasDoPolicial(db, POL);
+		expect(fracoes.map((f) => [f.ordem, f.status, f.historico_id != null])).toEqual([
+			[1, 'programada', true],
+			[2, 'programada', true]
+		]);
 		expect(eventosDeFerias()).toEqual([
-			{ data_inicio: '2026-07-01', data_fim: '2026-07-15', qtd_dias: 15 }
+			{ data_inicio: '2026-07-01', data_fim: '2026-07-10', qtd_dias: 10 },
+			{ data_inicio: '2026-12-01', data_fim: '2026-12-20', qtd_dias: 20 }
 		]);
 	});
 
-	it('recusa a mesma ordem digitada duas vezes', async () => {
+	it('recusa o exercício lançado duas vezes', async () => {
 		const dados = {
 			policial_id: POL,
 			exercicio: 2026,
-			ordem: 1 as const,
-			data_inicio: '2026-07-01',
-			data_fim: '2026-07-15'
+			periodos: [P('2026-07-01', '2026-07-30', 30)]
 		};
-		await registrarFracao(db, dados, QUEM);
-		const r = await registrarFracao(db, dados, QUEM);
-		expect(r).toEqual({ ok: false, motivo: 'duplicada' });
+		await registrarProgramacao(db, dados, QUEM);
+		expect(await registrarProgramacao(db, dados, QUEM)).toEqual({
+			ok: false,
+			motivo: 'ja_programado'
+		});
 	});
 
-	it('excluir a fração leva o evento junto', async () => {
-		const r = await registrarFracao(
+	it('excluir a programação leva todos os eventos junto', async () => {
+		await registrarProgramacao(
 			db,
 			{
 				policial_id: POL,
 				exercicio: 2026,
-				ordem: 1,
-				data_inicio: '2026-07-01',
-				data_fim: '2026-07-15'
+				periodos: [P('2026-07-01', '2026-07-15', 15), P('2026-12-01', '2026-12-15', 15)]
 			},
 			QUEM
 		);
-		if (!r.ok) throw new Error('não criou');
-		expect((await excluirFracao(db, r.id)).ok).toBe(true);
+		expect((await excluirProgramacao(db, POL, 2026)).ok).toBe(true);
 		expect(eventosDeFerias()).toEqual([]);
-		expect(await listarFeriasDoPolicial(db, POL)).toEqual([]);
+		expect((await listarFeriasDoPolicial(db, POL)).fracoes).toEqual([]);
 	});
 });
 
 describe('reprogramação', () => {
-	let fracaoId: number;
+	let ids: number[];
+	// 1ª de 10 (gozada em março), 2ª de 10 e 3ª de 10 ainda por vir.
 	beforeEach(async () => {
-		const r = await registrarFracao(
+		const r = await registrarProgramacao(
 			db,
 			{
 				policial_id: POL,
 				exercicio: 2026,
-				ordem: 2,
-				data_inicio: '2026-12-01',
-				data_fim: '2026-12-15'
+				periodos: [
+					P('2026-03-02', '2026-03-11', 10),
+					P('2026-11-03', '2026-11-12', 10),
+					P('2026-12-01', '2026-12-10', 10)
+				]
 			},
 			QUEM
 		);
 		if (!r.ok) throw new Error('não criou');
-		fracaoId = r.id;
+		ids = r.ids;
 	});
 
-	it('pedido pendente conta como pendência; segundo pedido é recusado', async () => {
+	it('pedido pendente conta como pendência; segundo pedido no exercício é recusado', async () => {
 		const r = await abrirReprogramacao(
 			db,
 			{
-				fracao_id: fracaoId,
 				policial_id: POL,
+				exercicio: 2026,
 				tipo: 'sustacao',
-				novo_inicio: '2027-01-12',
-				novo_fim: '2027-01-26',
+				fracoes_ids: [ids[1], ids[2]],
+				novos_periodos: [P('2027-01-12', '2027-01-31', 20)],
 				texto_oficio: 'ofício'
 			},
 			QUEM
 		);
 		expect(r.ok).toBe(true);
-		const pend = await pendenciasDeFerias(db, [POL]);
-		expect(pend.get(POL)?.reprogramacoesPendentes).toBe(1);
+		expect((await pendenciasDeFerias(db, [POL])).get(POL)?.reprogramacoesPendentes).toBe(1);
 
 		const segundo = await abrirReprogramacao(
 			db,
 			{
-				fracao_id: fracaoId,
 				policial_id: POL,
+				exercicio: 2026,
 				tipo: 'sustacao',
-				novo_inicio: '2027-02-01',
-				novo_fim: '2027-02-15',
+				fracoes_ids: [ids[2]],
+				novos_periodos: [P('2027-02-01', '2027-02-10', 10)],
 				texto_oficio: 'x'
 			},
 			QUEM
@@ -144,119 +149,158 @@ describe('reprogramação', () => {
 		expect(segundo).toEqual({ ok: false, motivo: 'ja_pendente' });
 	});
 
-	it('SUSTAÇÃO deferida: a antiga vira sustada, o evento dela some, a nova nasce com evento', async () => {
+	it('fração de outro servidor ou já fechada é recusada', async () => {
+		sqlite.exec(`
+			INSERT INTO policiais (id, matricula, nome, cargo, lotacao, senha) VALUES (7002, '7002', 'OUTRO', 'OIP', 'DP de Aurora', 'h');
+			INSERT INTO ferias_fracoes (id, policial_id, exercicio, ordem, data_inicio, data_fim) VALUES (999, 7002, 2026, 1, '2026-12-01', '2026-12-30');
+		`);
 		const r = await abrirReprogramacao(
 			db,
 			{
-				fracao_id: fracaoId,
 				policial_id: POL,
+				exercicio: 2026,
 				tipo: 'sustacao',
-				novo_inicio: '2027-01-12',
-				novo_fim: '2027-01-26',
+				fracoes_ids: [ids[2], 999],
+				novos_periodos: [P('2027-02-01', '2027-02-10', 10)],
+				texto_oficio: 'x'
+			},
+			QUEM
+		);
+		expect(r).toEqual({ ok: false, motivo: 'fracao_fechada' });
+	});
+
+	it('SUSTAÇÃO deferida: as antigas viram sustadas, os eventos somem, as novas nascem redivididas', async () => {
+		const r = await abrirReprogramacao(
+			db,
+			{
+				policial_id: POL,
+				exercicio: 2026,
+				tipo: 'sustacao',
+				fracoes_ids: [ids[1], ids[2]],
+				// 10 + 10 voltam como 20.
+				novos_periodos: [P('2027-01-12', '2027-01-31', 20)],
 				texto_oficio: 'ofício',
 				nup: '08100.1/2026-00'
 			},
 			QUEM
 		);
 		if (!r.ok) throw new Error('não abriu');
-		const decidida = await decidirReprogramacao(db, r.id, true, QUEM, '2026-11-20');
+		const decidida = await decidirReprogramacao(db, r.id, true, QUEM, '2026-09-20');
 		expect(decidida?.status).toBe('deferida');
 
-		const fracoes = await listarFeriasDoPolicial(db, POL);
-		const antiga = fracoes.find((f) => f.id === fracaoId);
-		const nova = fracoes.find((f) => f.id !== fracaoId);
-		expect(antiga?.status).toBe('sustada');
-		expect(antiga?.substituida_por_id).toBe(nova?.id);
+		const { fracoes, pedidos } = await listarFeriasDoPolicial(db, POL);
+		const nova = fracoes.find((f) => f.origem === 'reprogramacao');
+		expect(nova?.ordem).toBe(2); // continua de onde as sustadas começavam
 		expect(nova?.status).toBe('programada');
-		expect(nova?.origem).toBe('reprogramacao');
-		// Só o evento novo: as férias de dezembro não aconteceram.
+		for (const id of [ids[1], ids[2]]) {
+			const antiga = fracoes.find((f) => f.id === id);
+			expect(antiga?.status).toBe('sustada');
+			expect(antiga?.substituida_por_id).toBe(nova?.id);
+		}
+		expect(fracoes.find((f) => f.id === ids[0])?.status).toBe('programada'); // a gozada fica
+		// A 1ª gozada e a nova: as de novembro e dezembro não aconteceram.
 		expect(eventosDeFerias()).toEqual([
-			{ data_inicio: '2027-01-12', data_fim: '2027-01-26', qtd_dias: 15 }
+			{ data_inicio: '2026-03-02', data_fim: '2026-03-11', qtd_dias: 10 },
+			{ data_inicio: '2027-01-12', data_fim: '2027-01-31', qtd_dias: 20 }
 		]);
-		// A pendência sumiu.
+		expect(pedidos[0].status).toBe('deferida');
 		expect((await pendenciasDeFerias(db, [POL])).get(POL)).toBeUndefined();
 	});
 
-	it('SUSPENSÃO deferida: o evento antigo encurta até a véspera do retorno', async () => {
+	it('SUSPENSÃO deferida: o evento antigo encurta até a véspera do retorno e a nova traz só o que restava', async () => {
+		// A 2ª (03 a 12/11) suspensa em 10/11: 7 gozados, 3 restam.
 		const r = await abrirReprogramacao(
 			db,
 			{
-				fracao_id: fracaoId,
 				policial_id: POL,
+				exercicio: 2026,
 				tipo: 'suspensao',
-				novo_inicio: '2027-01-12',
-				novo_fim: '2027-01-19',
-				data_suspensao: '2026-12-09',
+				fracao_id: ids[1],
+				data_suspensao: '2026-11-10',
+				novos_periodos: [P('2027-01-12', '2027-01-14', 3)],
 				justificativa: 'Operação',
 				texto_oficio: 'ofício'
 			},
 			QUEM
 		);
 		if (!r.ok) throw new Error('não abriu');
-		await decidirReprogramacao(db, r.id, true, QUEM, '2026-12-10');
+		await decidirReprogramacao(db, r.id, true, QUEM, '2026-11-11');
 		expect(eventosDeFerias()).toEqual([
-			{ data_inicio: '2026-12-01', data_fim: '2026-12-08', qtd_dias: 8 },
-			{ data_inicio: '2027-01-12', data_fim: '2027-01-19', qtd_dias: 8 }
+			{ data_inicio: '2026-03-02', data_fim: '2026-03-11', qtd_dias: 10 },
+			{ data_inicio: '2026-11-03', data_fim: '2026-11-09', qtd_dias: 7 },
+			{ data_inicio: '2026-12-01', data_fim: '2026-12-10', qtd_dias: 10 }, // a 3ª não muda
+			{ data_inicio: '2027-01-12', data_fim: '2027-01-14', qtd_dias: 3 }
 		]);
+		const { fracoes } = await listarFeriasDoPolicial(db, POL);
+		expect(fracoes.find((f) => f.id === ids[1])?.status).toBe('suspensa');
+		expect(fracoes.find((f) => f.id === ids[2])?.status).toBe('programada');
 	});
 
-	it('INDEFERIDA: nada muda na fração nem no evento', async () => {
+	it('INDEFERIDA: nada muda nas frações nem nos eventos', async () => {
 		const r = await abrirReprogramacao(
 			db,
 			{
-				fracao_id: fracaoId,
 				policial_id: POL,
+				exercicio: 2026,
 				tipo: 'sustacao',
-				novo_inicio: '2027-01-12',
-				novo_fim: '2027-01-26',
+				fracoes_ids: [ids[1], ids[2]],
+				novos_periodos: [P('2027-01-12', '2027-01-31', 20)],
 				texto_oficio: 'x'
 			},
 			QUEM
 		);
 		if (!r.ok) throw new Error('não abriu');
-		await decidirReprogramacao(db, r.id, false, QUEM, '2026-11-20');
-		const [f] = await listarFeriasDoPolicial(db, POL);
-		expect(f.status).toBe('programada');
-		expect(eventosDeFerias()).toEqual([
-			{ data_inicio: '2026-12-01', data_fim: '2026-12-15', qtd_dias: 15 }
-		]);
+		await decidirReprogramacao(db, r.id, false, QUEM, '2026-09-20');
+		const { fracoes } = await listarFeriasDoPolicial(db, POL);
+		expect(fracoes.every((f) => f.status === 'programada')).toBe(true);
+		expect(eventosDeFerias()).toHaveLength(3);
 	});
 
 	it('decidir duas vezes: a segunda devolve null (tranca)', async () => {
 		const r = await abrirReprogramacao(
 			db,
 			{
-				fracao_id: fracaoId,
 				policial_id: POL,
+				exercicio: 2026,
 				tipo: 'sustacao',
-				novo_inicio: '2027-01-12',
-				novo_fim: '2027-01-26',
+				fracoes_ids: [ids[2]],
+				novos_periodos: [P('2027-01-12', '2027-01-21', 10)],
 				texto_oficio: 'x'
 			},
 			QUEM
 		);
 		if (!r.ok) throw new Error('não abriu');
-		await decidirReprogramacao(db, r.id, false, QUEM, '2026-11-20');
-		expect(await decidirReprogramacao(db, r.id, true, QUEM, '2026-11-21')).toBeNull();
+		await decidirReprogramacao(db, r.id, false, QUEM, '2026-09-20');
+		expect(await decidirReprogramacao(db, r.id, true, QUEM, '2026-09-21')).toBeNull();
+	});
+
+	it('exercício com pedido não se exclui', async () => {
+		await abrirReprogramacao(
+			db,
+			{
+				policial_id: POL,
+				exercicio: 2026,
+				tipo: 'sustacao',
+				fracoes_ids: [ids[2]],
+				novos_periodos: [P('2027-01-12', '2027-01-21', 10)],
+				texto_oficio: 'x'
+			},
+			QUEM
+		);
+		expect(await excluirProgramacao(db, POL, 2026)).toEqual({ ok: false, motivo: 'tem_vinculo' });
 	});
 });
 
 describe('abono', () => {
 	let fracaoId: number;
 	beforeEach(async () => {
-		const r = await registrarFracao(
+		const r = await registrarProgramacao(
 			db,
-			{
-				policial_id: POL,
-				exercicio: 2026,
-				ordem: 1,
-				data_inicio: '2026-12-01',
-				data_fim: '2026-12-30'
-			},
+			{ policial_id: POL, exercicio: 2026, periodos: [P('2026-12-01', '2026-12-30', 30)] },
 			QUEM
 		);
 		if (!r.ok) throw new Error('não criou');
-		fracaoId = r.id;
+		fracaoId = r.ids[0];
 	});
 
 	it('deferido: o evento passa a cobrir só o gozo, e a unidade fica com ciência pendente', async () => {
@@ -295,7 +339,7 @@ describe('abono', () => {
 		expect((await pendenciasDeFerias(db, [POL])).get(POL)).toBeUndefined();
 	});
 
-	it('segundo abono na mesma fração é recusado', async () => {
+	it('segundo abono na mesma fração é recusado; fração com abono não se susta', async () => {
 		await registrarAbono(
 			db,
 			{ fracao_id: fracaoId, policial_id: POL, posicao: 'finais', status: 'deferido' },
@@ -307,5 +351,18 @@ describe('abono', () => {
 			QUEM
 		);
 		expect(r).toEqual({ ok: false, motivo: 'ja_tem' });
+		const s = await abrirReprogramacao(
+			db,
+			{
+				policial_id: POL,
+				exercicio: 2026,
+				tipo: 'sustacao',
+				fracoes_ids: [fracaoId],
+				novos_periodos: [P('2027-02-01', '2027-03-02', 30)],
+				texto_oficio: 'x'
+			},
+			QUEM
+		);
+		expect(s).toEqual({ ok: false, motivo: 'tem_abono' });
 	});
 });

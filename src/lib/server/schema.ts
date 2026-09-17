@@ -2383,15 +2383,17 @@ export const feriasReprogramacoes = sqliteTable(
 	'ferias_reprogramacoes',
 	{
 		id: integer('id').primaryKey({ autoIncrement: true }),
-		fracao_id: integer('fracao_id')
-			.notNull()
-			.references(() => feriasFracoes.id),
 		policial_id: integer('policial_id')
 			.notNull()
 			.references(() => policiais.id),
+		exercicio: integer('exercicio').notNull(),
 		tipo: text('tipo', { enum: ['sustacao', 'suspensao'] }).notNull(),
-		novo_inicio: text('novo_inicio').notNull(),
-		novo_fim: text('novo_fim').notNull(),
+		/** Só na suspensão: a fração em gozo. */
+		fracao_id: integer('fracao_id').references(() => feriasFracoes.id),
+		/** Só na sustação: as frações alcançadas, todas de uma vez (JSON de ids). */
+		fracoes_ids: text('fracoes_ids').notNull().default('[]'),
+		/** Os períodos pedidos, JSON `[{inicio, fim, dias}]`. */
+		novos_periodos: text('novos_periodos').notNull().default('[]'),
 		/** Só na suspensão: o dia em que o servidor voltou ao serviço. */
 		data_suspensao: text('data_suspensao'),
 		justificativa: text('justificativa').notNull().default(''),
