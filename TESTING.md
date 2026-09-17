@@ -427,6 +427,19 @@ HISTORICO.xlsx --enviar --local`): 698/914 linhas casam com a base (os
       o texto, "APTO/VERIFICAR/EXONERAÇÃO" viram anotação; reexecutar em
       qualquer ordem (folha → histórico → afastamentos ou o inverso) não
       duplica nem ressuscita o suprimido
+- [ ] Lista /unidade: embaixo do nome de cada unidade aparece "Titular: FULANO"
+      (ou "Respondente: FULANO"). Sem titular, o aviso é DOURADO na delegacia e
+      apagado no departamento, no subdepartamento e na unidade de atendimento —
+      onde não ter titular é o estado correto
+- [ ] Botão "Sem titular · N" ao lado da busca: liga o recorte e deixa só as
+      unidades sem direção vigente; N conta apenas as delegacias. Ligado junto
+      com a busca, os dois se somam
+- [ ] Celular (390 px), lista /unidade: o cabeçalho ATIVOS · FÉRIAS · AFAST.
+      fica exatamente EM CIMA dos três números de cada cargo (era um texto solto
+      à esquerda enquanto os números ficavam à direita); nenhuma tela rola na
+      horizontal
+- [ ] Fila /solicitacoes com um pedido de direção: o tipo aparece como
+      "Direção de unidade", e o detalhe mostra Unidade e Papel antes das datas
 - [ ] Direção da unidade (E54, migração 0090) — Admin Geral: a ficha de
       `/unidade/[id]` tem o cartão "Direção" acima do efetivo. Unidade com
       titular mostra selo azul, nome com link para a ficha, matrícula, desde

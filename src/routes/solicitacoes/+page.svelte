@@ -44,7 +44,10 @@
 	const ROTULO_TIPO_ACAO: Record<string, string> = {
 		movimentacao: 'Movimentação',
 		afastamento: 'Afastamento',
-		desvinculacao: 'Desvinculação'
+		desvinculacao: 'Desvinculação',
+		// Ato sobre a UNIDADE, não sobre o servidor: aprovar grava a sucessão da
+		// unidade e não toca na linha do tempo funcional dele (E54).
+		direcao: 'Direção de unidade'
 	};
 
 	const vazio = $derived(pendentes.length === 0 && acoesPendentes.length === 0);

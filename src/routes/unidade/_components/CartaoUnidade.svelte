@@ -44,6 +44,15 @@
 		subarvore ? unidade.municipiosSubtotal : unidade.municipios || unidade.municipiosSubtotal
 	);
 
+	/**
+	 * A grade das três situações — três colunas iguais, alinhadas à direita.
+	 *
+	 * Uma constante porque o cabeçalho e os números PRECISAM usar a mesma: se
+	 * cada lado tivesse a sua, bastaria mexer num para o rótulo deixar de ficar
+	 * em cima do número, que foi exatamente o defeito corrigido.
+	 */
+	const GRADE_SITUACAO = 'grid w-[7.5rem] shrink-0 grid-cols-3 items-center';
+
 	const corDe = (situacao: PedidoEfetivo['situacao'], n: number) =>
 		n === 0
 			? 'text-surface-400'
@@ -57,7 +66,7 @@
 {#snippet numero(situacao: PedidoEfetivo['situacao'], cargo: 'DPC' | 'OIP', n: number)}
 	<button
 		type="button"
-		class="min-w-7 rounded px-1 py-0.5 text-sm font-semibold tabular-nums {corDe(
+		class="rounded py-0.5 text-center text-sm font-semibold tabular-nums {corDe(
 			situacao,
 			n
 		)} disabled:cursor-default"
@@ -71,11 +80,9 @@
 	{@const sigla = cargo === 'dpc' ? 'DPC' : 'OIP'}
 	<div class="flex items-center justify-between gap-2 text-sm">
 		<span class="text-surface-600 dark:text-surface-400">{titulo}</span>
-		<span class="flex items-center gap-1">
+		<span class={GRADE_SITUACAO}>
 			{@render numero('ativos', sigla, c.ativos)}
-			<span class="text-2xs text-surface-400">·</span>
 			{@render numero('ferias', sigla, c.ferias)}
-			<span class="text-2xs text-surface-400">·</span>
 			{@render numero('afastados', sigla, c.afastados)}
 		</span>
 	</div>
@@ -100,10 +107,34 @@
 					· {unidade.vinculadas} vinculada{unidade.vinculadas === 1 ? '' : 's'}{/if}
 			</span>
 		{/if}
+		<!-- Quem dirige — a mesma informação da tabela, na linha seguinte ao nome.
+		     "Sem titular" só chama atenção na delegacia: ver `cobraTitular`. -->
+		{#if unidade.direcao}
+			<span class="mt-0.5 block text-xs text-surface-500">
+				{unidade.direcao.papel === 'titular' ? 'Titular' : 'Respondente'}:
+				<a href="/servidores/{unidade.direcao.policialId}" class="font-medium"
+					>{unidade.direcao.nome}</a
+				>
+			</span>
+		{:else if unidade.tipo === 'delegacia'}
+			<span class="mt-0.5 block text-xs font-semibold text-warning-600 dark:text-warning-400"
+				>Sem titular</span
+			>
+		{/if}
 	</div>
 
-	<!-- Ativos · Férias · Afastados, na mesma ordem e cores da tabela. -->
-	<p class="mb-1 text-3xs tracking-wide text-surface-500 uppercase">Ativos · Férias · Afastados</p>
+	<!-- O cabeçalho das três situações. Ele e os números compartilham a MESMA
+	     grade (`GRADE_SITUACAO`): era um texto solto à esquerda enquanto os
+	     números ficavam à direita, e no celular não dava para saber qual palavra
+	     descrevia qual número (achado dele, 17/09). "Afast." abrevia porque a
+	     palavra inteira não cabe na coluna de um dígito em 390 px. -->
+	<div class="mb-1 flex items-center justify-end">
+		<span class="{GRADE_SITUACAO} text-3xs text-surface-500 uppercase">
+			<span class="text-center">Ativos</span>
+			<span class="text-center">Férias</span>
+			<span class="text-center" title="Afastados">Afast.</span>
+		</span>
+	</div>
 	<div class="space-y-1">
 		{@render linhaCargo('dpc', 'Delegados (DPC)')}
 		{@render linhaCargo('oip', 'Oficiais (OIP)')}

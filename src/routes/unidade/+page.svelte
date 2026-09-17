@@ -47,20 +47,48 @@
 	 */
 	const TH_FIXO = 'sm:sticky z-10 bg-white dark:bg-surface-900';
 
+	let soSemTitular = $state(false);
+
+	/**
+	 * Delegacia sem titular é PENDÊNCIA; as outras, não necessariamente.
+	 *
+	 * A régua veio dele (16/09): "as unidades de atendimento, em geral, não
+	 * possuem titulares", e o subdepartamento é subsede, não unidade com direção
+	 * própria. Por isso o vazio aparece em tom de alerta só na delegacia — pintar
+	 * todos de amarelo transformaria o estado correto de 12 unidades em alarme
+	 * permanente, e alarme permanente ninguém lê.
+	 */
+	const cobraTitular = (u: LinhaUnidade) => u.tipo === 'delegacia';
+
 	const casa = (u: LinhaUnidade, termo: string) =>
 		!termo || [u.nome, u.sigla, u.tipoRotulo].some((s) => s.toLowerCase().includes(termo));
 
+	/** Passa na busca E no filtro de titular — os dois se somam, não se anulam. */
+	const passa = (u: LinhaUnidade, termo: string) =>
+		casa(u, termo) && (!soSemTitular || u.direcao === null);
+
 	const blocosFiltrados = $derived.by((): BlocoUnidade[] => {
 		const termo = busca.trim().toLowerCase();
-		if (!termo) return data.blocos;
+		if (!termo && !soSemTitular) return data.blocos;
 		return data.blocos
 			.map((b) => {
-				const filhas = b.filhas.filter((f) => casa(f, termo));
-				if (casa(b.unidade, termo)) return { unidade: b.unidade, filhas: b.filhas };
+				const filhas = b.filhas.filter((f) => passa(f, termo));
+				// O bloco que casa traz as filhas inteiras na busca por texto; com o
+				// filtro de titular ligado, não — ali a pergunta é sobre CADA unidade,
+				// e trazer as filhas providas de volta desfaria o recorte.
+				if (passa(b.unidade, termo)) {
+					return { unidade: b.unidade, filhas: soSemTitular ? filhas : b.filhas };
+				}
 				return filhas.length ? { unidade: b.unidade, filhas } : null;
 			})
 			.filter((b): b is BlocoUnidade => b !== null);
 	});
+
+	const semTitular = $derived(
+		[data.raiz, ...data.blocos.flatMap((b) => [b.unidade, ...b.filhas])].filter(
+			(u) => u.direcao === null && cobraTitular(u)
+		).length
+	);
 
 	const totalLinhas = $derived(1 + data.blocos.reduce((n, b) => n + 1 + b.filhas.length, 0));
 
@@ -162,6 +190,19 @@
 				<Search class="h-4 w-4" />
 			</div>
 		</div>
+		<!-- A consulta de respondência: "quais delegacias estão sem titular hoje?".
+		     O número conta só as que COBRAM titular — ver `cobraTitular`. -->
+		<button
+			type="button"
+			class="btn btn-sm self-start sm:self-auto {soSemTitular
+				? 'preset-filled-warning-500'
+				: 'preset-outlined-surface-500'}"
+			aria-pressed={soSemTitular}
+			onclick={() => (soSemTitular = !soSemTitular)}
+		>
+			Sem titular{#if semTitular > 0}
+				· {semTitular}{/if}
+		</button>
 	</div>
 </div>
 
@@ -252,7 +293,25 @@
 					· esta linha é só a lotação do departamento{/if}</span
 			>
 		{/if}
+		{@render linhaDirecao(u)}
 	</td>
+{/snippet}
+
+<!-- Quem dirige, embaixo do nome. Linha e não coluna: a tabela já tem onze, e
+     "quem dirige" pertence à identificação da unidade, não aos números. -->
+{#snippet linhaDirecao(u: LinhaUnidade)}
+	{#if u.direcao}
+		<span class="block text-2xs text-surface-500">
+			{u.direcao.papel === 'titular' ? 'Titular' : 'Respondente'}:
+			<a href="/servidores/{u.direcao.policialId}" class="font-medium">{u.direcao.nome}</a>
+		</span>
+	{:else if cobraTitular(u)}
+		<span class="block text-2xs font-semibold text-warning-600 dark:text-warning-400"
+			>Sem titular</span
+		>
+	{:else}
+		<span class="block text-2xs text-surface-400">Sem titular</span>
+	{/if}
 {/snippet}
 
 <!-- O card não pode cortar (overflow-hidden) nem rolar (table-wrap): sticky só

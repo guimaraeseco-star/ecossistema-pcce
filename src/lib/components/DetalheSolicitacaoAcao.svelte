@@ -40,6 +40,13 @@
 			},
 			s.tipo === 'movimentacao' && { rotulo: 'Unidade destino', valor: s.unidade_destino ?? '' },
 			s.tipo === 'desvinculacao' && { rotulo: 'Destino', valor: s.unidade_destino ?? '' },
+			// Direção: o pedido é sobre a UNIDADE, e é ela que precisa aparecer
+			// primeiro — quem lê a fila decide "quem passa a dirigir o quê".
+			s.tipo === 'direcao' && { rotulo: 'Unidade', valor: s.unidade_destino ?? '' },
+			s.tipo === 'direcao' && {
+				rotulo: 'Papel',
+				valor: s.subtipo === 'respondente' ? 'Respondente' : 'Titular'
+			},
 			s.tipo === 'afastamento' && subtipo && { rotulo: 'Tipo', valor: subtipo },
 			s.tipo === 'afastamento' && s.descricao && { rotulo: 'Descrição/Motivo', valor: s.descricao },
 			s.data_evento && { rotulo: 'Data', valor: formatarData(s.data_evento) },
