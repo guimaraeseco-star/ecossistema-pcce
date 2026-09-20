@@ -3,13 +3,13 @@
 	 * Timeline do histórico funcional do servidor — a leitura do que
 	 * `PainelAcoesServidor` grava.
 	 *
-	 * A tabela é APPEND-ONLY no dia a dia. Três exceções, decididas pelo
-	 * responsável em 20/09/2026, ficam aqui no próprio evento de afastamento:
-	 * **Retorno antecipado** (a unidade e o DPI SUL: o servidor voltou antes —
-	 * data e NUP, o evento encurta) e, só para o Admin Geral, **Corrigir** e
-	 * **Excluir** um lançamento errado. Todas vão à auditoria com antes/depois
-	 * e viram notícia para o outro lado. Férias não passam por aqui: têm o
-	 * cartão. É a visão de RH, e complementa (não substitui) a trilha forense
+	 * A tabela é APPEND-ONLY no dia a dia. Duas exceções, decididas pelo
+	 * responsável em 20/09/2026, ficam aqui no próprio evento de afastamento e
+	 * só para o Admin Geral: **Corrigir** e **Excluir** um lançamento errado —
+	 * vão à auditoria com antes/depois e viram notícia para a unidade. O
+	 * **retorno antecipado** (a unidade voltou o servidor antes) mora no quadro
+	 * de solicitações, junto do pedido que gerou o afastamento. Férias não
+	 * passam por aqui: têm o cartão. É a visão de RH, e complementa (não substitui) a trilha forense
 	 * do Super Admin em `/auditoria`.
 	 *
 	 * `afastamentoVigenteId` marca o afastamento em curso HOJE, calculado no
@@ -27,7 +27,7 @@
 	import { toaster } from '$lib/toast';
 	import { formatarNUP } from '$lib/utils/formato';
 	import type { PolicialHistorico } from '$lib/types';
-	import { formatarData, hojeLocalISO } from '$lib/utils/datas';
+	import { formatarData } from '$lib/utils/datas';
 	import { LABEL_SUBTIPO_AFASTAMENTO } from '$lib/schemas/policial-historico';
 	import { AFASTAMENTOS, PORTARIA_39, SUBTIPOS_CADASTRAVEIS } from '$lib/servidores/afastamentos';
 	import Paginador from '$lib/components/Paginador.svelte';
@@ -62,17 +62,9 @@
 		isAdmin = false
 	}: Props = $props();
 
-	const hoje = hojeLocalISO();
 	/* ── as três ações sobre um afastamento (retorno / corrigir / excluir) ── */
-	let acao = $state<{ id: number; qual: 'retorno' | 'corrigir' } | null>(null);
+	let acao = $state<{ id: number; qual: 'corrigir' } | null>(null);
 	let enviando = $state(false);
-	/** Retorno antecipado cabe num afastamento que não é férias e ainda não acabou. */
-	const admiteRetorno = (ev: PolicialHistorico) =>
-		ev.tipo === 'afastamento' &&
-		ev.subtipo !== 'ferias' &&
-		!!ev.data_inicio &&
-		ev.data_inicio <= hoje &&
-		(!ev.data_fim || ev.data_fim >= hoje);
 	function aoResponder(ok: string) {
 		enviando = true;
 		return async ({ result }: { result: ActionResult }) => {
@@ -302,16 +294,8 @@
 									</p>
 								{/if}
 
-								{#if ev.subtipo !== 'ferias'}
+								{#if ev.subtipo !== 'ferias' && isAdmin}
 									<div class="mt-2 flex flex-wrap gap-1">
-										{#if admiteRetorno(ev)}
-											<button
-												type="button"
-												class="btn btn-sm preset-outlined-surface-500"
-												onclick={() => (acao = { id: ev.id, qual: 'retorno' })}
-												>Retorno antecipado</button
-											>
-										{/if}
 										{#if isAdmin}
 											<button
 												type="button"
@@ -333,54 +317,6 @@
 											</form>
 										{/if}
 									</div>
-								{/if}
-
-								<!-- Retorno antecipado: só a data e o NUP; o evento encurta até a véspera. -->
-								{#if acao?.id === ev.id && acao.qual === 'retorno'}
-									<form
-										method="POST"
-										action="?/retornoAntecipado"
-										use:enhance={() => aoResponder('Retorno antecipado registrado')}
-										class="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-primary-500/30 bg-primary-500/5 p-2"
-									>
-										<input type="hidden" name="historico_id" value={ev.id} />
-										<label class="label">
-											<span class="label-text text-2xs font-bold uppercase opacity-70"
-												>Retorno ao serviço</span
-											>
-											<input
-												class="input px-2 py-1 text-xs"
-												type="date"
-												name="data_retorno"
-												min={ev.data_inicio ?? undefined}
-												max={ev.data_fim ?? undefined}
-												required
-											/>
-										</label>
-										<label class="label">
-											<span class="label-text text-2xs font-bold uppercase opacity-70"
-												>NUP do retorno</span
-											>
-											<input
-												class="input w-48 px-2 py-1 text-xs font-mono"
-												name="nup"
-												maxlength="20"
-												placeholder="00000.000000/0000-00"
-												oninput={(e) =>
-													(e.currentTarget.value = formatarNUP(e.currentTarget.value))}
-											/>
-										</label>
-										<button
-											type="submit"
-											class="btn btn-sm preset-filled-primary-500"
-											disabled={enviando}>Registrar retorno</button
-										>
-										<button
-											type="button"
-											class="btn btn-sm preset-outlined-surface-500"
-											onclick={() => (acao = null)}>Cancelar</button
-										>
-									</form>
 								{/if}
 
 								<!-- Corrigir (Admin Geral): as datas, o tipo, o NUP e o CID, com as regras do lançamento. -->

@@ -94,6 +94,7 @@ import {
 	atualizarPolicialComHistorico,
 	listarHistoricoPolicial,
 	buscarEventoHistorico,
+	buscarSolicitacaoAcao,
 	encurtarAfastamento,
 	corrigirAfastamento,
 	excluirAfastamento,
@@ -1057,14 +1058,26 @@ export const actions: Actions = {
 		const { u, db, id, alvo } = auth;
 
 		const formData = await event.request.formData();
-		const eventoId = inteiroNaFaixa(formData, 'historico_id', 1, 99_999_999);
+		const solicitacaoId = inteiroNaFaixa(formData, 'solicitacao_id', 1, 99_999_999);
 		const retorno = dataIso(formData, 'data_retorno');
 		const nup = conferirNup(textoLimitado(formData, 'nup', 40), false);
-		if (!eventoId || !retorno)
-			return fail(400, { error: 'Informe o afastamento e a data do retorno.' });
+		if (!solicitacaoId || !retorno)
+			return fail(400, { error: 'Informe o pedido de afastamento e a data do retorno.' });
 		if (!nup.ok) return fail(400, { error: nup.erro });
-		const ev = await buscarEventoHistorico(db, eventoId);
-		if (!ev || ev.policial_id !== id) return fail(404, { error: 'Afastamento não encontrado.' });
+		// O pedido aprovado não guarda o id do evento que gerou: acha-se pelo que
+		// os dois têm em comum (servidor, tipo, subtipo, 1º dia).
+		const pedido = await buscarSolicitacaoAcao(db, solicitacaoId);
+		if (!pedido || pedido.policial_id !== id || pedido.status !== 'aprovada') {
+			return fail(404, { error: 'Pedido de afastamento aprovado não encontrado.' });
+		}
+		const ev = (await listarHistoricoPolicial(db, id)).find(
+			(h) =>
+				h.tipo === 'afastamento' &&
+				h.subtipo === pedido.subtipo &&
+				h.data_inicio === pedido.data_inicio
+		);
+		if (!ev) return fail(404, { error: 'Afastamento não encontrado na linha do tempo.' });
+		const eventoId = ev.id;
 
 		const r = await encurtarAfastamento(db, eventoId, retorno, nup.formatado);
 		if (!r) {

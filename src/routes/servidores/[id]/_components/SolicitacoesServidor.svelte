@@ -16,6 +16,12 @@
 	import StatusSolicitacao from '$lib/components/StatusSolicitacao.svelte';
 	import DetalheSolicitacaoAcao from '$lib/components/DetalheSolicitacaoAcao.svelte';
 	import type { CadastroSolicitacao, PolicialAcaoSolicitacao } from '$lib/types';
+	import { enhance } from '$app/forms';
+	import type { ActionResult } from '@sveltejs/kit';
+	import { invalidateShared } from '$lib/cross-tab-invalidate';
+	import { toaster } from '$lib/toast';
+	import { formatarNUP } from '$lib/utils/formato';
+	import { hojeLocalISO } from '$lib/utils/datas';
 
 	const ROTULO_TIPO_ACAO: Record<string, string> = {
 		movimentacao: 'Movimentação',
@@ -30,12 +36,43 @@
 		campos,
 		acoes,
 		/** Catálogo para resolver `designacao_id` — sem ele a fila mostraria "11". */
-		designacoes = []
+		designacoes = [],
+		policialId
 	}: {
 		campos: CadastroSolicitacao[];
 		acoes: PolicialAcaoSolicitacao[];
 		designacoes?: { id: number; nome: string }[];
+		/** O servidor da ficha, para o `invalidateShared` depois do retorno antecipado. */
+		policialId: number;
 	} = $props();
+
+	/* ── retorno antecipado (decisão dele, 20/09): no pedido de afastamento
+	     APROVADO e ainda em curso — a unidade e o DPI SUL registram direto a
+	     data do retorno e o NUP; o afastamento encurta até a véspera. ── */
+	const hoje = hojeLocalISO();
+	const admiteRetorno = (s: PolicialAcaoSolicitacao) =>
+		s.tipo === 'afastamento' &&
+		s.status === 'aprovada' &&
+		s.subtipo !== 'ferias' &&
+		!!s.data_inicio &&
+		s.data_inicio <= hoje &&
+		(!s.data_fim || s.data_fim >= hoje);
+	let retornoDe = $state<number | null>(null);
+	let enviando = $state(false);
+	function aoResponder() {
+		enviando = true;
+		return async ({ result }: { result: ActionResult }) => {
+			enviando = false;
+			if (result.type === 'success') {
+				toaster.create({ title: 'Retorno antecipado registrado', type: 'success' });
+				retornoDe = null;
+				await invalidateShared(`policial:${policialId}`, 'app:policiais');
+			} else if (result.type === 'failure') {
+				const d = result.data as Record<string, unknown> | undefined;
+				toaster.create({ title: String(d?.error ?? 'Não foi possível concluir'), type: 'error' });
+			}
+		};
+	}
 
 	const texto = (campo: string, valor: string | null) =>
 		textoDoValorSolicitado(
@@ -153,6 +190,59 @@
 						<p class="text-2xs text-surface-600 dark:text-surface-400 mt-2">
 							Solicitado por {s.solicitante_nome || '—'}
 						</p>
+						{#if admiteRetorno(s)}
+							{#if retornoDe === s.id}
+								<form
+									method="POST"
+									action="?/retornoAntecipado"
+									use:enhance={aoResponder}
+									class="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-primary-500/30 bg-primary-500/5 p-2"
+								>
+									<input type="hidden" name="solicitacao_id" value={s.id} />
+									<label class="label">
+										<span class="label-text text-2xs font-bold uppercase opacity-70"
+											>Retorno ao serviço</span
+										>
+										<input
+											class="input px-2 py-1 text-xs"
+											type="date"
+											name="data_retorno"
+											min={s.data_inicio ?? undefined}
+											max={s.data_fim ?? undefined}
+											required
+										/>
+									</label>
+									<label class="label">
+										<span class="label-text text-2xs font-bold uppercase opacity-70"
+											>NUP do retorno</span
+										>
+										<input
+											class="input w-48 px-2 py-1 text-xs font-mono"
+											name="nup"
+											maxlength="20"
+											placeholder="00000.000000/0000-00"
+											oninput={(e) => (e.currentTarget.value = formatarNUP(e.currentTarget.value))}
+										/>
+									</label>
+									<button
+										type="submit"
+										class="btn btn-sm preset-filled-primary-500"
+										disabled={enviando}>Registrar retorno</button
+									>
+									<button
+										type="button"
+										class="btn btn-sm preset-outlined-surface-500"
+										onclick={() => (retornoDe = null)}>Cancelar</button
+									>
+								</form>
+							{:else}
+								<button
+									type="button"
+									class="btn btn-sm preset-outlined-surface-500 mt-2"
+									onclick={() => (retornoDe = s.id)}>Retorno antecipado</button
+								>
+							{/if}
+						{/if}
 					</div>
 				{/each}
 			</div>

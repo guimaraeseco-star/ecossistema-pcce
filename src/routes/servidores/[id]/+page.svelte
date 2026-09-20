@@ -583,6 +583,7 @@
 	designacoes={data.designacoes}
 	campos={data.solicitacoesCampo}
 	acoes={data.solicitacoesAcao}
+	policialId={data.policial.id}
 />
 
 <!-- Férias: frações do Guardião, o assistente do NUP e o abono (E56). O que a
