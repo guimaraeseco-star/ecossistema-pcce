@@ -534,7 +534,9 @@
 				     data final é sempre calculada. Nos tipos de prazo fixo a quantidade
 				     vem travada; nos sem prazo, pode ficar vazia. -->
 				{#if regra}
-					<p class="text-2xs text-surface-600 dark:text-surface-400">
+					<p
+						class="rounded-md border-l-4 border-warning-500 bg-warning-500/10 px-3 py-1.5 text-xs font-semibold text-warning-800 dark:text-warning-300"
+					>
 						{#if regra.diasFixos != null}
 							Prazo fixo de {regra.diasFixos} dias: informe só a <b>data inicial</b>.
 						{:else if regra.semPrazo}
