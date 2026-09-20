@@ -289,9 +289,9 @@ export interface NovaReprogramacao {
 	policial_id: number;
 	exercicio: number;
 	tipo: TipoReprogramacao;
-	/** Sustação: as frações alcançadas (todas as não iniciadas). */
+	/** Todas as frações alcançadas (a em gozo, se houver, e as futuras). */
 	fracoes_ids?: number[];
-	/** Suspensão: a fração em gozo. */
+	/** Suspensão: a fração EM GOZO, cujo evento encurta até a véspera do retorno. */
 	fracao_id?: number;
 	novos_periodos: readonly PeriodoMontado[];
 	data_suspensao?: string | null;
@@ -315,7 +315,9 @@ export async function abrirReprogramacao(
 	| { ok: true; id: number }
 	| { ok: false; motivo: 'ja_pendente' | 'fracao_fechada' | 'toda_vendida' }
 > {
-	const alvo = dados.tipo === 'sustacao' ? (dados.fracoes_ids ?? []) : [dados.fracao_id ?? 0];
+	const alvo = [
+		...new Set([...(dados.fracao_id ? [dados.fracao_id] : []), ...(dados.fracoes_ids ?? [])])
+	];
 	if (alvo.length === 0) return { ok: false, motivo: 'fracao_fechada' };
 	const fracoes = await db.select().from(feriasFracoes).where(inArray(feriasFracoes.id, alvo));
 	const todasValidas =
@@ -365,7 +367,7 @@ export async function abrirReprogramacao(
 			exercicio: dados.exercicio,
 			tipo: dados.tipo,
 			fracao_id: dados.tipo === 'suspensao' ? (dados.fracao_id ?? null) : null,
-			fracoes_ids: JSON.stringify(dados.tipo === 'sustacao' ? alvo : []),
+			fracoes_ids: JSON.stringify(alvo),
 			novos_periodos: JSON.stringify(dados.novos_periodos),
 			data_suspensao: dados.data_suspensao ?? null,
 			justificativa: dados.justificativa ?? '',
@@ -470,11 +472,15 @@ export async function decidirReprogramacao(
 	];
 	for (const antiga of antigas) {
 		if (!antiga.historico_id) continue;
-		if (pedido.tipo === 'sustacao') {
+		// Só a fração EM GOZO (a de `fracao_id`) teve dias de verdade: o evento
+		// dela encurta até a véspera do retorno. As demais — sustadas, ou futuras
+		// alcançadas por uma suspensão — não aconteceram: o evento some.
+		const emGozo = pedido.tipo === 'suspensao' && antiga.id === pedido.fracao_id;
+		if (!emGozo || !pedido.data_suspensao) {
 			passos.push(
 				db.delete(policialHistorico).where(eq(policialHistorico.id, antiga.historico_id))
 			);
-		} else if (pedido.data_suspensao) {
+		} else {
 			const fimGozado = adicionarDias(pedido.data_suspensao, -1);
 			passos.push(
 				db

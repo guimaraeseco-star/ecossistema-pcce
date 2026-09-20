@@ -13,6 +13,7 @@ import {
 	divisoesPossiveis,
 	fimDaFracao,
 	montarPeriodos,
+	planoDaReprogramacao,
 	situacaoDaReprogramacao,
 	avisoDoTeto,
 	criteriosDaSuspensao,
@@ -99,16 +100,18 @@ describe('status pela data', () => {
 	});
 });
 
-describe('sustação × suspensão — decidido pelos fatos', () => {
-	it('nada começou: só SUSTAÇÃO, de todas as frações juntas', () => {
+describe('sustação × suspensão — decidido pelos fatos das FÉRIAS, não da fração', () => {
+	it('nada começou: SUSTAÇÃO de todas as frações juntas, redivisível', () => {
 		const ex = [fracao(1, '2026-12-01', '2026-12-10'), fracao(2, '2027-01-11', '2027-01-30')];
 		const s = situacaoDaReprogramacao(ex, '2026-11-20');
-		expect(s.suspensao).toBeNull();
-		expect(s.sustacao?.fracoes.map((f) => f.ordem)).toEqual([1, 2]);
-		expect(s.sustacao?.diasRestantes).toBe(30);
-		expect(s.sustacao?.motivo).toContain('juntas');
+		expect(s.tipo).toBe('sustacao');
+		expect(s.emGozo).toBeNull();
+		expect(s.futuras.map((f) => f.ordem)).toEqual([1, 2]);
+		expect(s.motivo).toContain('juntas');
+		const plano = planoDaReprogramacao(s);
+		expect(plano.diasRestantes).toBe(30);
 		// A divisão atual (10+20) vem primeiro; depois as outras quatro formas.
-		expect(s.sustacao?.divisoes.map((d) => d.join('+'))).toEqual([
+		expect(plano.divisoes.map((d) => d.join('+'))).toEqual([
 			'10+20',
 			'30',
 			'20+10',
@@ -117,54 +120,74 @@ describe('sustação × suspensão — decidido pelos fatos', () => {
 		]);
 	});
 
-	it('1ª em gozo e 2ª futura: SUSPENSÃO da 1ª e SUSTAÇÃO da 2ª, cada uma no seu lugar', () => {
+	it('1ª em gozo e 2ª futura: SUSPENSÃO das duas — o quebrado da em gozo + a futura inteira', () => {
 		const ex = [fracao(1, '2026-07-01', '2026-07-30'), fracao(2, '2026-12-01', '2026-12-10')];
 		const s = situacaoDaReprogramacao(ex, '2026-07-10');
-		expect(s.suspensao?.fracao.ordem).toBe(1);
-		expect(s.suspensao?.motivo).toContain('necessidade do serviço');
-		expect(s.sustacao?.fracoes.map((f) => f.ordem)).toEqual([2]);
-		expect(s.sustacao?.divisoes.map((d) => d.join('+'))).toEqual(['10']);
+		expect(s.tipo).toBe('suspensao');
+		expect(s.emGozo?.ordem).toBe(1);
+		expect(s.futuras.map((f) => f.ordem)).toEqual([2]);
+		expect(s.motivo).toContain('necessidade do serviço');
+		// Sem o retorno, o plano só tem a futura.
+		expect(planoDaReprogramacao(s).diasRestantes).toBe(10);
+		// Retorno em 10/07: 9 gozados, 21 quebrados + 10 = 31.
+		const plano = planoDaReprogramacao(s, '2026-07-10');
+		expect(plano.quebrado).toBe(21);
+		expect(plano.diasRestantes).toBe(31);
+		expect(plano.fracoes.map((f) => f.ordem)).toEqual([1, 2]);
+		expect(plano.divisoes.map((d) => d.join('+'))).toEqual(['21+10']);
 	});
 
-	it('depois de uma suspensão o que resta pode não ser uma das cinco formas — a divisão atual ainda cabe', () => {
-		// Continuação de 12 dias (ordem 2) mais a 3ª de 10: 22 não é forma do decreto.
-		const ex = [fracao(2, '2026-10-01', '2026-10-12'), fracao(3, '2026-12-01', '2026-12-10')];
-		const s = situacaoDaReprogramacao(ex, '2026-09-01');
-		expect(s.sustacao?.divisoes.map((d) => d.join('+'))).toEqual(['12+10']);
+	it('1ª já gozada e 2ª futura: as férias começaram → SUSPENSÃO da futura, com os dias preservados', () => {
+		const ex = [fracao(1, '2026-03-02', '2026-03-11'), fracao(2, '2026-12-01', '2026-12-20')];
+		const s = situacaoDaReprogramacao(ex, '2026-09-20');
+		expect(s.tipo).toBe('suspensao');
+		expect(s.emGozo).toBeNull();
+		expect(s.futuras.map((f) => f.ordem)).toEqual([2]);
+		expect(s.motivo).toContain('preservados');
+		expect(planoDaReprogramacao(s).divisoes.map((d) => d.join('+'))).toEqual(['20', '10+10']);
 	});
 
-	it('venda de férias: a fração toda vendida sai da sustação; a parcial entra só com o que resta', () => {
-		// 1ª de 10 toda vendida (abono), 2ª de 20 por gozar → sustam-se só os 20.
+	it('1ª vendida e já passada: as férias correram → SUSPENSÃO; antes de passar → SUSTAÇÃO', () => {
 		const ex = [
 			{ ...fracao(1, '2026-10-01', '2026-10-10'), diasAbonados: 10 },
 			fracao(2, '2027-01-11', '2027-01-30')
 		];
-		const s = situacaoDaReprogramacao(ex, '2026-09-20');
-		expect(s.sustacao?.fracoes.map((f) => f.ordem)).toEqual([2]);
-		expect(s.sustacao?.diasRestantes).toBe(20);
-		expect(s.sustacao?.divisoes.map((d) => d.join('+'))).toEqual(['20', '10+10']);
+		expect(situacaoDaReprogramacao(ex, '2026-09-20').tipo).toBe('sustacao');
+		const depois = situacaoDaReprogramacao(ex, '2026-10-15');
+		expect(depois.tipo).toBe('suspensao');
+		// A vendida nunca entra; só a 2ª, com 20.
+		expect(depois.futuras.map((f) => f.ordem)).toEqual([2]);
+		expect(planoDaReprogramacao(depois).diasRestantes).toBe(20);
+	});
 
-		// 1ª de 30 com 10 vendidos → restam 20; a divisão atual é [20].
-		const parcial = situacaoDaReprogramacao(
+	it('venda parcial: 30 com 10 vendidos entram com 20; o motivo avisa', () => {
+		const s = situacaoDaReprogramacao(
 			[{ ...fracao(1, '2026-12-01', '2026-12-30'), diasAbonados: 10 }],
 			'2026-09-20'
 		);
-		expect(parcial.sustacao?.diasRestantes).toBe(20);
-		expect(parcial.sustacao?.motivo).toContain('10 dias vendidos');
+		expect(planoDaReprogramacao(s).diasRestantes).toBe(20);
+		expect(s.motivo).toContain('10 dias vendidos');
+	});
+
+	it('depois de uma suspensão o que resta pode não ser uma das cinco formas — a divisão atual ainda cabe', () => {
+		const ex = [fracao(2, '2026-10-01', '2026-10-12'), fracao(3, '2026-12-01', '2026-12-10')];
+		const s = situacaoDaReprogramacao(ex, '2026-09-01');
+		expect(planoDaReprogramacao(s).divisoes.map((d) => d.join('+'))).toEqual(['12+10']);
 	});
 
 	it('tudo gozado: não há o que reprogramar', () => {
 		const s = situacaoDaReprogramacao([fracao(1, '2026-01-05', '2026-02-03')], '2026-06-01');
-		expect(s).toEqual({ sustacao: null, suspensao: null });
+		expect(s.tipo).toBeNull();
 	});
 
-	it('fração sustada não conta: reprograma-se a que a substituiu', () => {
+	it('fração sustada não conta: reprograma-se a que a substituiu, e ela não marca o início das férias', () => {
 		const s = situacaoDaReprogramacao(
-			[fracao(1, '2026-12-01', '2026-12-30', 'sustada'), fracao(1, '2027-02-01', '2027-03-02')],
+			[fracao(1, '2026-10-01', '2026-10-30', 'sustada'), fracao(1, '2027-02-01', '2027-03-02')],
 			'2026-11-20'
 		);
-		expect(s.sustacao?.fracoes).toHaveLength(1);
-		expect(s.sustacao?.fracoes[0].data_inicio).toBe('2027-02-01');
+		expect(s.tipo).toBe('sustacao');
+		expect(s.futuras).toHaveLength(1);
+		expect(s.futuras[0].data_inicio).toBe('2027-02-01');
 	});
 });
 
@@ -230,6 +253,7 @@ describe('o ofício do NUP sai com o instituto certo', () => {
 			fracoesOriginais: [f],
 			novosPeriodos: [{ inicio: '2026-08-03', fim: '2026-08-23', dias: 21 }],
 			justificativa: 'Operação Carnaval fora de época na região.',
+			emGozo: f,
 			dataSuspensao: '2026-07-10'
 		});
 		expect(texto).toContain('SUSPENSÃO');

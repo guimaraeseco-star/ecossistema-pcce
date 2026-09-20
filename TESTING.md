@@ -456,24 +456,9 @@ HISTORICO.xlsx --enviar --local`): 698/914 linhas casam com a base (os
       (Programada / Em gozo / Gozada) e os afastamentos de férias surgem na
       linha do tempo; lançar o mesmo exercício de novo é recusado; "Excluir"
       (só com a programação intacta) some com os afastamentos junto
-- [ ] Férias — sustar: o botão "Sustar a fração" / "Sustar as N frações" fica
-      no cabeçalho do exercício, e só quando há fração por começar; o
-      assistente diz SUSTAÇÃO em letras grandes, lista as frações alcançadas
-      (todas as não iniciadas — as férias são um período só) e oferece as
-      divisões possíveis para os dias que restam (30 sustados → 1, 2 ou 3
-      períodos; 20 → 20 ou 10 + 10), com a divisão atual pré-marcada; os
-      primeiros dias passam pela mesma régua do lançamento. "Gerar ofício"
-      registra o pedido, mostra o ofício (com todas as frações originais e os
-      novos períodos) com botão Copiar, e o pedido fica em amarelo "aguardando
-      a COGEP" no exercício, com NUP para anotar; enquanto pendente, os botões
-      de sustar/suspender/excluir somem
-- [ ] Férias — sustar com venda (abono): fração TODA vendida (10 dias com abono deferido) fica fora da sustação — o botão diz "Sustar a fração" (só a outra) e as divisões partem dos dias que restam (20 → 20 ou 10 + 10); fração de 30 com 10 vendidos entra com "10 vendidos — restam 20" e a divisão parte de 20; deferida, a fração antiga fica sustada COM o abono (os dias vendidos ficam vendidos) e a nova nasce só com os dias a gozar
-- [ ] Férias — suspender: "Suspender" só aparece na fração EM GOZO hoje; o
-      formulário diz SUSPENSÃO, pede o retorno ao serviço (limitado ao período
-      da fração) e mostra "N gozados · restam M dias"; pede só o 1º dia do
-      período que resta e calcula o último; menos de 7 dias gozados trava,
-      reprogramar depois de 10 dias só avisa; justificativa obrigatória. As
-      frações seguintes não mudam
+- [ ] Férias — reprogramar (um botão só, "Reprogramar", no cabeçalho do exercício; some com pedido pendente ou sem fração por gozar). O instituto sai do estado das FÉRIAS, não da fração: nenhuma fração começou (nem a vendida) → o assistente diz SUSTAÇÃO, lista as frações alcançadas (todas as não iniciadas — a toda vendida fica de fora; a de venda parcial entra "10 vendidos — restam 20") e oferece as divisões dos dias que restam (30 → 1, 2 ou 3 períodos; 20 → 20 ou 10 + 10), com a divisão atual pré-marcada; justificativa opcional
+- [ ] Férias — reprogramar com as férias já iniciadas (1ª em gozo, já gozada, ou vendida e já passada): o assistente diz SUSPENSÃO e exige a justificativa; se há fração EM GOZO hoje, pede o retorno ao serviço (limitado ao período dela), mostra "N gozados · restam M dias desta fração · + K das futuras = T a reprogramar" e só então abre a escolha de períodos; menos de 7 dias gozados trava, reprogramar depois de 10 dias só avisa; as frações futuras entram com os dias inteiros, sem contagem; a escolha de períodos parte do total (quebrado + inteiras)
+- [ ] Férias — "Gerar ofício" registra o pedido, mostra o ofício (todas as frações alcançadas, o retorno e os gozados quando há fração em gozo, os novos períodos) com botão Copiar; o pedido fica em amarelo "aguardando a COGEP" com o passo a passo (ofício → NUP → homologação) e o NUP para anotar
 - [ ] Férias — homologar: "COGEP deferiu" na sustação faz a fração antiga
       aparecer riscada (Sustada), a nova entrar como Programada (reprogramada)
       e o afastamento antigo sumir; na suspensão, o afastamento antigo encurta

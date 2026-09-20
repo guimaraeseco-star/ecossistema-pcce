@@ -307,18 +307,23 @@ export function periodosDoPedido(pedido: { novos_periodos: string }): PeriodoMon
 	}
 }
 
-/** As frações alcançadas pelo pedido: a suspensa (`fracao_id`) ou as sustadas (`fracoes_ids`, JSON). */
+/**
+ * As frações alcançadas pelo pedido: as de `fracoes_ids` (JSON) e, na
+ * suspensão, a em gozo (`fracao_id`) — que pode estar ou não na lista.
+ */
 export function fracoesDoPedido(pedido: {
 	fracoes_ids: string;
 	fracao_id: number | null;
 }): number[] {
-	if (pedido.fracao_id) return [pedido.fracao_id];
+	let lista: number[] = [];
 	try {
-		const lista = JSON.parse(pedido.fracoes_ids) as unknown;
-		return Array.isArray(lista) ? lista.filter((n): n is number => Number.isInteger(n)) : [];
+		const bruto = JSON.parse(pedido.fracoes_ids) as unknown;
+		if (Array.isArray(bruto)) lista = bruto.filter((n): n is number => Number.isInteger(n));
 	} catch {
-		return [];
+		lista = [];
 	}
+	if (pedido.fracao_id && !lista.includes(pedido.fracao_id)) lista = [pedido.fracao_id, ...lista];
+	return lista;
 }
 
 /* ── Reprogramação: sustação × suspensão ─────────────────────────────────── */
@@ -345,81 +350,148 @@ const BASE_LEGAL: Record<TipoReprogramacao, string> = {
 		'Dec. 32.907/2018, art. 3º § 12 (red. Dec. 33.739/2020) e art. 6º III (red. Dec. 34.495/2021)'
 };
 
-/** O que cabe pedir num exercício HOJE — decidido pelos fatos, não por escolha. */
+/**
+ * O que cabe pedir num exercício HOJE — decidido pelos fatos, não por escolha.
+ *
+ * O que decide o instituto é se AS FÉRIAS começaram, não a fração (decisão
+ * dele, 20/09/2026: "o fato de eu dividir as férias não significa que são
+ * férias separadas"):
+ *
+ *   - nenhuma fração começou → SUSTAÇÃO de tudo o que resta, sem motivo;
+ *   - a 1ª fração já começou (em gozo, gozada, ou vendida e já passada) →
+ *     tudo o que resta é SUSPENSÃO, por imperiosa necessidade do serviço.
+ *     A fração EM GOZO agora pede o dia do retorno e devolve só o restante
+ *     quebrado (7 dias gozados, art. 6º III); as ainda não iniciadas entram
+ *     com os dias inteiros, sem contagem.
+ *
+ * Em qualquer caso o pedido é um só, e o total que resta pode voltar
+ * redividido. Fração toda vendida (abono) nunca entra; a parcial entra só
+ * com o que resta a gozar.
+ */
 export interface SituacaoDaReprogramacao {
-	/**
-	 * SUSTAÇÃO: as frações ainda não iniciadas, todas de uma vez — as férias
-	 * são UM período. `diasRestantes` é o que a nova divisão redistribui;
-	 * `divisoes` traz a divisão atual primeiro e depois as outras formas do
-	 * decreto que somam o mesmo. `null` quando nada resta por começar.
-	 */
-	sustacao: {
-		fracoes: Fracao[];
-		diasRestantes: number;
-		divisoes: readonly (readonly number[])[];
-		motivo: string;
-	} | null;
-	/**
-	 * SUSPENSÃO: a fração em gozo hoje — a única exceção à regra do período
-	 * único, porque o servidor já está de férias. `null` quando ninguém
-	 * está em gozo.
-	 */
-	suspensao: { fracao: Fracao; motivo: string } | null;
+	/** `null` quando não há o que reprogramar. */
+	tipo: TipoReprogramacao | null;
+	/** A frase que o usuário precisa ler antes de escrever o NUP. */
+	motivo: string;
+	/** A fração em gozo hoje — só na suspensão; pede o dia do retorno. */
+	emGozo: Fracao | null;
+	/** As frações ainda não iniciadas, com dias a gozar. */
+	futuras: Fracao[];
+	/** Os dias inteiros das futuras (a em gozo depende do retorno). */
+	diasFuturos: number;
 }
 
 /**
  * Sustação ou suspensão? Decide pelos FATOS — as datas das frações e a data
  * de hoje —, não por escolha do usuário. É o que impede o pedido errado: o
  * chefe imediato vê o nome do caso e o motivo antes de escrever o NUP.
- *
- * A sustação alcança TODAS as frações que ainda não começaram (decisão do
- * responsável, 17/09/2026: "as férias são um período só, mesmo fracionadas;
- * precisam ser sustadas juntas"), e pode redividi-las. A suspensão mira só a
- * fração em gozo; as futuras ficam como estão.
  */
 export function situacaoDaReprogramacao(
 	fracoesDoExercicio: readonly Fracao[],
 	hojeISO: string
 ): SituacaoDaReprogramacao {
-	const vivas = fracoesDoExercicio.filter((f) => f.status === 'programada');
-	// Fração inteira vendida (abono sobre todos os dias) não se susta: já está
-	// resolvida em pecúnia. Com venda parcial, entra só o que resta a gozar.
-	const sustaveis = vivas.filter(
-		(f) => statusPelaData(f, hojeISO) === 'programada' && diasAGozar(f) > 0
+	// As férias começaram se alguma fração que VALE (programada ou já suspensa —
+	// a sustada nunca aconteceu) tem o 1º dia até hoje. A vendida conta: o
+	// período dela passou, as férias correram.
+	const comecaram = fracoesDoExercicio.some(
+		(f) => (f.status === 'programada' || f.status === 'suspensa') && f.data_inicio <= hojeISO
 	);
+	const vivas = fracoesDoExercicio.filter((f) => f.status === 'programada' && diasAGozar(f) > 0);
 	const emGozo = vivas.find((f) => statusPelaData(f, hojeISO) === 'em_gozo') ?? null;
+	const futuras = vivas.filter((f) => statusPelaData(f, hojeISO) === 'programada');
+	const diasFuturos = futuras.reduce((n, f) => n + diasAGozar(f), 0);
+	const vendidos = [...futuras, ...(emGozo ? [emGozo] : [])].reduce(
+		(n, f) => n + (f.diasAbonados ?? 0),
+		0
+	);
+	const notaVenda = vendidos > 0 ? ` Os ${vendidos} dias vendidos (abono) ficam vendidos.` : '';
 
-	let sustacao: SituacaoDaReprogramacao['sustacao'] = null;
-	if (sustaveis.length > 0) {
-		const diasRestantes = sustaveis.reduce((n, f) => n + diasAGozar(f), 0);
-		const atual = sustaveis.map(diasAGozar);
-		const igual = (d: readonly number[]) => d.join('+') === atual.join('+');
-		// A divisão atual sempre cabe (mesmo quando não é uma das cinco formas —
-		// o que resta depois de uma suspensão pode somar 22, por exemplo); as
-		// outras são as formas do decreto que somam o mesmo.
-		const divisoes = [atual, ...divisoesPossiveis(diasRestantes).filter((d) => !igual(d))];
-		const lista = sustaveis.map((f) => `${f.ordem}ª (${formatarData(f.data_inicio)})`).join(', ');
-		const vendidos = sustaveis.reduce((n, f) => n + (f.diasAbonados ?? 0), 0);
-		const notaVenda = vendidos > 0 ? ` Os ${vendidos} dias vendidos (abono) ficam vendidos.` : '';
-		sustacao = {
-			fracoes: sustaveis,
-			diasRestantes,
-			divisoes,
+	if (!emGozo && futuras.length === 0) {
+		return {
+			tipo: null,
+			motivo: 'Não há fração por gozar neste exercício.',
+			emGozo,
+			futuras,
+			diasFuturos
+		};
+	}
+	const lista = futuras.map((f) => `${f.ordem}ª (${formatarData(f.data_inicio)})`).join(', ');
+
+	if (!comecaram) {
+		return {
+			tipo: 'sustacao',
 			motivo:
-				sustaveis.length === 1
-					? `A ${lista} fração ainda não começou: é SUSTAÇÃO. Não precisa de motivo, e os ${diasRestantes} dias podem voltar divididos de outro jeito.${notaVenda}`
-					: `As frações ${lista} ainda não começaram: é SUSTAÇÃO, das ${sustaveis.length} juntas — as férias são um período só. Não precisa de motivo, e os ${diasRestantes} dias podem voltar divididos de outro jeito.${notaVenda}`
+				(futuras.length === 1
+					? `A ${lista} fração ainda não começou — as férias não tiveram início: é SUSTAÇÃO.`
+					: `As frações ${lista} ainda não começaram — as férias não tiveram início: é SUSTAÇÃO, das ${futuras.length} juntas, porque as férias são um período só.`) +
+				` Não precisa de motivo, e os ${diasFuturos} dias podem voltar divididos de outro jeito.${notaVenda}`,
+			emGozo: null,
+			futuras,
+			diasFuturos
 		};
 	}
 
-	const suspensao: SituacaoDaReprogramacao['suspensao'] = emGozo
-		? {
-				fracao: emGozo,
-				motivo: `A ${emGozo.ordem}ª fração começou em ${formatarData(emGozo.data_inicio)} e está em gozo: só cabe SUSPENSÃO, por imperiosa necessidade do serviço. As frações seguintes não mudam.`
-			}
-		: null;
+	const partes: string[] = [];
+	if (emGozo) {
+		partes.push(
+			`A ${emGozo.ordem}ª fração está em gozo desde ${formatarData(emGozo.data_inicio)}: informe o dia do retorno — os dias até a véspera ficam gozados (mínimo 7, art. 6º III) e só o restante volta.`
+		);
+	}
+	if (futuras.length > 0) {
+		partes.push(
+			`${futuras.length === 1 ? `A ${lista} fração ainda não começou` : `As frações ${lista} ainda não começaram`}, mas as férias já tiveram início — por isso também é SUSPENSÃO, com os ${diasFuturos} dias preservados por inteiro.`
+		);
+	}
+	return {
+		tipo: 'suspensao',
+		motivo: `As férias já começaram: o que resta se reprograma por SUSPENSÃO, por imperiosa necessidade do serviço, justificada. ${partes.join(' ')} O total que resta pode voltar dividido de outro jeito.${notaVenda}`,
+		emGozo,
+		futuras,
+		diasFuturos
+	};
+}
 
-	return { sustacao, suspensao };
+/** O que a nova divisão redistribui, depois de conhecido o retorno (se há fração em gozo). */
+export interface PlanoDaReprogramacao {
+	/** Todas as frações alcançadas: a em gozo (se houver) e as futuras. */
+	fracoes: Fracao[];
+	/** O restante quebrado da fração em gozo; 0 sem fração em gozo. */
+	quebrado: number;
+	diasRestantes: number;
+	/** A divisão atual primeiro; depois as formas do decreto que somam o mesmo. */
+	divisoes: readonly (readonly number[])[];
+}
+
+/**
+ * Monta o plano: o restante da fração em gozo (dias − gozados até a véspera
+ * do retorno) mais os dias inteiros das futuras. Sem fração em gozo,
+ * `dataSuspensaoISO` é ignorada.
+ */
+export function planoDaReprogramacao(
+	situacao: SituacaoDaReprogramacao,
+	dataSuspensaoISO?: string | null
+): PlanoDaReprogramacao {
+	const quebrado =
+		situacao.emGozo && dataSuspensaoISO
+			? Math.max(
+					0,
+					diasRestantesNaSuspensao(situacao.emGozo, dataSuspensaoISO).restantes -
+						(situacao.emGozo.diasAbonados ?? 0)
+				)
+			: 0;
+	const fracoes = [
+		...(situacao.emGozo && quebrado > 0 ? [situacao.emGozo] : []),
+		...situacao.futuras
+	];
+	const atual = [...(quebrado > 0 ? [quebrado] : []), ...situacao.futuras.map(diasAGozar)];
+	const diasRestantes = atual.reduce((n, d) => n + d, 0);
+	const igual = (d: readonly number[]) => d.join('+') === atual.join('+');
+	// A divisão atual sempre cabe (mesmo quando não é uma das cinco formas — o
+	// que resta depois de uma suspensão pode somar 22); as outras são as formas
+	// do decreto que somam o mesmo.
+	const divisoes =
+		diasRestantes > 0 ? [atual, ...divisoesPossiveis(diasRestantes).filter((d) => !igual(d))] : [];
+	return { fracoes, quebrado, diasRestantes, divisoes };
 }
 
 /**
@@ -495,12 +567,14 @@ export function temErro(checagens: readonly Checagem[]): boolean {
 export interface DadosDoOficio {
 	servidor: { nome: string; matricula: string; cargo: string; lotacao: string };
 	tipo: TipoReprogramacao;
-	/** As frações alcançadas: todas as sustadas, ou só a suspensa. */
+	/** As frações alcançadas: todas as que restam (a em gozo e as futuras). */
 	fracoesOriginais: readonly Fracao[];
 	novosPeriodos: readonly PeriodoMontado[];
 	/** Obrigatória na suspensão: a imperiosa necessidade do serviço. */
 	justificativa?: string;
-	dataSuspensao?: string;
+	/** Na suspensão com fração em gozo: a fração e o dia do retorno. */
+	emGozo?: Fracao | null;
+	dataSuspensao?: string | null;
 }
 
 /**
@@ -520,7 +594,8 @@ export function textoDoOficio(d: DadosDoOficio): string {
 		'',
 		`Período${plural(d.fracoesOriginais.length)} programado${plural(d.fracoesOriginais.length)}:`,
 		...d.fracoesOriginais.map(
-			(f) => `  - ${f.ordem}ª fração, ${periodo(f.data_inicio, f.data_fim, diasDaFracao(f))}`
+			(f) =>
+				`  - ${f.ordem}ª fração, ${periodo(f.data_inicio, f.data_fim, diasDaFracao(f))}${f.diasAbonados ? ` — ${f.diasAbonados} dias convertidos em abono` : ''}`
 		),
 		`Período${plural(d.novosPeriodos.length)} de reprogramação:`,
 		...d.novosPeriodos.map((p, k) => `  - ${k + 1}º período, ${periodo(p.inicio, p.fim, p.dias)}`),
@@ -528,15 +603,16 @@ export function textoDoOficio(d: DadosDoOficio): string {
 	];
 	if (d.tipo === 'sustacao') {
 		linhas.push(
-			`Trata-se de SUSTAÇÃO: o período programado ainda não teve início.`,
+			`Trata-se de SUSTAÇÃO: as férias ainda não tiveram início.`,
 			...(d.justificativa?.trim() ? [`Observação: ${d.justificativa.trim()}`] : [])
 		);
 	} else {
-		const f = d.fracoesOriginais[0];
 		const gozados =
-			d.dataSuspensao && f ? diasRestantesNaSuspensao(f, d.dataSuspensao).gozados : null;
+			d.emGozo && d.dataSuspensao
+				? diasRestantesNaSuspensao(d.emGozo, d.dataSuspensao).gozados
+				: null;
 		linhas.push(
-			`Trata-se de SUSPENSÃO de férias já iniciadas${d.dataSuspensao ? `, com retorno ao serviço em ${formatarData(d.dataSuspensao)}` : ''}${gozados != null ? ` (${gozados} dias gozados)` : ''}, por imperiosa necessidade do serviço.`,
+			`Trata-se de SUSPENSÃO de férias já iniciadas${d.emGozo && d.dataSuspensao ? `, com retorno ao serviço em ${formatarData(d.dataSuspensao)} (${gozados} dias gozados da ${d.emGozo.ordem}ª fração)` : ''}, por imperiosa necessidade do serviço${d.emGozo ? '' : '; as frações alcançadas ainda não haviam iniciado e têm os dias preservados por inteiro'}.`,
 			`Justificativa: ${d.justificativa?.trim() || '(informar a necessidade do serviço)'}`
 		);
 	}

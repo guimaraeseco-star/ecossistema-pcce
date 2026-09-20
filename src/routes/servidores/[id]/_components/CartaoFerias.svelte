@@ -10,10 +10,11 @@
 	 *     do decreto; depois só o 1º dia de cada fração — o último dia sai da
 	 *     regra (`fimDaFracao`), e o 1º dia tem de ser útil (nem fim de semana,
 	 *     nem feriado — o caso do 01/11/2026, domingo, que passou);
-	 *   - SUSTAR alcança todas as frações ainda não iniciadas do exercício, de
-	 *     uma vez, e pode redividi-las (30 sustados voltam como 10 + 20);
-	 *   - SUSPENDER é a exceção: mira a fração em gozo, e o que resta dela volta
-	 *     num período só.
+	 *   - REPROGRAMAR alcança tudo o que resta do exercício, num pedido só. O que
+	 *     decide o instituto é se AS FÉRIAS começaram: nenhuma fração começou →
+	 *     SUSTAÇÃO; a 1ª já começou → SUSPENSÃO, em que a fração em gozo devolve
+	 *     só o restante quebrado (retorno informado, 7 dias gozados) e as
+	 *     futuras entram inteiras. Redivisão nos dois casos.
 	 *
 	 * O que este cartão precisa fazer bem, e a razão de existir: dizer ao chefe
 	 * imediato se o pedido é SUSTAÇÃO ou SUSPENSÃO antes de ele escrever o NUP.
@@ -42,6 +43,7 @@
 		fimDaFracao,
 		montarPeriodos,
 		periodoAquisitivo,
+		planoDaReprogramacao,
 		periodosDoPedido,
 		ROTULO_STATUS_FRACAO,
 		ROTULO_TIPO_REPROGRAMACAO,
@@ -113,8 +115,8 @@
 
 	/* ── formulários abertos ─────────────────────────────────────────────── */
 	let lancando = $state(false);
-	let sustando = $state<{ exercicio: number; fracoes: FracaoCompleta[] } | null>(null);
-	let suspendendo = $state<FracaoCompleta | null>(null);
+	/** O exercício em reprogramação — sustação ou suspensão, a regra decide. */
+	let reprogramando = $state<{ exercicio: number; fracoes: FracaoCompleta[] } | null>(null);
 	let abonando = $state<FracaoCompleta | null>(null);
 	let enviando = $state(false);
 	/** O ofício devolvido pela action, para copiar no NUP. */
@@ -125,11 +127,32 @@
 	let divisaoEscolhida = $state<readonly number[]>([30]);
 	let inicios = $state<string[]>(['', '', '']);
 
-	/** As divisões admitidas no formulário aberto: as cinco ao lançar; ao sustar, as que somam o restante. */
+	/* ── reprogramar: a situação pelos fatos das FÉRIAS, e o plano depois do retorno ── */
+	let rSuspensao = $state('');
+	let rJustificativa = $state('');
+	const situacaoAberta = $derived(reprogramando ? situacaoDe(reprogramando.fracoes) : null);
+	const plano = $derived(situacaoAberta ? planoDaReprogramacao(situacaoAberta, rSuspensao) : null);
+	const restoDaSuspensao = $derived(
+		situacaoAberta?.emGozo && rSuspensao
+			? diasRestantesNaSuspensao(situacaoAberta.emGozo, rSuspensao)
+			: null
+	);
+	/** Os 7 dias gozados (erro) e os 10 para reprogramar (aviso) — só com fração em gozo. */
+	const checagensDaSuspensao = $derived.by((): Checagem[] => {
+		if (!situacaoAberta?.emGozo || !rSuspensao || !inicios[0]) return [];
+		return criteriosDaSuspensao(situacaoAberta.emGozo, rSuspensao, inicios[0]);
+	});
+	const podeEnviarReprogramacao = $derived(
+		!!situacaoAberta?.tipo &&
+			(!situacaoAberta.emGozo || (!!rSuspensao && (plano?.quebrado ?? 0) > 0)) &&
+			(situacaoAberta.tipo !== 'suspensao' || rJustificativa.trim().length > 0) &&
+			!temErro(checagensDaSuspensao) &&
+			(plano?.diasRestantes ?? 0) > 0
+	);
+
+	/** As divisões admitidas no formulário aberto: as cinco ao lançar; ao reprogramar, as que somam o restante. */
 	const divisoesAdmitidas = $derived.by((): readonly (readonly number[])[] => {
-		if (sustando) {
-			return situacaoDe(sustando.fracoes).sustacao?.divisoes ?? [];
-		}
+		if (reprogramando) return plano?.divisoes ?? [];
 		return divisoesPossiveis(30);
 	});
 	const quantidadesPossiveis = $derived(
@@ -155,44 +178,16 @@
 	let novoExercicio = $state(new Date().getFullYear());
 	const aquisitivo = $derived(dataPosse ? periodoAquisitivo(dataPosse, novoExercicio) : null);
 
-	/* ── suspender ───────────────────────────────────────────────────────── */
-	let sSuspensao = $state('');
-	let sInicio = $state('');
-	let sJustificativa = $state('');
-	const restoDaSuspensao = $derived(
-		suspendendo && sSuspensao ? diasRestantesNaSuspensao(suspendendo, sSuspensao) : null
-	);
-	const checagensSuspensao = $derived.by((): Checagem[] => {
-		if (!suspendendo || !sSuspensao) return [];
-		const lista: Checagem[] = [];
-		if (sInicio) {
-			lista.push(...criteriosDaSuspensao(suspendendo, sSuspensao, sInicio));
-			if (restoDaSuspensao && restoDaSuspensao.restantes > 0) {
-				lista.push(...montarPeriodos([restoDaSuspensao.restantes], [sInicio], feriados).checagens);
-			}
-		}
-		return lista;
-	});
-	const podeEnviarSuspensao = $derived(
-		!!suspendendo &&
-			!!sSuspensao &&
-			!!sInicio &&
-			(restoDaSuspensao?.restantes ?? 0) > 0 &&
-			!temErro(checagensSuspensao) &&
-			sJustificativa.trim().length > 0
-	);
-
 	/* ── abono ───────────────────────────────────────────────────────────── */
 	let aPosicao = $state<'iniciais' | 'finais'>('finais');
 	let aStatus = $state<'deferido' | 'indeferido'>('deferido');
 
 	function fecharTudo() {
 		lancando = false;
-		sustando = null;
-		suspendendo = null;
+		reprogramando = null;
 		abonando = null;
 		inicios = ['', '', ''];
-		sSuspensao = sInicio = sJustificativa = '';
+		rSuspensao = rJustificativa = '';
 	}
 
 	function abrirLancar() {
@@ -201,10 +196,14 @@
 		escolherQuantidade(1);
 	}
 
-	function abrirSustar(exercicio: number, fracoes: FracaoCompleta[]) {
+	function abrirReprogramar(exercicio: number, fracoes: FracaoCompleta[]) {
 		fecharTudo();
-		sustando = { exercicio, fracoes };
-		// A divisão atual vem primeiro na lista — é a escolha padrão.
+		reprogramando = { exercicio, fracoes };
+		sincronizarDivisao();
+	}
+
+	/** A divisão atual vem primeiro na lista — é a escolha padrão; muda quando o retorno muda o restante. */
+	function sincronizarDivisao() {
 		const atual = divisoesAdmitidas[0];
 		if (atual) {
 			qtdPeriodos = atual.length as 1 | 2 | 3;
@@ -371,14 +370,12 @@
 					</p>
 					{#if !pendente}
 						<div class="flex gap-1">
-							{#if situacao.sustacao}
+							{#if situacao.tipo}
+								<!-- Um botão só: a regra diz se é sustação ou suspensão. -->
 								<button
 									type="button"
 									class="btn btn-sm preset-outlined-surface-500"
-									onclick={() => abrirSustar(exercicio, fracoes)}
-									>Sustar {situacao.sustacao.fracoes.length === 1
-										? 'a fração'
-										: `as ${situacao.sustacao.fracoes.length} frações`}</button
+									onclick={() => abrirReprogramar(exercicio, fracoes)}>Reprogramar</button
 								>
 							{/if}
 							{#if intacta(exercicio, fracoes)}
@@ -422,16 +419,6 @@
 								</div>
 								{#if f.status === 'programada' && status !== 'gozada' && !pendente}
 									<div class="flex gap-1">
-										{#if status === 'em_gozo'}
-											<button
-												type="button"
-												class="btn btn-sm preset-outlined-surface-500"
-												onclick={() => {
-													fecharTudo();
-													suspendendo = f;
-												}}>Suspender</button
-											>
-										{/if}
 										{#if isAdmin && !f.abono}
 											<button
 												type="button"
@@ -587,24 +574,38 @@
 		{/each}
 	{/if}
 
-	<!-- SUSTAÇÃO: todas as frações por começar, de uma vez, redivididas ou não -->
-	{#if sustando}
-		{@const s = situacaoDe(sustando.fracoes).sustacao}
+	<!-- REPROGRAMAR: tudo o que resta do exercício. Sustação se as férias não
+	     começaram; suspensão se já começaram — com o retorno da fração em gozo
+	     (só o restante volta) e as futuras inteiras. Redivisão nos dois casos. -->
+	{#if reprogramando && situacaoAberta}
+		{@const s = situacaoAberta}
 		<form
 			method="POST"
-			action="?/sustar"
+			action="?/reprogramar"
 			use:enhance={() => aoResponder('Pedido registrado')}
 			class="mt-4 space-y-3 rounded-xl border border-primary-500/30 bg-primary-500/5 p-4"
 		>
-			<input type="hidden" name="exercicio" value={sustando.exercicio} />
-			<h3 class="text-sm font-bold">Sustar as férias do exercício {sustando.exercicio}</h3>
-			{#if s}
-				<!-- O nome do caso, decidido pelos fatos — é isto que evita o NUP errado. -->
+			<input type="hidden" name="exercicio" value={reprogramando.exercicio} />
+			<h3 class="text-sm font-bold">
+				Reprogramar as férias do exercício {reprogramando.exercicio}
+			</h3>
+			{#if s.tipo}
+				<!-- O nome do caso, decidido pelos fatos das FÉRIAS — é isto que evita o NUP errado. -->
 				<div class="rounded-lg bg-white/70 p-3 text-sm dark:bg-surface-900/60">
-					<p class="text-lg font-bold text-primary-700 dark:text-primary-400">SUSTAÇÃO</p>
+					<p class="text-lg font-bold text-primary-700 dark:text-primary-400">
+						{ROTULO_TIPO_REPROGRAMACAO[s.tipo].toUpperCase()}
+					</p>
 					<p class="text-surface-700 dark:text-surface-300">{s.motivo}</p>
 					<ul class="mt-1 text-xs text-surface-600 dark:text-surface-400">
-						{#each s.fracoes as f (f.ordem + f.data_inicio)}
+						{#if s.emGozo}
+							<li>
+								{s.emGozo.ordem}ª fração (em gozo): {formatarData(s.emGozo.data_inicio)} – {formatarData(
+									s.emGozo.data_fim
+								)} ({diasDaFracao(s.emGozo)} dias{#if s.emGozo.diasAbonados}, {s.emGozo
+										.diasAbonados} vendidos{/if})
+							</li>
+						{/if}
+						{#each s.futuras as f (f.ordem + f.data_inicio)}
 							<li>
 								{f.ordem}ª fração: {formatarData(f.data_inicio)} – {formatarData(f.data_fim)} ({diasDaFracao(
 									f
@@ -615,19 +616,60 @@
 						{/each}
 					</ul>
 				</div>
-				{@render escolhaDePeriodos()}
+
+				{#if s.emGozo}
+					<label class="label sm:max-w-xs">
+						<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70"
+							>Retorno ao serviço (fração em gozo)</span
+						>
+						<input
+							class="input px-3 py-1 text-sm"
+							type="date"
+							name="data_suspensao"
+							bind:value={rSuspensao}
+							min={s.emGozo.data_inicio}
+							max={s.emGozo.data_fim}
+							onchange={sincronizarDivisao}
+							required
+						/>
+						{#if restoDaSuspensao}
+							<span class="ml-1 text-2xs text-surface-500"
+								>{restoDaSuspensao.gozados} gozados · restam {plano?.quebrado ?? 0} dias desta fração{#if s.diasFuturos > 0}
+									· + {s.diasFuturos} das futuras = {plano?.diasRestantes ?? 0} a reprogramar{/if}</span
+							>
+						{/if}
+					</label>
+				{/if}
+
+				{#if !s.emGozo || rSuspensao}
+					{@render escolhaDePeriodos()}
+				{/if}
+
+				{#if checagensDaSuspensao.length > 0}
+					<ul class="space-y-0.5 text-xs">
+						{#each checagensDaSuspensao as ch (ch.texto)}
+							<li class={classeChecagem(ch)}>{marcaChecagem(ch)} {ch.texto}</li>
+						{/each}
+					</ul>
+				{/if}
+
 				<label class="label">
-					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70"
-						>Observação (opcional)</span
-					>
+					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70">
+						{s.tipo === 'suspensao' ? 'Imperiosa necessidade do serviço' : 'Observação (opcional)'}
+					</span>
 					<textarea
 						class="textarea px-3 py-1 text-sm"
 						name="justificativa"
+						bind:value={rJustificativa}
 						rows="2"
-						maxlength={MAX_JUSTIFICATIVA}></textarea>
+						maxlength={MAX_JUSTIFICATIVA}
+						required={s.tipo === 'suspensao'}
+						placeholder={s.tipo === 'suspensao'
+							? 'Ex.: operação de grande porte na região, sem efetivo para substituição'
+							: ''}></textarea>
 				</label>
 			{:else}
-				<p class="text-sm text-error-600">Não há fração por começar neste exercício.</p>
+				<p class="text-sm text-error-600">{s.motivo}</p>
 			{/if}
 			<div class="flex justify-end gap-2">
 				<button type="button" class="btn btn-sm preset-outlined-surface-500" onclick={fecharTudo}
@@ -636,104 +678,8 @@
 				<button
 					type="submit"
 					class="btn btn-sm preset-filled-primary-500 disabled:opacity-40"
-					disabled={enviando || !s || !podeEnviarPeriodos}>Gerar ofício e registrar pedido</button
-				>
-			</div>
-		</form>
-	{/if}
-
-	<!-- SUSPENSÃO: a fração em gozo é interrompida; o que resta volta num período só -->
-	{#if suspendendo}
-		<form
-			method="POST"
-			action="?/suspender"
-			use:enhance={() => aoResponder('Pedido registrado')}
-			class="mt-4 space-y-3 rounded-xl border border-primary-500/30 bg-primary-500/5 p-4"
-		>
-			<input type="hidden" name="fracao_id" value={suspendendo.id} />
-			<h3 class="text-sm font-bold">
-				Suspender a {suspendendo.ordem}ª fração de {suspendendo.exercicio}
-				<span class="font-normal text-surface-500">
-					({formatarData(suspendendo.data_inicio)} – {formatarData(suspendendo.data_fim)}, {diasDaFracao(
-						suspendendo
-					)} dias)</span
-				>
-			</h3>
-			<div class="rounded-lg bg-white/70 p-3 text-sm dark:bg-surface-900/60">
-				<p class="text-lg font-bold text-primary-700 dark:text-primary-400">SUSPENSÃO</p>
-				<p class="text-surface-700 dark:text-surface-300">
-					A fração está em gozo: só cabe suspensão, por imperiosa necessidade do serviço. Os dias já
-					gozados ficam; os que restam voltam num período novo. As frações seguintes não mudam.
-				</p>
-			</div>
-			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-				<label class="label">
-					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70"
-						>Retorno ao serviço</span
-					>
-					<input
-						class="input px-3 py-1 text-sm"
-						type="date"
-						name="data_suspensao"
-						bind:value={sSuspensao}
-						min={suspendendo.data_inicio}
-						max={suspendendo.data_fim}
-						required
-					/>
-					{#if restoDaSuspensao}
-						<span class="ml-1 text-2xs text-surface-500"
-							>{restoDaSuspensao.gozados} gozados · restam {restoDaSuspensao.restantes} dias</span
-						>
-					{/if}
-				</label>
-				<label class="label">
-					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70"
-						>1º dia do período que resta</span
-					>
-					<input
-						class="input px-3 py-1 text-sm"
-						type="date"
-						name="novo_inicio"
-						bind:value={sInicio}
-						min={sSuspensao || undefined}
-						required
-					/>
-					{#if sInicio && restoDaSuspensao && restoDaSuspensao.restantes > 0}
-						<span class="ml-1 text-2xs text-surface-500"
-							>até {formatarData(fimDaFracao(sInicio, restoDaSuspensao.restantes))}</span
-						>
-					{/if}
-				</label>
-			</div>
-			{#if checagensSuspensao.length > 0}
-				<ul class="space-y-0.5 text-xs">
-					{#each checagensSuspensao as ch (ch.texto)}
-						<li class={classeChecagem(ch)}>{marcaChecagem(ch)} {ch.texto}</li>
-					{/each}
-				</ul>
-			{/if}
-			<label class="label">
-				<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70"
-					>Imperiosa necessidade do serviço</span
-				>
-				<textarea
-					class="textarea px-3 py-1 text-sm"
-					name="justificativa"
-					bind:value={sJustificativa}
-					rows="2"
-					maxlength={MAX_JUSTIFICATIVA}
-					required
-					placeholder="Ex.: operação de grande porte na região, sem efetivo para substituição"
-				></textarea>
-			</label>
-			<div class="flex justify-end gap-2">
-				<button type="button" class="btn btn-sm preset-outlined-surface-500" onclick={fecharTudo}
-					>Cancelar</button
-				>
-				<button
-					type="submit"
-					class="btn btn-sm preset-filled-primary-500 disabled:opacity-40"
-					disabled={enviando || !podeEnviarSuspensao}>Gerar ofício e registrar pedido</button
+					disabled={enviando || !podeEnviarReprogramacao || !podeEnviarPeriodos}
+					>Gerar ofício e registrar pedido</button
 				>
 			</div>
 		</form>
