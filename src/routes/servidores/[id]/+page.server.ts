@@ -990,6 +990,8 @@ export const actions: Actions = {
 				tipo_cid: tipoCid
 			},
 			resumo: `${rotulo}${tipoCid ? ` (${tipoCid})` : ''}: ${periodo}`,
+			// O tipo, o período e o NUP são o pedido; não há motivo à parte a escrever.
+			justificativaDispensada: true,
 			metadados: {
 				subtipo,
 				nup: nup.formatado,
@@ -1052,6 +1054,11 @@ interface PedidoRH {
 	metadados: Record<string, unknown>;
 	/** No modo solicitação, a lista que a tela repõe sem `invalidateAll`. */
 	recarregar: () => Promise<unknown>;
+	/**
+	 * O pedido não pede motivo à parte (afastamento: tipo, período e NUP já
+	 * são o pedido — decisão dele, 20/09). Grava justificativa vazia.
+	 */
+	justificativaDispensada?: boolean;
 }
 
 /**
@@ -1073,7 +1080,7 @@ async function concluirAcaoRH(
 	const { u, db, id, alvo, modo } = auth;
 
 	let justificativa = '';
-	if (modo === 'solicitacao') {
+	if (modo === 'solicitacao' && !pedido.justificativaDispensada) {
 		const lida = lerJustificativa(formData);
 		if ('erro' in lida) return fail(400, { error: lida.erro });
 		justificativa = lida.texto;

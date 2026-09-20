@@ -87,7 +87,6 @@
 	let adicional = $state(false);
 	const meta = $derived(AFASTAMENTOS[subtipo]);
 	const regra = $derived(regraDePrazo(subtipo, adicional));
-	let descricao = $state('');
 	let dataInicio = $state('');
 	let qtdDias = $state('');
 	let dataFim = $state('');
@@ -100,7 +99,7 @@
 	/** No modo solicitação, nada é enviado sem motivo escrito; no afastamento, sem NUP válido. */
 	const bloqueado = $derived(
 		enviando ||
-			(solicitando && justificativa.trim().length === 0) ||
+			(solicitando && modal !== 'afastamento' && justificativa.trim().length === 0) ||
 			(modal === 'afastamento' && !nupConferido.ok)
 	);
 
@@ -109,7 +108,6 @@
 		subtipo = primeiroSubtipo;
 		tipoCid = 'CID-Outras';
 		adicional = false;
-		descricao = '';
 		dataInicio = '';
 		qtdDias = '';
 		dataFim = '';
@@ -139,14 +137,13 @@
 		const dias = diffDiasInclusivo(dataInicio, dataFim);
 		if (dias > 0) qtdDias = String(dias);
 	}
-	/** Ao trocar o tipo (ou o adicional): prazo fixo entra travado; sem prazo limpa o fim. */
+	/** Ao trocar o tipo (ou o adicional): a quantidade ZERA; prazo fixo entra travado. */
 	function aoMudarTipo() {
+		qtdDias = '';
+		dataFim = '';
 		if (regra.diasFixos != null) {
 			qtdDias = String(regra.diasFixos);
 			recalcularDataFim();
-		} else if (regra.semPrazo) {
-			qtdDias = '';
-			dataFim = '';
 		}
 	}
 
@@ -380,7 +377,7 @@
 		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-surface-950/80 backdrop-blur-sm overflow-y-auto"
 	>
 		<div
-			class="acoes-modal card p-4 sm:p-5 max-w-lg w-full max-h-[calc(100dvh-2rem)] overflow-y-auto card-elevated shadow-2xl rounded-2xl"
+			class="acoes-modal card p-4 sm:p-5 max-w-2xl w-full max-h-[calc(100dvh-2rem)] overflow-y-auto card-elevated shadow-2xl rounded-2xl"
 		>
 			<Dialog.Title class="h3 font-bold mb-4 flex items-center gap-2">
 				<CalendarOff size={20} class="text-warning-500" /> Registrar Afastamento
@@ -393,7 +390,7 @@
 				use:enhance={handleSubmit}
 				class="space-y-3"
 			>
-				<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+				<div class="grid grid-cols-1 gap-2">
 					<label class="label">
 						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"
 							>Tipo de Afastamento</span
@@ -415,18 +412,6 @@
 								</optgroup>
 							{/each}
 						</select>
-					</label>
-					<label class="label">
-						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"
-							>Descrição/Motivo</span
-						>
-						<input
-							class="input py-1 px-3 text-sm"
-							type="text"
-							name="descricao"
-							bind:value={descricao}
-							maxlength="500"
-						/>
 					</label>
 				</div>
 
@@ -564,6 +549,8 @@
 				{/if}
 
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+					<!-- Sem descrição, sem PDF e sem justificativa (pedido dele, 20/09): o
+					     tipo, o período e o NUP dizem tudo — o processo é o fundamento. -->
 					<label class="label">
 						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"
 							>NUP do processo <span class="text-error-500">*</span></span
@@ -582,19 +569,7 @@
 							<span class="text-2xs text-error-600 ml-1">{nupConferido.erro}</span>
 						{/if}
 					</label>
-					<label class="label">
-						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"
-							>Documento (PDF)</span
-						>
-						<input
-							class="input py-1 px-2 text-sm"
-							type="file"
-							name="documento"
-							accept="application/pdf"
-						/>
-					</label>
 				</div>
-				{@render campoJustificativa()}
 				{@render rodapeAcao('preset-filled-warning-500', 'Salvar', 'Salvando...')}
 			</form>
 		</div>

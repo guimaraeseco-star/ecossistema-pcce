@@ -24,12 +24,12 @@ import {
  * É a segunda promessa que este spec fecha — esconder botão não é autorização.
  *
  * As outras asserções fecham o ciclo: o Admin Geral vê o pedido INTEIRO (tipo,
- * período e justificativa) antes de decidir, e a aprovação credita a linha do
+ * período, CID e NUP — o afastamento não tem justificativa à parte) antes de decidir, e a aprovação credita a linha do
  * tempo a quem PEDIU — não ao aprovador, que só autorizou.
  */
 
 const ADMIN_TMP = 99004;
-const JUSTIFICATIVA = 'Atestado médico de 5 dias — CID em anexo.';
+const NUP = '10051.028034/2026-64';
 const INICIO = '2026-09-01';
 
 test.describe.configure({ mode: 'serial' });
@@ -104,8 +104,9 @@ test('admin de unidade PEDE o afastamento — nada entra no histórico', async (
 	await expect(modal.getByRole('alert')).toContainText('Portaria nº 39/2026');
 	await modal.getByLabel('Data Início').fill(INICIO);
 	await modal.getByLabel('Qtd Dias').fill('5');
+	// Sem descrição, PDF ou justificativa: o NUP é o fundamento do pedido.
 	await modal.getByLabel(/NUP do processo/).fill('10051028034202664');
-	await modal.getByLabel('Justificativa do pedido').fill(JUSTIFICATIVA);
+	await expect(modal.getByLabel('Justificativa do pedido')).toHaveCount(0);
 
 	// O verbo do botão é parte do contrato: "Salvar" faria o administrador
 	// acreditar que afastou quem continua em serviço.
@@ -113,7 +114,7 @@ test('admin de unidade PEDE o afastamento — nada entra no histórico', async (
 	await expect(page.getByText('Solicitação enviada')).toBeVisible();
 
 	// A promessa: nada mudou. O pedido aparece no quadro, o histórico não.
-	await expect(page.getByText(JUSTIFICATIVA)).toBeVisible();
+	await expect(page.getByText(NUP).first()).toBeVisible();
 	expect(afastamentosDoA()).toBe(0);
 });
 
@@ -123,8 +124,8 @@ test('admin geral vê o pedido inteiro na fila e aprova', async ({ page }) => {
 
 	await page.goto('/solicitacoes');
 	await expect(page.getByText('Movimentação, afastamento e desvinculação')).toBeVisible();
-	// Decidir sem ver o período e o motivo seria decidir no escuro.
-	await expect(page.getByText(JUSTIFICATIVA)).toBeVisible();
+	// Decidir sem ver o período e o processo seria decidir no escuro.
+	await expect(page.getByText(NUP).first()).toBeVisible();
 	await expect(page.getByText(/tratamento de saúde/i).first()).toBeVisible();
 	// O DPI SUL vê a Portaria 39 ANTES de aprovar.
 	await expect(page.getByRole('alert').filter({ hasText: 'Portaria nº 39/2026' })).toBeVisible();

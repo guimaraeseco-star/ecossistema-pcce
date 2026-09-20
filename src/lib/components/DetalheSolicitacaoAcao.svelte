@@ -90,10 +90,13 @@
 		</div>
 	{/if}
 
-	<div class="rounded-lg bg-surface-500/10 border-l-4 border-primary-500 px-3 py-2">
-		<p class="text-2xs uppercase font-bold opacity-60">Justificativa</p>
-		<p class="text-sm whitespace-pre-wrap break-words">{s.justificativa}</p>
-	</div>
+	<!-- O afastamento não tem justificativa à parte (o NUP é o fundamento). -->
+	{#if s.justificativa}
+		<div class="rounded-lg bg-surface-500/10 border-l-4 border-primary-500 px-3 py-2">
+			<p class="text-2xs uppercase font-bold opacity-60">Justificativa</p>
+			<p class="text-sm whitespace-pre-wrap break-words">{s.justificativa}</p>
+		</div>
+	{/if}
 
 	{#if s.documento_r2_key}
 		<a
