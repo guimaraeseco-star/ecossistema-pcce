@@ -982,10 +982,10 @@ HISTORICO.xlsx --enviar --local`): 698/914 linhas casam com a base (os
 - [ ] Enviar → cria solicitação PENDENTE (cadastro NÃO muda) e aparece no quadro "Solicitações deste servidor"
 - [ ] Nova solicitação do mesmo campo substitui a pendente anterior
 - [ ] CPF aparece em branco (com placeholder dizendo se há ou não CPF cadastrado); preenchê-lo cria pedido, deixá-lo vazio não
-- [ ] Lotação é somente leitura, com o aviso de que se altera por Movimentação
+- [ ] Lotação é somente leitura, com o aviso de que a troca de lotação e a desvinculação são feitas pelo DPI SUL
 - [ ] "Papel Administrativo" e "Admin Geral" aparecem marcados como **informativo**, sem controles; POST direto em `?/salvarPapel` ou `?/toggleAdminGeral` → 403
-- [ ] "Afastar / Movimentar Servidor" aparece; cada modal exige justificativa e o botão diz "Solicitar" (não "Salvar")
-- [ ] Desvinculação pedida por admin de unidade → servidor **continua ativo** até a aprovação
+- [ ] "Afastar / Movimentar Servidor" mostra SÓ o botão "Afastamento" (Movimentação e Desvinculação são do Admin Geral desde 20/09); o modal exige justificativa e o botão diz "Solicitar" (não "Salvar"); POST direto em `?/registrarMovimentacao` ou `?/registrarDesvinculacao` → 403
+- [ ] No modal de afastamento, "Férias" NÃO está na lista de tipos (entram pelo cartão Férias); POST direto com `subtipo=ferias` → 400
 
 **Fila do Admin Geral (`/solicitacoes`)**
 

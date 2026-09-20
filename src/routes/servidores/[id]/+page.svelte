@@ -227,8 +227,8 @@
 			class="rounded-xl bg-primary-500/10 border-l-4 border-primary-500 px-4 py-3 text-sm text-surface-700 dark:text-surface-200"
 		>
 			Nesta tela você <b>solicita</b> alterações: nada muda no cadastro até o Administrador Geral
-			aprovar. Todo pedido exige justificativa. A troca de <b>lotação</b> é feita pelo botão
-			<b>Movimentação</b>, no quadro "Afastar / Movimentar Servidor".
+			aprovar. Todo pedido exige justificativa. A troca de <b>lotação</b> e a desvinculação são feitas
+			pelo DPI SUL.
 		</div>
 	{/if}
 </div>

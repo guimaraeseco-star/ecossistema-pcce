@@ -44,12 +44,17 @@ interface DescricaoSubtipo {
 	rotulo: string;
 	/** Artigo do Estatuto (Lei 12.124/93) ou norma que o prevê — para a tela e o documento. */
 	base: string;
-	/** Aparece no cadastro? Os valores legados não: só se leem. */
+	/**
+	 * Aparece no modal de afastamento? Os valores legados não: só se leem. As
+	 * FÉRIAS também não (decisão dele, 20/09): entram só pelo cartão Férias da
+	 * ficha, que é quem mantém a programação, a reprogramação e o abono — um
+	 * evento de férias lançado por aqui ficaria sem fração e fora do controle.
+	 */
 	cadastravel: boolean;
 }
 
 export const AFASTAMENTOS: Record<SubtipoAfastamento, DescricaoSubtipo> = {
-	ferias: { rotulo: 'Férias', base: '', cadastravel: true },
+	ferias: { rotulo: 'Férias', base: '', cadastravel: false },
 	lts: {
 		rotulo: 'Licença para tratamento de saúde (LTS)',
 		base: 'arts. 62, I e 63',

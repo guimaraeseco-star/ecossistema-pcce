@@ -10,7 +10,11 @@
 	 *
 	 *  - `direto` — Admin Geral: o ato acontece na hora e vira linha na timeline;
 	 *  - `solicitacao` — admin de seccional/unidade: o ato vira PEDIDO, com
-	 *    justificativa obrigatória, e só acontece se o Admin Geral aprovar.
+	 *    justificativa obrigatória, e só acontece se o Admin Geral aprovar. Neste
+	 *    modo só existe o AFASTAMENTO: movimentação e desvinculação são do Admin
+	 *    Geral (decisão dele, 20/09) e nem aparecem — a action recusa também.
+	 *
+	 * Férias não estão na lista de afastamentos: entram pelo cartão Férias.
 	 *
 	 * O PDF anexo sobe nos DOIS modos, e é isso que permite ao Admin Geral baixar
 	 * a portaria antes de decidir. O texto dos botões muda junto: um painel que
@@ -59,7 +63,7 @@
 
 	// ---- Campos controlados (resetados ao fechar) ----
 	let unidadeDestino = $state('');
-	let subtipo = $state('ferias');
+	let subtipo = $state<string>(SUBTIPOS_CADASTRAVEIS[0]);
 	let descricao = $state('');
 	let dataInicio = $state('');
 	let qtdDias = $state('');
@@ -74,7 +78,7 @@
 
 	function resetCampos() {
 		unidadeDestino = '';
-		subtipo = 'ferias';
+		subtipo = SUBTIPOS_CADASTRAVEIS[0];
 		descricao = '';
 		dataInicio = '';
 		qtdDias = '';
@@ -137,21 +141,22 @@
 	</h2>
 	<p class="text-xs text-surface-600 dark:text-surface-400 mb-3">
 		{#if solicitando}
-			Movimentação, afastamento e desvinculação são <b>enviados para aprovação</b> do Administrador
-			Geral, com justificativa. A <b>troca de lotação do servidor é feita apenas por aqui</b>, pelo
-			botão Movimentação.
+			O afastamento é <b>enviado para aprovação</b> do Administrador Geral, com justificativa. Movimentação
+			e desvinculação são feitas pelo DPI SUL. Férias entram pelo cartão Férias.
 		{:else}
 			Toda movimentação, afastamento ou desvinculação fica registrada no histórico do servidor.
 		{/if}
 	</p>
-	<div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-		<button
-			type="button"
-			class="btn preset-outlined-surface-500 flex items-center justify-center gap-2"
-			onclick={() => abrir('movimentacao')}
-		>
-			<ArrowRightLeft size={16} /> Movimentação
-		</button>
+	<div class="grid grid-cols-1 gap-2 {solicitando ? '' : 'sm:grid-cols-3'}">
+		{#if !solicitando}
+			<button
+				type="button"
+				class="btn preset-outlined-surface-500 flex items-center justify-center gap-2"
+				onclick={() => abrir('movimentacao')}
+			>
+				<ArrowRightLeft size={16} /> Movimentação
+			</button>
+		{/if}
 		<button
 			type="button"
 			class="btn preset-outlined-surface-500 flex items-center justify-center gap-2"
@@ -159,13 +164,15 @@
 		>
 			<CalendarOff size={16} /> Afastamento
 		</button>
-		<button
-			type="button"
-			class="btn preset-outlined-error-500 flex items-center justify-center gap-2"
-			onclick={() => abrir('desvinculacao')}
-		>
-			<UserMinus size={16} /> Desvinculação
-		</button>
+		{#if !solicitando}
+			<button
+				type="button"
+				class="btn preset-outlined-error-500 flex items-center justify-center gap-2"
+				onclick={() => abrir('desvinculacao')}
+			>
+				<UserMinus size={16} /> Desvinculação
+			</button>
+		{/if}
 	</div>
 </div>
 

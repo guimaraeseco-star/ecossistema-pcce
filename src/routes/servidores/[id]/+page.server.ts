@@ -116,6 +116,7 @@ import {
 	desvinculacaoSchema,
 	LABEL_SUBTIPO_AFASTAMENTO
 } from '$lib/schemas/policial-historico';
+import { AFASTAMENTOS } from '$lib/servidores/afastamentos';
 import { isAdminGeral } from '$lib/auth';
 import {
 	lotacoesAdministradas,
@@ -857,6 +858,9 @@ export const actions: Actions = {
 	},
 
 	// ---- Movimentação: transfere a lotação e registra no histórico ----
+	// Movimentação e desvinculação são do ADMIN GERAL (decisão dele, 20/09): a
+	// unidade e a seccional não as propõem mais — só o afastamento segue no
+	// modo solicitação. O botão some da tela e a action recusa o POST direto.
 	registrarMovimentacao: async (event) => {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
@@ -864,7 +868,10 @@ export const actions: Actions = {
 			event.params.id
 		);
 		if ('erro' in auth) return auth.erro;
-		const { db, id, alvo, modo } = auth;
+		const { alvo, modo } = auth;
+		if (modo !== 'direto') {
+			return fail(403, { error: 'Movimentação e desvinculação são feitas pelo DPI SUL.' });
+		}
 
 		const formData = await event.request.formData();
 		const parsed = movimentacaoSchema.safeParse({
@@ -889,9 +896,8 @@ export const actions: Actions = {
 			},
 			resumo: `${origem || '—'} → ${parsed.data.unidade_destino}`,
 			metadados: { nup: parsed.data.nup || null, data: parsed.data.data_evento },
-			// Recarrega para devolver o que a tela mostra ao lado do painel.
-			recarregar: () =>
-				modo === 'solicitacao' ? listarSolicitacoesAcaoDoPolicial(db, id) : Promise.resolve(null)
+			// Modo direto só: nada a recarregar ao lado do painel.
+			recarregar: () => Promise.resolve(null)
 		});
 	},
 
@@ -919,6 +925,16 @@ export const actions: Actions = {
 		if (parsed.data.data_fim < parsed.data.data_inicio) {
 			return fail(400, { error: 'A data final não pode ser anterior à data inicial.' });
 		}
+		// Férias entram só pelo cartão Férias (E56): o modal não as oferece, e o
+		// POST direto não passa por aqui.
+		if (!AFASTAMENTOS[parsed.data.subtipo].cadastravel) {
+			return fail(400, {
+				error:
+					parsed.data.subtipo === 'ferias'
+						? 'Férias são lançadas pelo cartão Férias, não como afastamento.'
+						: 'Este tipo de afastamento não é lançado pela tela.'
+			});
+		}
 
 		return concluirAcaoRH(event, auth, formData, {
 			acao: {
@@ -945,7 +961,10 @@ export const actions: Actions = {
 			event.params.id
 		);
 		if ('erro' in auth) return auth.erro;
-		const { db, id, alvo, modo } = auth;
+		const { alvo, modo } = auth;
+		if (modo !== 'direto') {
+			return fail(403, { error: 'Movimentação e desvinculação são feitas pelo DPI SUL.' });
+		}
 
 		const formData = await event.request.formData();
 		const parsed = desvinculacaoSchema.safeParse({
@@ -966,8 +985,8 @@ export const actions: Actions = {
 			},
 			resumo: `${alvo.nome} (mat. ${alvo.matricula}) → ${parsed.data.destino}`,
 			metadados: { nup: parsed.data.nup || null, data: parsed.data.data_evento },
-			recarregar: () =>
-				modo === 'solicitacao' ? listarSolicitacoesAcaoDoPolicial(db, id) : Promise.resolve(null)
+			// Modo direto só: nada a recarregar ao lado do painel.
+			recarregar: () => Promise.resolve(null)
 		});
 	},
 
