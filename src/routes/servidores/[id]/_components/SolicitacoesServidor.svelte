@@ -58,6 +58,18 @@
 		s.data_inicio <= hoje &&
 		(!s.data_fim || s.data_fim >= hoje);
 	let retornoDe = $state<number | null>(null);
+
+	/** Aberto = pendente, ou afastamento aprovado ainda em curso. */
+	const acaoAberta = (a: PolicialAcaoSolicitacao) =>
+		a.status === 'pendente' ||
+		(a.status === 'aprovada' &&
+			a.tipo === 'afastamento' &&
+			!!a.data_inicio &&
+			(!a.data_fim || a.data_fim >= hoje));
+	const camposAbertos = $derived(campos.filter((c) => c.status === 'pendente'));
+	const camposAnteriores = $derived(campos.filter((c) => c.status !== 'pendente'));
+	const acoesAbertas = $derived(acoes.filter(acaoAberta));
+	const acoesAnteriores = $derived(acoes.filter((a) => !acaoAberta(a)));
 	let enviando = $state(false);
 	function aoResponder() {
 		enviando = true;
@@ -103,149 +115,170 @@
 			Pedidos enviados ao Administrador Geral. Só entram no cadastro depois de aprovados.
 		</p>
 
-		{#if campos.length > 0}
-			<div class="hidden md:block table-wrap">
-				<table class="table w-full text-sm">
-					<thead>
-						<tr class="text-left text-xs uppercase text-surface-600 dark:text-surface-400">
-							<th class="py-2">Campo</th>
-							<th class="py-2">De</th>
-							<th class="py-2">Para</th>
-							<th class="py-2">Justificativa</th>
-							<th class="py-2">Solicitante</th>
-							<th class="py-2">Status</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each campos as s (s.id)}
-							<tr class="border-t border-surface-200 dark:border-white/5 align-top">
-								<td class="py-2 font-medium whitespace-nowrap">{ROTULO_CAMPO[s.campo]}</td>
-								<td class="py-2 text-surface-600 dark:text-surface-400"
-									>{texto(s.campo, s.valor_atual) || '—'}</td
-								>
-								<td class="py-2 font-semibold">{texto(s.campo, s.valor_novo)}</td>
-								<td class="py-2 text-surface-600 dark:text-surface-400 max-w-xs break-words">
-									{s.justificativa || '—'}
-								</td>
-								<td class="py-2 text-surface-600 dark:text-surface-400">
-									{s.solicitante_nome || '—'}
-								</td>
-								<td class="py-2"><StatusSolicitacao status={s.status} /></td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
-
-			<ul class="md:hidden space-y-3">
-				{#each campos as s (s.id)}
-					<li class="rounded-xl border border-surface-200 dark:border-white/10 p-3 space-y-2">
-						<div class="flex items-start justify-between gap-2">
-							<p class="min-w-0 font-medium text-sm break-words">{ROTULO_CAMPO[s.campo]}</p>
-							<div class="shrink-0"><StatusSolicitacao status={s.status} /></div>
-						</div>
-						<dl class="grid grid-cols-1 gap-1.5 text-sm">
-							<div>
-								<dt class="text-2xs font-semibold uppercase text-surface-600 dark:text-surface-400">
-									De
-								</dt>
-								<dd class="text-surface-600 dark:text-surface-400 break-words">
-									{texto(s.campo, s.valor_atual) || '—'}
-								</dd>
-							</div>
-							<div>
-								<dt class="text-2xs font-semibold uppercase text-surface-600 dark:text-surface-400">
-									Para
-								</dt>
-								<dd class="font-semibold break-words">{texto(s.campo, s.valor_novo)}</dd>
-							</div>
-							<div>
-								<dt class="text-2xs font-semibold uppercase text-surface-600 dark:text-surface-400">
-									Justificativa
-								</dt>
-								<dd class="text-surface-600 dark:text-surface-400 break-words">
-									{s.justificativa || '—'}
-								</dd>
-							</div>
-							<p class="text-2xs text-surface-600 dark:text-surface-400">
-								Solicitado por {s.solicitante_nome || '—'}
-							</p>
-						</dl>
-					</li>
-				{/each}
-			</ul>
+		<!-- O que ainda importa fica aberto: pendentes e afastamentos aprovados em
+		     curso. O resto (rejeitado, ou aprovado e já passado) vai para
+		     "anteriores", recolhido — o histórico já o registra (decisão dele,
+		     20/09). -->
+		{@render quadro(camposAbertos, acoesAbertas)}
+		{#if camposAbertos.length === 0 && acoesAbertas.length === 0}
+			<p class="text-sm text-surface-500">Nenhum pedido em aberto.</p>
 		{/if}
-
-		{#if acoes.length > 0}
-			<div class="space-y-3 {campos.length > 0 ? 'mt-4' : ''}">
-				{#each acoes as s (s.id)}
-					<div class="rounded-xl border border-surface-200 dark:border-white/10 p-3">
-						<div class="flex items-center justify-between gap-2 mb-2">
-							<span class="font-semibold text-sm">
-								{ROTULO_TIPO_ACAO[s.tipo] ?? s.tipo}
-							</span>
-							<StatusSolicitacao status={s.status} />
-						</div>
-						<DetalheSolicitacaoAcao solicitacao={s} compacto />
-						<p class="text-2xs text-surface-600 dark:text-surface-400 mt-2">
-							Solicitado por {s.solicitante_nome || '—'}
-						</p>
-						{#if admiteRetorno(s)}
-							{#if retornoDe === s.id}
-								<form
-									method="POST"
-									action="?/retornoAntecipado"
-									use:enhance={aoResponder}
-									class="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-primary-500/30 bg-primary-500/5 p-2"
-								>
-									<input type="hidden" name="solicitacao_id" value={s.id} />
-									<label class="label">
-										<span class="label-text text-2xs font-bold uppercase opacity-70"
-											>Retorno ao serviço</span
-										>
-										<input
-											class="input px-2 py-1 text-xs"
-											type="date"
-											name="data_retorno"
-											min={s.data_inicio ?? undefined}
-											max={s.data_fim ?? undefined}
-											required
-										/>
-									</label>
-									<label class="label">
-										<span class="label-text text-2xs font-bold uppercase opacity-70"
-											>NUP do retorno</span
-										>
-										<input
-											class="input w-48 px-2 py-1 text-xs font-mono"
-											name="nup"
-											maxlength="20"
-											placeholder="00000.000000/0000-00"
-											oninput={(e) => (e.currentTarget.value = formatarNUP(e.currentTarget.value))}
-										/>
-									</label>
-									<button
-										type="submit"
-										class="btn btn-sm preset-filled-primary-500"
-										disabled={enviando}>Registrar retorno</button
-									>
-									<button
-										type="button"
-										class="btn btn-sm preset-outlined-surface-500"
-										onclick={() => (retornoDe = null)}>Cancelar</button
-									>
-								</form>
-							{:else}
-								<button
-									type="button"
-									class="btn btn-sm preset-outlined-surface-500 mt-2"
-									onclick={() => (retornoDe = s.id)}>Retorno antecipado</button
-								>
-							{/if}
-						{/if}
-					</div>
-				{/each}
-			</div>
+		{#if camposAnteriores.length > 0 || acoesAnteriores.length > 0}
+			<details class="mt-4">
+				<summary class="cursor-pointer text-xs font-semibold text-surface-500"
+					>Ver anteriores ({camposAnteriores.length + acoesAnteriores.length})</summary
+				>
+				<div class="mt-3 opacity-80">
+					{@render quadro(camposAnteriores, acoesAnteriores)}
+				</div>
+			</details>
 		{/if}
 	</div>
 {/if}
+
+{#snippet quadro(lc: CadastroSolicitacao[], la: PolicialAcaoSolicitacao[])}
+	{#if lc.length > 0}
+		<div class="hidden md:block table-wrap">
+			<table class="table w-full text-sm">
+				<thead>
+					<tr class="text-left text-xs uppercase text-surface-600 dark:text-surface-400">
+						<th class="py-2">Campo</th>
+						<th class="py-2">De</th>
+						<th class="py-2">Para</th>
+						<th class="py-2">Justificativa</th>
+						<th class="py-2">Solicitante</th>
+						<th class="py-2">Status</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each lc as s (s.id)}
+						<tr class="border-t border-surface-200 dark:border-white/5 align-top">
+							<td class="py-2 font-medium whitespace-nowrap">{ROTULO_CAMPO[s.campo]}</td>
+							<td class="py-2 text-surface-600 dark:text-surface-400"
+								>{texto(s.campo, s.valor_atual) || '—'}</td
+							>
+							<td class="py-2 font-semibold">{texto(s.campo, s.valor_novo)}</td>
+							<td class="py-2 text-surface-600 dark:text-surface-400 max-w-xs break-words">
+								{s.justificativa || '—'}
+							</td>
+							<td class="py-2 text-surface-600 dark:text-surface-400">
+								{s.solicitante_nome || '—'}
+							</td>
+							<td class="py-2"><StatusSolicitacao status={s.status} /></td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+
+		<ul class="md:hidden space-y-3">
+			{#each lc as s (s.id)}
+				<li class="rounded-xl border border-surface-200 dark:border-white/10 p-3 space-y-2">
+					<div class="flex items-start justify-between gap-2">
+						<p class="min-w-0 font-medium text-sm break-words">{ROTULO_CAMPO[s.campo]}</p>
+						<div class="shrink-0"><StatusSolicitacao status={s.status} /></div>
+					</div>
+					<dl class="grid grid-cols-1 gap-1.5 text-sm">
+						<div>
+							<dt class="text-2xs font-semibold uppercase text-surface-600 dark:text-surface-400">
+								De
+							</dt>
+							<dd class="text-surface-600 dark:text-surface-400 break-words">
+								{texto(s.campo, s.valor_atual) || '—'}
+							</dd>
+						</div>
+						<div>
+							<dt class="text-2xs font-semibold uppercase text-surface-600 dark:text-surface-400">
+								Para
+							</dt>
+							<dd class="font-semibold break-words">{texto(s.campo, s.valor_novo)}</dd>
+						</div>
+						<div>
+							<dt class="text-2xs font-semibold uppercase text-surface-600 dark:text-surface-400">
+								Justificativa
+							</dt>
+							<dd class="text-surface-600 dark:text-surface-400 break-words">
+								{s.justificativa || '—'}
+							</dd>
+						</div>
+						<p class="text-2xs text-surface-600 dark:text-surface-400">
+							Solicitado por {s.solicitante_nome || '—'}
+						</p>
+					</dl>
+				</li>
+			{/each}
+		</ul>
+	{/if}
+
+	{#if la.length > 0}
+		<div class="space-y-3 {lc.length > 0 ? 'mt-4' : ''}">
+			{#each la as s (s.id)}
+				<div class="rounded-xl border border-surface-200 dark:border-white/10 p-3">
+					<div class="flex items-center justify-between gap-2 mb-2">
+						<span class="font-semibold text-sm">
+							{ROTULO_TIPO_ACAO[s.tipo] ?? s.tipo}
+						</span>
+						<StatusSolicitacao status={s.status} />
+					</div>
+					<DetalheSolicitacaoAcao solicitacao={s} compacto />
+					<p class="text-2xs text-surface-600 dark:text-surface-400 mt-2">
+						Solicitado por {s.solicitante_nome || '—'}
+					</p>
+					{#if admiteRetorno(s)}
+						{#if retornoDe === s.id}
+							<form
+								method="POST"
+								action="?/retornoAntecipado"
+								use:enhance={aoResponder}
+								class="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-primary-500/30 bg-primary-500/5 p-2"
+							>
+								<input type="hidden" name="solicitacao_id" value={s.id} />
+								<label class="label">
+									<span class="label-text text-2xs font-bold uppercase opacity-70"
+										>Retorno ao serviço</span
+									>
+									<input
+										class="input px-2 py-1 text-xs"
+										type="date"
+										name="data_retorno"
+										min={s.data_inicio ?? undefined}
+										max={s.data_fim ?? undefined}
+										required
+									/>
+								</label>
+								<label class="label">
+									<span class="label-text text-2xs font-bold uppercase opacity-70"
+										>NUP do retorno</span
+									>
+									<input
+										class="input w-48 px-2 py-1 text-xs font-mono"
+										name="nup"
+										maxlength="20"
+										placeholder="00000.000000/0000-00"
+										oninput={(e) => (e.currentTarget.value = formatarNUP(e.currentTarget.value))}
+									/>
+								</label>
+								<button
+									type="submit"
+									class="btn btn-sm preset-filled-primary-500"
+									disabled={enviando}>Registrar retorno</button
+								>
+								<button
+									type="button"
+									class="btn btn-sm preset-outlined-surface-500"
+									onclick={() => (retornoDe = null)}>Cancelar</button
+								>
+							</form>
+						{:else}
+							<button
+								type="button"
+								class="btn btn-sm preset-outlined-surface-500 mt-2"
+								onclick={() => (retornoDe = s.id)}>Retorno antecipado</button
+							>
+						{/if}
+					{/if}
+				</div>
+			{/each}
+		</div>
+	{/if}
+{/snippet}
