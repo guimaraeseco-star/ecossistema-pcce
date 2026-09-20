@@ -19,6 +19,7 @@
  */
 import { redirect, fail } from '@sveltejs/kit';
 import { avisarOutroLado, servidorParaAviso } from '$lib/server/avisos/emitir';
+import { avisarDesfalques } from '$lib/server/avisos/desfalques';
 import type { PageServerLoad, Actions } from './$types';
 import {
 	getDB,
@@ -218,7 +219,22 @@ export const actions: Actions = {
 			lotacoes: [servidor?.lotacao, pedido.unidade_origem, pedido.unidade_destino]
 		});
 
+		// Escala desfalcada (E60): o afastamento aprovado cai sobre escalas?
+		const desfalques =
+			aprovar && pedido.tipo === 'afastamento' && pedido.data_inicio && servidor
+				? await avisarDesfalques(
+						db,
+						u,
+						{ id: pedido.policial_id, nome: servidor.nome, lotacao: servidor.lotacao },
+						{
+							rotulo: ROTULO_TIPO_AVISO[pedido.tipo] ?? pedido.tipo,
+							inicio: pedido.data_inicio,
+							fim: pedido.data_fim ?? null
+						}
+					)
+				: [];
+
 		const acoesPendentes = await listarSolicitacoesAcaoPendentes(db);
-		return { success: true, acoesPendentes };
+		return { success: true, acoesPendentes, avisos: desfalques };
 	}
 };

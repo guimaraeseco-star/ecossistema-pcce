@@ -368,14 +368,18 @@ export async function adicionarTodosPoliciais(
 	dataPlantao: string,
 	dataSaida: string,
 	horaEntrada: string,
-	horaSaida: string
+	horaSaida: string,
+	/** Quem NÃO entra (afastados no período — E60); a action lista quem ficou de fora. */
+	excluirIds: ReadonlySet<number> = new Set()
 ): Promise<number> {
-	const candidatos = await db
-		.select({ id: policiais.id })
-		.from(policiais)
-		.where(
-			and(eq(policiais.ativo, 1), eq(policiais.lotacao, lotacao), eq(policiais.regime, regime))
-		);
+	const candidatos = (
+		await db
+			.select({ id: policiais.id })
+			.from(policiais)
+			.where(
+				and(eq(policiais.ativo, 1), eq(policiais.lotacao, lotacao), eq(policiais.regime, regime))
+			)
+	).filter((p) => !excluirIds.has(p.id));
 
 	if (candidatos.length === 0) return 0;
 

@@ -68,6 +68,7 @@ import {
 } from '$lib/servidores/ferias';
 import { adicionarDias, hojeBrasilISO } from '$lib/utils/datas';
 import { avisarOutroLado } from '$lib/server/avisos/emitir';
+import { avisarDesfalques } from '$lib/server/avisos/desfalques';
 import { conflitosDasFerias, ocupadosDoHistorico } from '$lib/servidores/conflitos';
 
 type Event = RequestEvent<{ id: string }>;
@@ -210,6 +211,17 @@ export const actionsFerias = {
 		}
 		const aviso = await avisoDoTetoNoMes(db, alvo.lotacao, 1, periodos[0].inicio);
 		const avisos = aviso && !aviso.ok ? [aviso.texto] : [];
+		// Escala desfalcada (E60): as férias caem sobre datas já escaladas?
+		for (const p of periodos) {
+			avisos.push(
+				...(await avisarDesfalques(
+					db,
+					u,
+					{ id, nome: alvo.nome, lotacao: alvo.lotacao },
+					{ rotulo: 'férias', inicio: p.inicio, fim: p.fim }
+				))
+			);
+		}
 
 		const { contexto, env } = contextoDeEvento(event);
 		await auditar(
@@ -563,6 +575,20 @@ export const actionsFerias = {
 			hojeBrasilISO()
 		);
 		if (!r) return fail(409, { error: 'Este pedido já foi homologado.' });
+		// Escala desfalcada (E60): os períodos novos, deferidos, caem sobre escalas?
+		const desfalques: string[] = [];
+		if (decisao === 'deferida') {
+			for (const p of periodosDoPedido(r)) {
+				desfalques.push(
+					...(await avisarDesfalques(
+						db,
+						u,
+						{ id, nome: alvo.nome, lotacao: alvo.lotacao },
+						{ rotulo: 'férias', inicio: p.inicio, fim: p.fim }
+					))
+				);
+			}
+		}
 
 		const { contexto, env } = contextoDeEvento(event);
 		await auditar(
@@ -593,7 +619,7 @@ export const actionsFerias = {
 			`${ROTULO_TIPO_REPROGRAMACAO[r.tipo]} das férias de ${alvo.nome} ${decisao.toUpperCase()} pela COGEP`,
 			r.nup ? `NUP ${r.nup}` : 'sem NUP anotado'
 		);
-		return { success: true, ferias: await listarFeriasDoPolicial(db, id) };
+		return { success: true, ferias: await listarFeriasDoPolicial(db, id), avisos: desfalques };
 	},
 
 	/**

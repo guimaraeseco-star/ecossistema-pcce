@@ -7,6 +7,7 @@
  * que cada seccional executa antes de "finalizar" seu preenchimento.
  */
 import { fail } from '@sveltejs/kit';
+import { afastamentosNasDatas, descreverAfastamento } from '$lib/db/policiais/afastamento-escalas';
 import type { RequestEvent } from '@sveltejs/kit';
 import {
 	getDB,
@@ -90,6 +91,15 @@ export const actionsMembros = {
 		const equipe = await db.select().from(giseEquipes).where(eq(giseEquipes.id, equipeId)).get();
 		if (!equipe || equipe.gise_seccional_id !== secId)
 			return fail(404, { error: 'Equipe não encontrada' });
+
+		// Afastado não se escala (decisão dele, 20/09 — E60): férias em gozo ou
+		// qualquer afastamento no dia da GISE recusam.
+		const afastado = (await afastamentosNasDatas(db, policialId, [gise.data_inicio])).get(
+			gise.data_inicio
+		);
+		if (afastado) {
+			return fail(409, { error: `Servidor afastado — ${descreverAfastamento(afastado)}.` });
+		}
 
 		// Choque com OUTRA escala (GISE ou comum) continua sendo pré-checagem: é
 		// conflito entre escalas, não disputa pela mesma vaga, e não cabe na mesma

@@ -154,6 +154,7 @@ import { limparCPF, limparMatricula, limparTelefone } from '$lib/utils/formato';
 import { resolverCredencial } from '$lib/server/auth/credencial';
 import { adicionarDias, diffDiasInclusivo, hojeBrasilISO } from '$lib/utils/datas';
 import { avisarOutroLado } from '$lib/server/avisos/emitir';
+import { avisarDesfalques } from '$lib/server/avisos/desfalques';
 import { feriadosNoIntervalo } from '$lib/db/diarias/feriados';
 import type { RequestEvent } from './$types';
 import { mensagemDeErro } from '$lib/utils/erro';
@@ -1502,8 +1503,33 @@ async function concluirAcaoRH(
 		});
 	}
 
+	// Escala desfalcada (E60): o afastamento registrado DIRETO cai sobre datas
+	// em que o servidor já está escalado? Avisa (não desescala).
+	const desfalques =
+		modo === 'direto' && acao.tipo === 'afastamento' && acao.data_inicio
+			? await avisarDesfalques(
+					db,
+					u,
+					{ id, nome: alvo.nome, lotacao: alvo.lotacao },
+					{
+						rotulo:
+							LABEL_SUBTIPO_AFASTAMENTO[acao.subtipo as keyof typeof LABEL_SUBTIPO_AFASTAMENTO] ??
+							acao.subtipo ??
+							'afastamento',
+						inicio: acao.data_inicio,
+						fim: acao.data_fim ?? null
+					}
+				)
+			: [];
+
 	const solicitacoesAcao = await pedido.recarregar();
-	return { success: true, tipo: acao.tipo, modo, solicitacoesAcao, avisos: pedido.avisos ?? [] };
+	return {
+		success: true,
+		tipo: acao.tipo,
+		modo,
+		solicitacoesAcao,
+		avisos: [...(pedido.avisos ?? []), ...desfalques]
+	};
 }
 
 /** O nome do ato em PT-BR — a mesma palavra na trilha e na tela. */

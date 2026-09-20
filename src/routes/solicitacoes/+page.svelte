@@ -75,9 +75,12 @@
 			decidindoAcaoId = null;
 			if (result.type === 'success') {
 				acoesPendentes = (result.data?.acoesPendentes as typeof acoesPendentes) ?? acoesPendentes;
+				// Escala desfalcada (E60): o afastamento aprovado cai sobre escalas.
+				const avisos = ((result.data?.avisos as string[] | undefined) ?? []).join(' ');
 				toaster.create({
 					title: decisao === 'aprovar' ? `${rotulo} aprovada e aplicada` : `${rotulo} rejeitada`,
-					type: decisao === 'aprovar' ? 'success' : 'info'
+					description: avisos || undefined,
+					type: avisos ? 'warning' : decisao === 'aprovar' ? 'success' : 'info'
 				});
 			} else {
 				mostrarErroDeResultado(result, 'Erro ao decidir');
