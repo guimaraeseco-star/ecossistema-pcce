@@ -603,4 +603,6 @@
 	afastamentoVigenteId={data.afastamentoVigenteId}
 	unidades={data.unidades}
 	designacoes={data.designacoes}
+	policialId={data.policial.id}
+	{isAdmin}
 />

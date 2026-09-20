@@ -240,20 +240,54 @@ export async function registrarProgramacao(
  * frações estão `programada` e nenhuma tem abono nem pedido. Leva os eventos
  * junto: o que nunca foi programado não pode constar como férias. Exercício
  * que já passou por sustação/suspensão não se apaga: a sucessão é registro.
+ *
+ * `forcado` é a exceção do ADMIN GERAL (decisão do responsável, 20/09/2026):
+ * apaga o exercício inteiro — frações de qualquer status, pedidos, abonos e
+ * eventos — para desfazer um lançamento errado. A action confere o perfil e
+ * leva o que apagou para a auditoria.
  */
 export async function excluirProgramacao(
 	db: Database,
 	policialId: number,
-	exercicio: number
-): Promise<{ ok: true } | { ok: false; motivo: 'nao_programada' | 'tem_vinculo' }> {
+	exercicio: number,
+	forcado = false
+): Promise<
+	{ ok: true; apagadas: number } | { ok: false; motivo: 'nao_programada' | 'tem_vinculo' }
+> {
 	const fracoes = await db
 		.select()
 		.from(feriasFracoes)
 		.where(and(eq(feriasFracoes.policial_id, policialId), eq(feriasFracoes.exercicio, exercicio)));
-	if (fracoes.length === 0 || fracoes.some((f) => f.status !== 'programada')) {
+	if (fracoes.length === 0) return { ok: false, motivo: 'nao_programada' };
+	const ids = fracoes.map((f) => f.id);
+	if (forcado) {
+		const eventos = fracoes.map((f) => f.historico_id).filter((h): h is number => h != null);
+		const passos: BatchItem<'sqlite'>[] = [
+			db.delete(feriasAbonos).where(inArray(feriasAbonos.fracao_id, ids)),
+			db
+				.delete(feriasReprogramacoes)
+				.where(
+					and(
+						eq(feriasReprogramacoes.policial_id, policialId),
+						eq(feriasReprogramacoes.exercicio, exercicio)
+					)
+				),
+			// A sucessão aponta de fração para fração no mesmo exercício: some junto.
+			db
+				.update(feriasFracoes)
+				.set({ substituida_por_id: null })
+				.where(inArray(feriasFracoes.id, ids)),
+			db.delete(feriasFracoes).where(inArray(feriasFracoes.id, ids))
+		];
+		if (eventos.length > 0) {
+			passos.push(db.delete(policialHistorico).where(inArray(policialHistorico.id, eventos)));
+		}
+		await batchNonEmpty(db, passos);
+		return { ok: true, apagadas: fracoes.length };
+	}
+	if (fracoes.some((f) => f.status !== 'programada')) {
 		return { ok: false, motivo: 'nao_programada' };
 	}
-	const ids = fracoes.map((f) => f.id);
 	const [pedidos, abonos] = await Promise.all([
 		db
 			.select({ n: sql<number>`count(*)` })
@@ -281,7 +315,57 @@ export async function excluirProgramacao(
 		passos.push(db.delete(policialHistorico).where(inArray(policialHistorico.id, eventos)));
 	}
 	await batchNonEmpty(db, passos);
-	return { ok: true };
+	return { ok: true, apagadas: fracoes.length };
+}
+
+/**
+ * CORRIGE as datas de uma fração lançada errada — só o Admin Geral (a action
+ * confere; decisão do responsável, 20/09/2026). Só fração `programada` sem
+ * abono e sem pedido pendente: o que já tem sucessão ou venda não se edita, se
+ * apaga (`excluirProgramacao` forçado) e relança. O evento acompanha.
+ * Devolve a fração ANTES, ou o motivo.
+ */
+export async function corrigirFracao(
+	db: Database,
+	id: number,
+	novo: { data_inicio: string; data_fim: string }
+): Promise<
+	{ ok: true; antes: FeriasFracao } | { ok: false; motivo: 'nao_programada' | 'tem_vinculo' }
+> {
+	const f = await buscarFracao(db, id);
+	if (!f || f.status !== 'programada') return { ok: false, motivo: 'nao_programada' };
+	const [abono, pendente] = await Promise.all([
+		db
+			.select({ n: sql<number>`count(*)` })
+			.from(feriasAbonos)
+			.where(eq(feriasAbonos.fracao_id, id))
+			.get(),
+		db
+			.select({ n: sql<number>`count(*)` })
+			.from(feriasReprogramacoes)
+			.where(
+				and(
+					eq(feriasReprogramacoes.policial_id, f.policial_id),
+					eq(feriasReprogramacoes.exercicio, f.exercicio),
+					eq(feriasReprogramacoes.status, 'pendente')
+				)
+			)
+			.get()
+	]);
+	if ((abono?.n ?? 0) > 0 || (pendente?.n ?? 0) > 0) return { ok: false, motivo: 'tem_vinculo' };
+	const passos: BatchItem<'sqlite'>[] = [
+		db.update(feriasFracoes).set(novo).where(eq(feriasFracoes.id, id))
+	];
+	if (f.historico_id) {
+		passos.push(
+			db
+				.update(policialHistorico)
+				.set({ ...novo, qtd_dias: diasDaFracao(novo) })
+				.where(eq(policialHistorico.id, f.historico_id))
+		);
+	}
+	await batchNonEmpty(db, passos);
+	return { ok: true, antes: f };
 }
 
 /** O pedido de reprogramação, como a unidade o abre. */

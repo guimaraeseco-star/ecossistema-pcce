@@ -122,6 +122,10 @@
 	/** O exercício em reprogramação — sustação ou suspensão, a regra decide. */
 	let reprogramando = $state<{ exercicio: number; fracoes: FracaoCompleta[] } | null>(null);
 	let abonando = $state<FracaoCompleta | null>(null);
+	/** Admin Geral: a fração lançada errada, com o 1º dia e os dias novos. */
+	let corrigindo = $state<FracaoCompleta | null>(null);
+	let cInicio = $state('');
+	let cDias = $state('');
 	let enviando = $state(false);
 	/** O ofício devolvido pela action, para copiar no NUP. */
 	let oficioGerado = $state('');
@@ -193,6 +197,8 @@
 		lancando = false;
 		reprogramando = null;
 		abonando = null;
+		corrigindo = null;
+		cInicio = cDias = '';
 		inicios = ['', '', ''];
 		rSuspensao = rJustificativa = '';
 	}
@@ -399,6 +405,31 @@
 										disabled={enviando}>Excluir</button
 									>
 								</form>
+							{:else if isAdmin}
+								<!-- Admin Geral: apaga o exercício inteiro — pedidos, abono, sucessão —
+								     para desfazer um lançamento errado (decisão dele, 20/09). -->
+								<form
+									method="POST"
+									action="?/excluirProgramacao"
+									use:enhance={() => aoResponder('Programação excluída')}
+									onsubmit={(e) => {
+										if (
+											!confirm(
+												`Apagar o exercício ${exercicio} inteiro, com pedidos e abono? Fica só na auditoria.`
+											)
+										)
+											e.preventDefault();
+									}}
+								>
+									<input type="hidden" name="exercicio" value={exercicio} />
+									<input type="hidden" name="forcado" value="1" />
+									<button
+										type="submit"
+										class="btn btn-sm preset-outlined-error-500"
+										title="Lançado errado? Apaga o exercício inteiro (Admin Geral)"
+										disabled={enviando}>Excluir tudo</button
+									>
+								</form>
 							{/if}
 						</div>
 					{/if}
@@ -427,6 +458,16 @@
 								{#if f.status === 'programada' && status !== 'gozada' && !pendente}
 									<div class="flex gap-1">
 										{#if isAdmin && !f.abono}
+											<button
+												type="button"
+												class="btn btn-sm preset-outlined-surface-500"
+												onclick={() => {
+													fecharTudo();
+													corrigindo = f;
+													cInicio = f.data_inicio;
+													cDias = String(diasDaFracao(f));
+												}}>Corrigir</button
+											>
 											<button
 												type="button"
 												class="btn btn-sm preset-outlined-surface-500"
@@ -687,6 +728,73 @@
 					class="btn btn-sm preset-filled-primary-500 disabled:opacity-40"
 					disabled={enviando || !podeEnviarReprogramacao || !podeEnviarPeriodos}
 					>Gerar ofício e registrar pedido</button
+				>
+			</div>
+		</form>
+	{/if}
+
+	<!-- Corrigir fração (Admin Geral): 1º dia e dias; o fim sai da regra, com a
+	     mesma conferência de dia útil e de conflito com afastamentos. -->
+	{#if corrigindo}
+		{@const previaC = montarPeriodos([Number(cDias) || 0], [cInicio], feriados)}
+		{@const conflitosC = conflitosDasFerias(previaC.periodos, ocupados)}
+		<form
+			method="POST"
+			action="?/corrigirFracao"
+			use:enhance={() => aoResponder('Fração corrigida')}
+			class="mt-4 space-y-3 rounded-xl border border-surface-200 p-4 dark:border-white/10"
+		>
+			<input type="hidden" name="fracao_id" value={corrigindo.id} />
+			<h3 class="text-sm font-bold">
+				Corrigir a {corrigindo.ordem}ª fração de {corrigindo.exercicio}
+				<span class="font-normal text-surface-500">
+					(hoje {formatarData(corrigindo.data_inicio)} – {formatarData(corrigindo.data_fim)})</span
+				>
+			</h3>
+			<div class="grid grid-cols-2 gap-3 sm:max-w-md">
+				<label class="label">
+					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70">1º dia</span>
+					<input
+						class="input px-3 py-1 text-sm"
+						type="date"
+						name="data_inicio"
+						bind:value={cInicio}
+						required
+					/>
+				</label>
+				<label class="label">
+					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70">Dias</span>
+					<input
+						class="input px-3 py-1 text-sm"
+						type="number"
+						name="dias"
+						min="1"
+						max="30"
+						bind:value={cDias}
+						required
+					/>
+					{#if previaC.periodos[0]}
+						<span class="ml-1 text-2xs text-surface-500"
+							>até {formatarData(previaC.periodos[0].fim)}</span
+						>
+					{/if}
+				</label>
+			</div>
+			<ul class="space-y-0.5 text-xs">
+				{#each [...previaC.checagens, ...conflitosC] as ch (ch.texto)}
+					<li class={classeChecagem(ch)}>{marcaChecagem(ch)} {ch.texto}</li>
+				{/each}
+			</ul>
+			<div class="flex justify-end gap-2">
+				<button type="button" class="btn btn-sm preset-outlined-surface-500" onclick={fecharTudo}
+					>Cancelar</button
+				>
+				<button
+					type="submit"
+					class="btn btn-sm preset-filled-primary-500 disabled:opacity-40"
+					disabled={enviando ||
+						previaC.periodos.length !== 1 ||
+						temErro([...previaC.checagens, ...conflitosC])}>Salvar correção</button
 				>
 			</div>
 		</form>

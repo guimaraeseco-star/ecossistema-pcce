@@ -49,6 +49,24 @@ describe('afastamento contra férias', () => {
 	});
 });
 
+describe('afastamento sobre os dias vendidos (abono) — art. 16', () => {
+	it('não impede, mas avisa a restituição', () => {
+		const c = conflitosDoAfastamento({ inicio: '2026-10-03', fim: '2026-10-12' }, [
+			{ inicio: '2026-10-01', fim: '2026-10-10', subtipo: 'abono' }
+		]);
+		expect(c).toHaveLength(1);
+		expect(c[0].nivel).toBe('aviso');
+		expect(c[0].texto).toContain('art. 16');
+		// E nas férias, os dias vendidos não bloqueiam um período novo.
+		expect(
+			conflitosDasFerias(
+				[{ inicio: '2026-10-05', fim: '2026-10-14' }],
+				[{ inicio: '2026-10-01', fim: '2026-10-10', subtipo: 'abono' }]
+			)
+		).toEqual([]);
+	});
+});
+
 describe('férias contra afastamentos', () => {
 	it('cair dentro de LTS ou de cessão em aberto é erro; as férias já registradas não contam', () => {
 		const c = conflitosDasFerias(

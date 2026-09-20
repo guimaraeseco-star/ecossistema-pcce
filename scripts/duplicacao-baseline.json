@@ -105,6 +105,13 @@
 			"nota": "DUP-MANTER: assinatura de handler SvelteKit + linha de import, não lógica. As rotas de assinatura GISE desestruturam o mesmo `{ platform, params, locals, url, request, getClientAddress }` e importam o mesmo portão — a lógica que compartilhavam saiu para `carregarGiseParaAssinatura` em ago/2026. Não há o que extrair de uma assinatura de handler."
 		},
 		{
+			"id": "39e027a92d1a",
+			"arquivos": ["src/lib/db.ts", "src/lib/db/policiais/index.ts"],
+			"ocorrencias": 2,
+			"amostra": "excluirProgramacao,",
+			"nota": "Barrel de DOIS NÍVEIS, o mesmo caso registrado para planos/ e operacoes/: lib/db/policiais/index.ts é a fachada do domínio e lib/db.ts reexporta por nome (regra do próprio cabeçalho de lib/db.ts). As funções de férias aparecem nas duas listas na mesma ordem. Extrair com export * alargaria a superfície pública sem controle; importar as folhas direto em db.ts tiraria do domínio a fachada que os outros têm."
+		},
+		{
 			"id": "3d2ad9db31c6",
 			"arquivos": [
 				"src/routes/api/gise/[id]/relatorios/[seccionalId]/assinar/+server.ts",
@@ -302,13 +309,6 @@
 			"ocorrencias": 2,
 			"amostra": "import type { Escala, EscalaPolicialComDados } from '../../types';",
 			"nota": "DUP-MANTER: linha de import de tipos, não lógica."
-		},
-		{
-			"id": "a7aac8d0682e",
-			"arquivos": ["src/lib/db.ts", "src/lib/db/policiais/index.ts"],
-			"ocorrencias": 2,
-			"amostra": "registrarProgramacao,",
-			"nota": "Barrel de DOIS NÍVEIS, o mesmo caso registrado para planos/ e operacoes/: lib/db/policiais/index.ts é a fachada do domínio e lib/db.ts reexporta por nome (regra do próprio cabeçalho de lib/db.ts). As funções de férias aparecem nas duas listas na mesma ordem. Extrair com export * alargaria a superfície pública sem controle; importar as folhas direto em db.ts tiraria do domínio a fachada que os outros têm."
 		},
 		{
 			"id": "ac29836ff951",

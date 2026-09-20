@@ -39,6 +39,9 @@ export {
 	atualizarPolicialComHistorico,
 	listarHistoricoPolicial,
 	buscarEventoHistorico,
+	encurtarAfastamento,
+	corrigirAfastamento,
+	excluirAfastamento,
 	afastamentoVigente
 } from './historico';
 export type { NovoEventoHistorico, CamposDoEventoFuncional } from './historico';
@@ -50,6 +53,7 @@ export {
 	buscarFracao,
 	registrarProgramacao,
 	excluirProgramacao,
+	corrigirFracao,
 	abrirReprogramacao,
 	anotarNupDaReprogramacao,
 	decidirReprogramacao,

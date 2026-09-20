@@ -33,6 +33,7 @@ import {
 	anotarNupDaReprogramacao,
 	buscarFracao,
 	contagemParaTeto,
+	corrigirFracao,
 	darCienciaDoAbono,
 	decidirReprogramacao,
 	excluirProgramacao,
@@ -253,7 +254,13 @@ export const actionsFerias = {
 		const exercicio = inteiroNaFaixa(fd, 'exercicio', 2000, 2100);
 		if (!exercicio) return fail(400, { error: 'Informe o exercício.' });
 
-		const r = await excluirProgramacao(db, id, exercicio);
+		// `forcado`: o Admin Geral apaga o exercício inteiro, com pedidos e abono
+		// — a exceção para lançamento errado (decisão dele, 20/09).
+		const forcado = fd.get('forcado') === '1';
+		if (forcado && !isAdminGeral(u)) {
+			return fail(403, { error: 'Só o Administrador Geral exclui uma programação com vínculos.' });
+		}
+		const r = await excluirProgramacao(db, id, exercicio, forcado);
 		if (!r.ok) {
 			return fail(409, {
 				error:
@@ -273,7 +280,7 @@ export const actionsFerias = {
 				alvo_tipo: 'policial',
 				alvo_id: id,
 				alvo_nome: alvo.nome,
-				detalhes: `Programação do exercício ${exercicio} excluída`,
+				detalhes: `Programação do exercício ${exercicio} excluída${forcado ? ` pelo Admin Geral (${r.apagadas} frações, com pedidos e abono)` : ''}`,
 				...contexto
 			},
 			{ env }
@@ -420,6 +427,87 @@ export const actionsFerias = {
 			`novos períodos: ${periodos.map((p) => `${p.inicio} a ${p.fim}`).join(' · ')}`
 		);
 		return { success: true, ferias: await listarFeriasDoPolicial(db, id), texto, avisos };
+	},
+
+	/**
+	 * CORRIGIR as datas de uma fração lançada errada — só o Admin Geral
+	 * (decisão dele, 20/09). Só fração intacta (sem abono, sem pedido pendente):
+	 * o que já tem sucessão se apaga (forçado) e relança.
+	 */
+	corrigirFracao: async (event: Event) => {
+		const auth = await carregarFichaDoPolicial(
+			getDB(event.platform),
+			event.locals.usuario,
+			event.params.id
+		);
+		if ('erro' in auth) return auth.erro;
+		const { u, db, id, alvo } = auth;
+		if (!isAdminGeral(u))
+			return fail(403, { error: 'Só o Administrador Geral corrige lançamentos.' });
+
+		const fd = await event.request.formData();
+		const fracaoId = inteiroNaFaixa(fd, 'fracao_id', 1, 99_999_999);
+		const inicio = dataIso(fd, 'data_inicio');
+		const dias = inteiroNaFaixa(fd, 'dias', 1, 30);
+		if (!fracaoId || !inicio || !dias)
+			return fail(400, { error: 'Informe a fração, o 1º dia e os dias.' });
+		const fracao = await buscarFracao(db, fracaoId);
+		if (!fracao || fracao.policial_id !== id) {
+			return fail(404, { error: 'Fração não encontrada para este servidor.' });
+		}
+		const feriados = await feriadosNoIntervalo(db, inicio, inicio);
+		const { periodos, checagens } = montarPeriodos(
+			[dias],
+			[inicio],
+			feriados.map((f) => f.data)
+		);
+		if (temErro(checagens) || periodos.length !== 1) {
+			return fail(400, { error: primeiroErro(checagens) ?? 'Período inválido.' });
+		}
+		const ocupados = ocupadosDoHistorico(await listarHistoricoPolicial(db, id));
+		const conflito = primeiroErro(conflitosDasFerias(periodos, ocupados));
+		if (conflito) return fail(400, { error: conflito });
+
+		const r = await corrigirFracao(db, fracaoId, {
+			data_inicio: periodos[0].inicio,
+			data_fim: periodos[0].fim
+		});
+		if (!r.ok) {
+			return fail(409, {
+				error:
+					r.motivo === 'tem_vinculo'
+						? 'Fração com abono ou pedido pendente não se corrige: exclua a programação e relance.'
+						: 'Só uma fração ainda programada pode ser corrigida.'
+			});
+		}
+		const { contexto, env } = contextoDeEvento(event);
+		await auditar(
+			db,
+			{
+				acao: 'ferias_lancar_fracao',
+				usuario: u,
+				entidade: 'policial',
+				entidade_id: id,
+				alvo_tipo: 'policial',
+				alvo_id: id,
+				alvo_nome: alvo.nome,
+				detalhes: `${fracao.ordem}ª fração ${fracao.exercicio} corrigida pelo Admin Geral: ${r.antes.data_inicio}–${r.antes.data_fim} → ${periodos[0].inicio}–${periodos[0].fim}`,
+				dados_antes: { data_inicio: r.antes.data_inicio, data_fim: r.antes.data_fim },
+				dados_depois: { data_inicio: periodos[0].inicio, data_fim: periodos[0].fim },
+				...contexto
+			},
+			{ env }
+		);
+		await avisoDeFerias(
+			db,
+			u,
+			alvo,
+			id,
+			'ferias_corrigida',
+			`${fracao.ordem}ª fração de férias de ${alvo.nome} (${fracao.exercicio}) corrigida pelo DPI SUL`,
+			`${periodos[0].inicio} a ${periodos[0].fim}`
+		);
+		return { success: true, ferias: await listarFeriasDoPolicial(db, id) };
 	},
 
 	/** O número do processo, depois de protocolado. */

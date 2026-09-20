@@ -11,6 +11,7 @@ import type { PolicialHistorico } from '../../server/schema';
 import type { Database } from '../core';
 import { camposDeAtualizacao, type CamposDoPolicial } from './cadastro';
 import type { CpfCriptoEnv } from '../../crypto/cpf-cripto';
+import { adicionarDias, diffDiasInclusivo } from '$lib/utils/datas';
 
 type TipoHistorico =
 	'movimentacao' | 'afastamento' | 'desvinculacao' | 'edicao' | 'papel' | 'observacao';
@@ -172,4 +173,78 @@ export function afastamentoVigente(
 		if (inicio <= hojeISO && (!fim || hojeISO <= fim)) return ev;
 	}
 	return null;
+}
+
+/**
+ * Encurta um afastamento pelo RETORNO ANTECIPADO (decisão do responsável,
+ * 20/09/2026): o servidor voltou antes do previsto, e o evento passa a
+ * terminar na véspera do retorno, com a anotação e o NUP do retorno na
+ * descrição — o `nup` original é o do ato que afastou e fica. Só afastamento
+ * que não seja férias (férias voltam pela suspensão) e só com retorno dentro
+ * do período. Devolve `null` quando não cabe.
+ */
+export async function encurtarAfastamento(
+	db: Database,
+	eventoId: number,
+	retornoISO: string,
+	nupRetorno: string
+): Promise<PolicialHistorico | null> {
+	const ev = await buscarEventoHistorico(db, eventoId);
+	if (!ev || ev.tipo !== 'afastamento' || ev.subtipo === 'ferias' || !ev.data_inicio) return null;
+	if (retornoISO <= ev.data_inicio) return null;
+	if (ev.data_fim && retornoISO > ev.data_fim) return null;
+	const fim = adicionarDias(retornoISO, -1);
+	const nota = `Retorno antecipado em ${retornoISO}${nupRetorno ? ` (NUP ${nupRetorno})` : ''}`;
+	await db
+		.update(policialHistorico)
+		.set({
+			data_fim: fim,
+			qtd_dias: diffDiasInclusivo(ev.data_inicio, fim),
+			descricao: ev.descricao ? `${ev.descricao} — ${nota}` : nota
+		})
+		.where(eq(policialHistorico.id, eventoId));
+	return { ...ev, data_fim: fim, descricao: ev.descricao ? `${ev.descricao} — ${nota}` : nota };
+}
+
+/** O que o Admin Geral pode corrigir num afastamento lançado errado. */
+export interface CorrecaoDeAfastamento {
+	subtipo: string;
+	descricao: string | null;
+	data_inicio: string;
+	data_fim: string | null;
+	qtd_dias: number | null;
+	nup: string | null;
+	tipo_cid: string | null;
+}
+
+/**
+ * CORRIGE um afastamento lançado errado — só o Admin Geral (a action confere;
+ * decisão do responsável, 20/09/2026). A linha do tempo é append-only para o
+ * dia a dia; a correção é a exceção, e por isso vai para a auditoria com o
+ * antes e o depois. Férias não passam por aqui (têm o cartão). Devolve o
+ * evento ANTES da correção, ou `null` quando não cabe.
+ */
+export async function corrigirAfastamento(
+	db: Database,
+	eventoId: number,
+	correcao: CorrecaoDeAfastamento
+): Promise<PolicialHistorico | null> {
+	const ev = await buscarEventoHistorico(db, eventoId);
+	if (!ev || ev.tipo !== 'afastamento' || ev.subtipo === 'ferias') return null;
+	await db.update(policialHistorico).set(correcao).where(eq(policialHistorico.id, eventoId));
+	return ev;
+}
+
+/**
+ * EXCLUI um afastamento lançado errado — só o Admin Geral. O que nunca
+ * aconteceu não pode constar como afastamento. Férias não passam por aqui.
+ */
+export async function excluirAfastamento(
+	db: Database,
+	eventoId: number
+): Promise<PolicialHistorico | null> {
+	const ev = await buscarEventoHistorico(db, eventoId);
+	if (!ev || ev.tipo !== 'afastamento' || ev.subtipo === 'ferias') return null;
+	await db.delete(policialHistorico).where(eq(policialHistorico.id, eventoId));
+	return ev;
 }

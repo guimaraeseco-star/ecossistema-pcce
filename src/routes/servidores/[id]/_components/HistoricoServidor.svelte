@@ -3,9 +3,14 @@
 	 * Timeline do histórico funcional do servidor — a leitura do que
 	 * `PainelAcoesServidor` grava.
 	 *
-	 * A tabela é APPEND-ONLY e esta tela é só leitura: não há caminho de UI que
-	 * edite ou apague um evento. É a visão de RH, e complementa (não substitui)
-	 * a trilha forense do Super Admin em `/auditoria`.
+	 * A tabela é APPEND-ONLY no dia a dia. Três exceções, decididas pelo
+	 * responsável em 20/09/2026, ficam aqui no próprio evento de afastamento:
+	 * **Retorno antecipado** (a unidade e o DPI SUL: o servidor voltou antes —
+	 * data e NUP, o evento encurta) e, só para o Admin Geral, **Corrigir** e
+	 * **Excluir** um lançamento errado. Todas vão à auditoria com antes/depois
+	 * e viram notícia para o outro lado. Férias não passam por aqui: têm o
+	 * cartão. É a visão de RH, e complementa (não substitui) a trilha forense
+	 * do Super Admin em `/auditoria`.
 	 *
 	 * `afastamentoVigenteId` marca o afastamento em curso HOJE, calculado no
 	 * servidor: comparar datas aqui reintroduziria o problema de fuso que a
@@ -16,10 +21,15 @@
 	 * ou crescer num `invalidateAll()` depois de registrar um evento, que
 	 * deixaria o usuário numa página vazia.
 	 */
+	import { enhance } from '$app/forms';
+	import type { ActionResult } from '@sveltejs/kit';
+	import { invalidateShared } from '$lib/cross-tab-invalidate';
+	import { toaster } from '$lib/toast';
+	import { formatarNUP } from '$lib/utils/formato';
 	import type { PolicialHistorico } from '$lib/types';
-	import { formatarData } from '$lib/utils/datas';
+	import { formatarData, hojeLocalISO } from '$lib/utils/datas';
 	import { LABEL_SUBTIPO_AFASTAMENTO } from '$lib/schemas/policial-historico';
-	import { PORTARIA_39 } from '$lib/servidores/afastamentos';
+	import { AFASTAMENTOS, PORTARIA_39, SUBTIPOS_CADASTRAVEIS } from '$lib/servidores/afastamentos';
 	import Paginador from '$lib/components/Paginador.svelte';
 	import ArrowRightLeft from '@lucide/svelte/icons/arrow-right-left';
 	import CalendarOff from '@lucide/svelte/icons/calendar-off';
@@ -37,9 +47,46 @@
 		unidades?: { id: number; nome: string }[];
 		/** Catálogo de designações, para resolver `designacao_id` no diff. */
 		designacoes?: { id: number; nome: string }[];
+		/** O servidor da ficha, para o `invalidateShared` depois de uma ação. */
+		policialId: number;
+		/** Admin Geral: corrige e exclui lançamentos errados. */
+		isAdmin?: boolean;
 	}
 
-	const { historico, afastamentoVigenteId, unidades = [], designacoes = [] }: Props = $props();
+	const {
+		historico,
+		afastamentoVigenteId,
+		unidades = [],
+		designacoes = [],
+		policialId,
+		isAdmin = false
+	}: Props = $props();
+
+	const hoje = hojeLocalISO();
+	/* ── as três ações sobre um afastamento (retorno / corrigir / excluir) ── */
+	let acao = $state<{ id: number; qual: 'retorno' | 'corrigir' } | null>(null);
+	let enviando = $state(false);
+	/** Retorno antecipado cabe num afastamento que não é férias e ainda não acabou. */
+	const admiteRetorno = (ev: PolicialHistorico) =>
+		ev.tipo === 'afastamento' &&
+		ev.subtipo !== 'ferias' &&
+		!!ev.data_inicio &&
+		ev.data_inicio <= hoje &&
+		(!ev.data_fim || ev.data_fim >= hoje);
+	function aoResponder(ok: string) {
+		enviando = true;
+		return async ({ result }: { result: ActionResult }) => {
+			enviando = false;
+			if (result.type === 'success') {
+				toaster.create({ title: ok, type: 'success' });
+				acao = null;
+				await invalidateShared(`policial:${policialId}`, 'app:policiais');
+			} else if (result.type === 'failure') {
+				const d = result.data as Record<string, unknown> | undefined;
+				toaster.create({ title: String(d?.error ?? 'Não foi possível concluir'), type: 'error' });
+			}
+		};
+	}
 
 	const nomePorUnidadeId = $derived(new Map(unidades.map((u) => [u.id, u.nome])));
 	const nomePorDesignacaoId = $derived(new Map(designacoes.map((d) => [d.id, d.nome])));
@@ -253,6 +300,176 @@
 										⚠ {PORTARIA_39.titulo}: armamento recolhido sob cautela, porte suspenso até
 										perícia da DIPEM.
 									</p>
+								{/if}
+
+								{#if ev.subtipo !== 'ferias'}
+									<div class="mt-2 flex flex-wrap gap-1">
+										{#if admiteRetorno(ev)}
+											<button
+												type="button"
+												class="btn btn-sm preset-outlined-surface-500"
+												onclick={() => (acao = { id: ev.id, qual: 'retorno' })}
+												>Retorno antecipado</button
+											>
+										{/if}
+										{#if isAdmin}
+											<button
+												type="button"
+												class="btn btn-sm preset-outlined-surface-500"
+												onclick={() => (acao = { id: ev.id, qual: 'corrigir' })}>Corrigir</button
+											>
+											<form
+												method="POST"
+												action="?/excluirAfastamento"
+												use:enhance={() => aoResponder('Afastamento excluído')}
+											>
+												<input type="hidden" name="historico_id" value={ev.id} />
+												<button
+													type="submit"
+													class="btn btn-sm preset-outlined-error-500"
+													title="Lançado errado? Some da linha do tempo (fica na auditoria)"
+													disabled={enviando}>Excluir</button
+												>
+											</form>
+										{/if}
+									</div>
+								{/if}
+
+								<!-- Retorno antecipado: só a data e o NUP; o evento encurta até a véspera. -->
+								{#if acao?.id === ev.id && acao.qual === 'retorno'}
+									<form
+										method="POST"
+										action="?/retornoAntecipado"
+										use:enhance={() => aoResponder('Retorno antecipado registrado')}
+										class="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-primary-500/30 bg-primary-500/5 p-2"
+									>
+										<input type="hidden" name="historico_id" value={ev.id} />
+										<label class="label">
+											<span class="label-text text-2xs font-bold uppercase opacity-70"
+												>Retorno ao serviço</span
+											>
+											<input
+												class="input px-2 py-1 text-xs"
+												type="date"
+												name="data_retorno"
+												min={ev.data_inicio ?? undefined}
+												max={ev.data_fim ?? undefined}
+												required
+											/>
+										</label>
+										<label class="label">
+											<span class="label-text text-2xs font-bold uppercase opacity-70"
+												>NUP do retorno</span
+											>
+											<input
+												class="input w-48 px-2 py-1 text-xs font-mono"
+												name="nup"
+												maxlength="20"
+												placeholder="00000.000000/0000-00"
+												oninput={(e) =>
+													(e.currentTarget.value = formatarNUP(e.currentTarget.value))}
+											/>
+										</label>
+										<button
+											type="submit"
+											class="btn btn-sm preset-filled-primary-500"
+											disabled={enviando}>Registrar retorno</button
+										>
+										<button
+											type="button"
+											class="btn btn-sm preset-outlined-surface-500"
+											onclick={() => (acao = null)}>Cancelar</button
+										>
+									</form>
+								{/if}
+
+								<!-- Corrigir (Admin Geral): as datas, o tipo, o NUP e o CID, com as regras do lançamento. -->
+								{#if acao?.id === ev.id && acao.qual === 'corrigir'}
+									<form
+										method="POST"
+										action="?/corrigirAfastamento"
+										use:enhance={() => aoResponder('Afastamento corrigido')}
+										class="mt-2 grid grid-cols-2 items-end gap-2 rounded-lg border border-primary-500/30 bg-primary-500/5 p-2 sm:grid-cols-4"
+									>
+										<input type="hidden" name="historico_id" value={ev.id} />
+										<label class="label col-span-2">
+											<span class="label-text text-2xs font-bold uppercase opacity-70">Tipo</span>
+											<select
+												class="select px-2 py-1 text-xs"
+												name="subtipo"
+												value={ev.subtipo ?? 'outros'}
+											>
+												{#each SUBTIPOS_CADASTRAVEIS as s (s)}
+													<option value={s}>{AFASTAMENTOS[s].rotulo}</option>
+												{/each}
+											</select>
+										</label>
+										<label class="label">
+											<span class="label-text text-2xs font-bold uppercase opacity-70">Início</span>
+											<input
+												class="input px-2 py-1 text-xs"
+												type="date"
+												name="data_inicio"
+												value={ev.data_inicio ?? ''}
+												required
+											/>
+										</label>
+										<label class="label">
+											<span class="label-text text-2xs font-bold uppercase opacity-70">Fim</span>
+											<input
+												class="input px-2 py-1 text-xs"
+												type="date"
+												name="data_fim"
+												value={ev.data_fim ?? ''}
+											/>
+										</label>
+										<label class="label col-span-2">
+											<span class="label-text text-2xs font-bold uppercase opacity-70">NUP</span>
+											<input
+												class="input px-2 py-1 text-xs font-mono"
+												name="nup"
+												maxlength="20"
+												value={ev.nup ?? ''}
+												oninput={(e) =>
+													(e.currentTarget.value = formatarNUP(e.currentTarget.value))}
+											/>
+										</label>
+										<label class="label">
+											<span class="label-text text-2xs font-bold uppercase opacity-70"
+												>CID (LTS)</span
+											>
+											<select
+												class="select px-2 py-1 text-xs"
+												name="tipo_cid"
+												value={ev.tipo_cid ?? ''}
+											>
+												<option value="">—</option>
+												<option value="CID-Outras">CID-Outras</option>
+												<option value="CID-F">CID-F</option>
+											</select>
+										</label>
+										<label class="label col-span-2 sm:col-span-4">
+											<span class="label-text text-2xs font-bold uppercase opacity-70">Motivo</span>
+											<input
+												class="input px-2 py-1 text-xs"
+												name="descricao"
+												maxlength="500"
+												value={ev.descricao ?? ''}
+											/>
+										</label>
+										<div class="col-span-2 flex justify-end gap-1 sm:col-span-4">
+											<button
+												type="button"
+												class="btn btn-sm preset-outlined-surface-500"
+												onclick={() => (acao = null)}>Cancelar</button
+											>
+											<button
+												type="submit"
+												class="btn btn-sm preset-filled-primary-500"
+												disabled={enviando}>Salvar correção</button
+											>
+										</div>
+									</form>
 								{/if}
 							{:else if ev.tipo === 'desvinculacao'}
 								<p>

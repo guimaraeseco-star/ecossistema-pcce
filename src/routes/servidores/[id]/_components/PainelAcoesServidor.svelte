@@ -110,7 +110,8 @@
 	const bloqueado = $derived(
 		enviando ||
 			(solicitando && modal !== 'afastamento' && justificativa.trim().length === 0) ||
-			(modal === 'afastamento' && (!subtipo || !nupConferido.ok || conflitosFerias.length > 0))
+			(modal === 'afastamento' &&
+				(!subtipo || !nupConferido.ok || conflitosFerias.some((c) => c.nivel === 'erro')))
 	);
 
 	function resetCampos() {
@@ -160,12 +161,17 @@
 			loading.hide();
 			enviando = false;
 			if (result.type === 'success') {
+				const avisos = ((result.data as { avisos?: string[] } | undefined)?.avisos ?? []).join(' ');
 				toaster.create({
 					title: solicitando ? 'Solicitação enviada' : 'Registro salvo com sucesso!',
-					description: solicitando
-						? 'O ato só acontece após a aprovação do Administrador Geral.'
-						: undefined,
-					type: 'success'
+					description:
+						[
+							solicitando ? 'O ato só acontece após a aprovação do Administrador Geral.' : '',
+							avisos
+						]
+							.filter(Boolean)
+							.join(' ') || undefined,
+					type: avisos ? 'warning' : 'success'
 				});
 				fechar();
 				await invalidateShared(`policial:${policial.id}`, 'app:policiais');
@@ -604,7 +610,15 @@
 					</label>
 				</div>
 				{#each conflitosFerias as c (c.texto)}
-					<p class="text-xs font-semibold text-error-600" role="alert">✖ {c.texto}</p>
+					<p
+						class="text-xs font-semibold {c.nivel === 'erro'
+							? 'text-error-600'
+							: 'text-warning-700 dark:text-warning-400'}"
+						role="alert"
+					>
+						{c.nivel === 'erro' ? '✖' : '⚠'}
+						{c.texto}
+					</p>
 				{/each}
 				{#if regra?.semPrazo}
 					<p class="text-2xs text-warning-700 dark:text-warning-400">
