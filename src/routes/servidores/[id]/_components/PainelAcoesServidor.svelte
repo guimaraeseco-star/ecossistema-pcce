@@ -54,6 +54,7 @@
 	import CalendarOff from '@lucide/svelte/icons/calendar-off';
 	import UserMinus from '@lucide/svelte/icons/user-minus';
 	import type { ActionResult } from '@sveltejs/kit';
+	import { conflitosDoAfastamento, type PeriodoOcupado } from '$lib/servidores/conflitos';
 	import {
 		AFASTAMENTOS,
 		conferirNup,
@@ -68,9 +69,11 @@
 		lotacoes: string[];
 		/** `direto` executa; `solicitacao` envia para aprovação do Admin Geral. */
 		modo: 'direto' | 'solicitacao';
+		/** Os períodos ocupados da linha do tempo — o afastamento não abrange férias. */
+		ocupados: PeriodoOcupado[];
 	}
 
-	const { policial, lotacoes, modo }: Props = $props();
+	const { policial, lotacoes, modo, ocupados }: Props = $props();
 
 	const solicitando = $derived(modo === 'solicitacao');
 
@@ -96,12 +99,18 @@
 	let nup = $state('');
 	let justificativa = $state('');
 	const nupConferido = $derived(conferirNup(nup, modal === 'afastamento'));
+	/** O afastamento não pode abranger férias programadas (impede). */
+	const conflitosFerias = $derived(
+		modal === 'afastamento' && dataInicio
+			? conflitosDoAfastamento({ inicio: dataInicio, fim: dataFim || null }, ocupados)
+			: []
+	);
 
 	/** No modo solicitação, nada é enviado sem motivo escrito; no afastamento, sem NUP válido. */
 	const bloqueado = $derived(
 		enviando ||
 			(solicitando && modal !== 'afastamento' && justificativa.trim().length === 0) ||
-			(modal === 'afastamento' && (!subtipo || !nupConferido.ok))
+			(modal === 'afastamento' && (!subtipo || !nupConferido.ok || conflitosFerias.length > 0))
 	);
 
 	function resetCampos() {
@@ -594,6 +603,9 @@
 						/>
 					</label>
 				</div>
+				{#each conflitosFerias as c (c.texto)}
+					<p class="text-xs font-semibold text-error-600" role="alert">✖ {c.texto}</p>
+				{/each}
 				{#if regra?.semPrazo}
 					<p class="text-2xs text-warning-700 dark:text-warning-400">
 						Sem data final, o servidor consta como afastado até o registro do retorno.

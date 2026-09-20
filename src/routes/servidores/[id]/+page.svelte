@@ -576,6 +576,7 @@
 	}}
 	lotacoes={data.lotacoes}
 	modo={data.modo}
+	ocupados={data.ocupados}
 />
 
 <SolicitacoesServidor
@@ -591,6 +592,7 @@
 		bind:ferias={feriasDaFicha}
 		feriados={data.feriados}
 		dataPosse={data.dataPosse}
+		ocupados={data.ocupados}
 		{isAdmin}
 		podeDarCiencia={true}
 	/>

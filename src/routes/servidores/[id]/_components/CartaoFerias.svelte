@@ -34,6 +34,7 @@
 	import { formatarNUP } from '$lib/utils/formato';
 	import { MAX_JUSTIFICATIVA } from '$lib/cadastro-campos';
 	import type { FeriasDoPolicial, FracaoCompleta } from '$lib/db';
+	import { conflitosDasFerias, type PeriodoOcupado } from '$lib/servidores/conflitos';
 	import {
 		criteriosDaSuspensao,
 		diasAGozar,
@@ -59,12 +60,15 @@
 		ferias = $bindable(),
 		feriados,
 		dataPosse,
+		ocupados,
 		isAdmin,
 		podeDarCiencia
 	}: {
 		ferias: FeriasDoPolicial;
 		feriados: string[];
 		dataPosse: string | null;
+		/** Os períodos ocupados da linha do tempo — férias não caem em afastamento. */
+		ocupados: PeriodoOcupado[];
 		/** Admin Geral: registra abono. */
 		isAdmin: boolean;
 		/** Admin de unidade/seccional (e o Admin Geral): dá ciência do abono. */
@@ -168,8 +172,11 @@
 		if (primeira) divisaoEscolhida = primeira;
 	}
 
-	/** A prévia: os períodos montados e o que a regra diz de cada 1º dia. */
-	const previa = $derived(montarPeriodos(divisaoEscolhida, inicios, feriados));
+	/** A prévia: os períodos montados, o que a regra diz de cada 1º dia, e os conflitos com afastamentos. */
+	const previa = $derived.by(() => {
+		const p = montarPeriodos(divisaoEscolhida, inicios, feriados);
+		return { ...p, checagens: [...p.checagens, ...conflitosDasFerias(p.periodos, ocupados)] };
+	});
 	const podeEnviarPeriodos = $derived(
 		previa.periodos.length === divisaoEscolhida.length && !temErro(previa.checagens)
 	);

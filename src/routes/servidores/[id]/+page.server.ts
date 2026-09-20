@@ -117,6 +117,7 @@ import {
 	LABEL_SUBTIPO_AFASTAMENTO
 } from '$lib/schemas/policial-historico';
 import { AFASTAMENTOS, conferirNup, regraDePrazo } from '$lib/servidores/afastamentos';
+import { conflitosDoAfastamento, ocupadosDoHistorico } from '$lib/servidores/conflitos';
 import { isAdminGeral } from '$lib/auth';
 import {
 	lotacoesAdministradas,
@@ -323,6 +324,8 @@ export const load: PageServerLoad = async ({ locals, params, platform, depends }
 		solicitacoesAcao,
 		/** Férias: frações, pedidos à COGEP e abono (fase 2-C). */
 		ferias,
+		/** Os períodos ocupados da linha do tempo: o modal de afastamento e o cartão de férias conferem conflito na hora. */
+		ocupados: ocupadosDoHistorico(historico),
 		feriados: feriados.map((f) => f.data),
 		dataPosse: policial.data_posse,
 		afastamentoVigenteId: afastamentoAtual?.id ?? null,
@@ -986,6 +989,10 @@ export const actions: Actions = {
 			]
 				.filter(Boolean)
 				.join(' ') || null;
+		// Afastamento não abrange férias programadas (decisão dele, 20/09): impede.
+		const ocupados = ocupadosDoHistorico(await listarHistoricoPolicial(db, id));
+		const conflito = conflitosDoAfastamento({ inicio: data_inicio, fim: dataFim }, ocupados)[0];
+		if (conflito) return fail(400, { error: conflito.texto });
 		const rotulo = LABEL_SUBTIPO_AFASTAMENTO[subtipo];
 		const periodo = dataFim
 			? `${data_inicio} a ${dataFim}`

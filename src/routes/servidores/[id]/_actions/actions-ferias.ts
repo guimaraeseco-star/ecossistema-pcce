@@ -67,6 +67,7 @@ import {
 } from '$lib/servidores/ferias';
 import { adicionarDias, hojeBrasilISO } from '$lib/utils/datas';
 import { avisarOutroLado } from '$lib/server/avisos/emitir';
+import { conflitosDasFerias, ocupadosDoHistorico } from '$lib/servidores/conflitos';
 
 type Event = RequestEvent<{ id: string }>;
 
@@ -191,6 +192,10 @@ export const actionsFerias = {
 		const lidos = await lerPeriodos(db, fd, divisoesPossiveis(30));
 		if ('erro' in lidos) return lidos.erro;
 		const { periodos } = lidos;
+		// Férias não caem dentro de afastamento (decisão dele, 20/09): impede.
+		const ocupados = ocupadosDoHistorico(await listarHistoricoPolicial(db, id));
+		const conflito = primeiroErro(conflitosDasFerias(periodos, ocupados));
+		if (conflito) return fail(400, { error: conflito });
 
 		const r = await registrarProgramacao(
 			db,
@@ -328,6 +333,10 @@ export const actionsFerias = {
 		const lidos = await lerPeriodos(db, fd, plano.divisoes);
 		if ('erro' in lidos) return lidos.erro;
 		const { periodos } = lidos;
+		// Férias não caem dentro de afastamento (decisão dele, 20/09): impede.
+		const ocupados = ocupadosDoHistorico(await listarHistoricoPolicial(db, id));
+		const conflito = primeiroErro(conflitosDasFerias(periodos, ocupados));
+		if (conflito) return fail(400, { error: conflito });
 		if (situacao.emGozo && dataSuspensao) {
 			const erro = primeiroErro(
 				criteriosDaSuspensao(situacao.emGozo, dataSuspensao, periodos[0].inicio)
