@@ -390,7 +390,7 @@
 				use:enhance={handleSubmit}
 				class="space-y-3"
 			>
-				<div class="grid grid-cols-1 gap-2">
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
 					<label class="label">
 						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"
 							>Tipo de Afastamento</span
@@ -413,7 +413,45 @@
 							{/each}
 						</select>
 					</label>
+					<!-- O NUP ao lado do tipo (pedido dele, 20/09): o processo é o fundamento
+					     — sem descrição, PDF ou justificativa à parte. -->
+					<label class="label">
+						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"
+							>NUP do processo <span class="text-error-500">*</span></span
+						>
+						<input
+							class="input py-1 px-3 text-sm font-mono"
+							type="text"
+							name="nup"
+							value={nup}
+							oninput={(e) => (nup = formatarNUP(e.currentTarget.value))}
+							placeholder="00000.000000/0000-00"
+							maxlength="20"
+							required
+						/>
+						{#if nup && !nupConferido.ok}
+							<span class="text-2xs text-error-600 ml-1">{nupConferido.erro}</span>
+						{/if}
+					</label>
 				</div>
+
+				<!-- "Outros" é o único tipo que não diz do que se trata: aqui entra a
+				     justificativa, opcional, gravada como o motivo do evento. -->
+				{#if subtipo === 'outros'}
+					<label class="label">
+						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"
+							>Justificativa <span class="normal-case font-normal opacity-70"
+								>(do que se trata)</span
+							></span
+						>
+						<textarea
+							class="textarea py-1 px-3 text-sm"
+							name="descricao"
+							rows="2"
+							maxlength="500"
+							placeholder="Ex.: afastamento eleitoral; aguardando aposentadoria"></textarea>
+					</label>
+				{/if}
 
 				<!-- A base legal e a observação do tipo escolhido — o que a tela antiga
 				     mostrava e que evita o tipo errado. -->
@@ -548,28 +586,6 @@
 					</p>
 				{/if}
 
-				<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-					<!-- Sem descrição, sem PDF e sem justificativa (pedido dele, 20/09): o
-					     tipo, o período e o NUP dizem tudo — o processo é o fundamento. -->
-					<label class="label">
-						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"
-							>NUP do processo <span class="text-error-500">*</span></span
-						>
-						<input
-							class="input py-1 px-3 text-sm font-mono"
-							type="text"
-							name="nup"
-							value={nup}
-							oninput={(e) => (nup = formatarNUP(e.currentTarget.value))}
-							placeholder="00000.000000/0000-00"
-							maxlength="20"
-							required
-						/>
-						{#if nup && !nupConferido.ok}
-							<span class="text-2xs text-error-600 ml-1">{nupConferido.erro}</span>
-						{/if}
-					</label>
-				</div>
 				{@render rodapeAcao('preset-filled-warning-500', 'Salvar', 'Salvando...')}
 			</form>
 		</div>
