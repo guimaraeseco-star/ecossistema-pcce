@@ -501,6 +501,25 @@
 							<span class="ml-1 font-semibold text-warning-700 dark:text-warning-400"
 								>· aguardando a COGEP</span
 							>
+							<!-- O passo a passo, porque o pedido nasce aqui antes de o processo existir
+							     (pedido dele, 20/09): sem isto, "Anotar" não diz o que é. -->
+							<ol
+								class="mt-2 list-decimal space-y-0.5 pl-5 text-2xs text-surface-700 dark:text-surface-300"
+							>
+								<li>
+									O pedido já está registrado aqui e o <b>ofício</b> foi gerado (botão Copiar acima, ao
+									registrar).
+								</li>
+								<li>
+									Abra o processo à COGEP com o ofício e, quando tiver o número, <b>anote o NUP</b>
+									abaixo — é o que liga este pedido ao processo.
+								</li>
+								<li>
+									Quando a resposta da COGEP chegar, clique <b>COGEP deferiu</b> ou
+									<b>Indeferiu</b>: deferido, as frações mudam sozinhas; indeferido, tudo fica como
+									estava. Até lá o pedido é pendência da unidade.
+								</li>
+							</ol>
 							<div class="mt-2 flex flex-wrap items-end gap-2">
 								{#if !r.nup}
 									<form
