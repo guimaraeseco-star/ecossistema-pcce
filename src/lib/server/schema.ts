@@ -1651,7 +1651,7 @@ export const policialAcaoSolicitacoes = sqliteTable(
 		// justificativa) já estão aqui, e com eles vêm o rito de decisão e a
 		// trilha de auditoria que já existem.
 		tipo: text('tipo', {
-			enum: ['movimentacao', 'afastamento', 'desvinculacao', 'direcao']
+			enum: ['movimentacao', 'afastamento', 'desvinculacao', 'direcao', 'retorno_antecipado']
 		}).notNull(),
 		subtipo: text('subtipo'),
 		descricao: text('descricao'),

@@ -29,7 +29,8 @@
 		desvinculacao: 'Desvinculação',
 		// Ato sobre a UNIDADE, não sobre o servidor: aprovar grava a sucessão da
 		// unidade e não toca na linha do tempo funcional dele (E54).
-		direcao: 'Direção de unidade'
+		direcao: 'Direção de unidade',
+		retorno_antecipado: 'Retorno antecipado'
 	};
 
 	const {
@@ -50,13 +51,23 @@
 	     APROVADO e ainda em curso — a unidade e o DPI SUL registram direto a
 	     data do retorno e o NUP; o afastamento encurta até a véspera. ── */
 	const hoje = hojeLocalISO();
+	/** Já há retorno pedido (pendente) ou aprovado para este afastamento? Então o botão some; volta se rejeitado. */
+	const retornoJaPedido = (s: PolicialAcaoSolicitacao) =>
+		acoes.some(
+			(r) =>
+				r.tipo === 'retorno_antecipado' &&
+				r.status !== 'rejeitada' &&
+				r.subtipo === s.subtipo &&
+				r.data_inicio === s.data_inicio
+		);
 	const admiteRetorno = (s: PolicialAcaoSolicitacao) =>
 		s.tipo === 'afastamento' &&
 		s.status === 'aprovada' &&
 		s.subtipo !== 'ferias' &&
 		!!s.data_inicio &&
 		s.data_inicio <= hoje &&
-		(!s.data_fim || s.data_fim >= hoje);
+		(!s.data_fim || s.data_fim >= hoje) &&
+		!retornoJaPedido(s);
 	let retornoDe = $state<number | null>(null);
 
 	/** Aberto = pendente, ou afastamento aprovado ainda em curso. */
@@ -76,7 +87,13 @@
 		return async ({ result }: { result: ActionResult }) => {
 			enviando = false;
 			if (result.type === 'success') {
-				toaster.create({ title: 'Retorno antecipado registrado', type: 'success' });
+				const d = result.data as { solicitacoesAcao?: unknown } | undefined;
+				toaster.create({
+					title: d?.solicitacoesAcao
+						? 'Pedido de retorno antecipado enviado ao Admin Geral'
+						: 'Retorno antecipado registrado',
+					type: 'success'
+				});
 				retornoDe = null;
 				await invalidateShared(`policial:${policialId}`, 'app:policiais');
 			} else if (result.type === 'failure') {

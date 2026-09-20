@@ -33,7 +33,14 @@ import type { CamposDoEventoFuncional } from './historico';
  * para `executarAcaoRH`, e sim para `registrarResponsavel`. Quem faz esse
  * desvio é `decidirSolicitacaoAcao`.
  */
-type TipoAcaoSolicitada = 'movimentacao' | 'afastamento' | 'desvinculacao' | 'direcao';
+/**
+ * `retorno_antecipado` (20/09): o servidor voltou antes do fim do afastamento.
+ * O pedido guarda o afastamento alcançado por `subtipo` + `data_inicio` (o
+ * evento não tem id no pedido) e o retorno em `data_evento`; aprovado, o
+ * evento encurta até a véspera.
+ */
+type TipoAcaoSolicitada =
+	'movimentacao' | 'afastamento' | 'desvinculacao' | 'direcao' | 'retorno_antecipado';
 
 /**
  * O pedido, na forma em que a aprovação vai executá-lo: os MESMOS campos do

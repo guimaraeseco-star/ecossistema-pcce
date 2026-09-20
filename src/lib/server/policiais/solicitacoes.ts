@@ -23,6 +23,29 @@ import { fecharSolicitacaoAcao, type Database } from '$lib/db';
 import { registrarResponsavel } from '$lib/db/unidades-responsaveis';
 import { unidades, type PolicialAcaoSolicitacao } from '$lib/server/schema';
 import { executarAcaoRH, type AtorDaAcao } from './acoes-rh';
+import { encurtarAfastamento, listarHistoricoPolicial } from '$lib/db/policiais/historico';
+
+/** O afastamento que um pedido de retorno antecipado alcança, e o corte. */
+async function aplicarRetornoAntecipado(
+	db: Database,
+	pedido: {
+		policial_id: number;
+		subtipo: string | null;
+		data_inicio: string | null;
+		data_evento: string | null;
+		nup: string | null;
+	}
+): Promise<void> {
+	if (!pedido.data_evento) return;
+	const ev = (await listarHistoricoPolicial(db, pedido.policial_id)).find(
+		(h) =>
+			h.tipo === 'afastamento' &&
+			h.subtipo === pedido.subtipo &&
+			h.data_inicio === pedido.data_inicio
+	);
+	if (!ev) return;
+	await encurtarAfastamento(db, ev.id, pedido.data_evento, pedido.nup ?? '');
+}
 
 /**
  * Decide um pedido de ação de RH. Aprovar EXECUTA o ato (movimentar, afastar,
@@ -56,6 +79,13 @@ export async function decidirSolicitacaoAcao(
 	const { tipo } = pedido;
 	if (tipo === 'direcao') {
 		await registrarDirecaoDoPedido(db, pedido, adminId);
+		return pedido;
+	}
+	// Retorno antecipado: não cria evento — encurta o afastamento que o pedido
+	// aponta (mesmo servidor, subtipo e 1º dia). Se ele já não existe (o Admin
+	// Geral excluiu), o pedido fecha sem efeito.
+	if (tipo === 'retorno_antecipado') {
+		await aplicarRetornoAntecipado(db, pedido);
 		return pedido;
 	}
 

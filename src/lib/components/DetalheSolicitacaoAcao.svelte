@@ -49,11 +49,19 @@
 				valor: s.subtipo === 'respondente' ? 'Respondente' : 'Titular'
 			},
 			s.tipo === 'afastamento' && subtipo && { rotulo: 'Tipo', valor: subtipo },
+			// Retorno antecipado: o afastamento alcançado e o dia da volta.
+			s.tipo === 'retorno_antecipado' && subtipo && { rotulo: 'Afastamento', valor: subtipo },
+			s.tipo === 'retorno_antecipado' &&
+				s.data_evento && { rotulo: 'Retorno ao serviço', valor: formatarData(s.data_evento) },
 			s.tipo === 'afastamento' && s.tipo_cid && { rotulo: 'CID', valor: s.tipo_cid },
 			s.tipo === 'afastamento' && s.descricao && { rotulo: 'Descrição/Motivo', valor: s.descricao },
-			s.data_evento && { rotulo: 'Data', valor: formatarData(s.data_evento) },
+			s.tipo !== 'retorno_antecipado' &&
+				s.data_evento && { rotulo: 'Data', valor: formatarData(s.data_evento) },
 			s.data_inicio && { rotulo: 'Início', valor: formatarData(s.data_inicio) },
-			s.data_fim && { rotulo: 'Término', valor: formatarData(s.data_fim) },
+			s.data_fim && {
+				rotulo: s.tipo === 'retorno_antecipado' ? 'Término previsto' : 'Término',
+				valor: formatarData(s.data_fim)
+			},
 			s.qtd_dias != null && { rotulo: 'Dias', valor: String(s.qtd_dias) },
 			s.nup && { rotulo: 'NUP', valor: s.nup }
 		].filter((l): l is { rotulo: string; valor: string } => !!l)

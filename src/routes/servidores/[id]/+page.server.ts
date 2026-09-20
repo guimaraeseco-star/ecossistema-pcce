@@ -1045,8 +1045,9 @@ export const actions: Actions = {
 	/**
 	 * RETORNO ANTECIPADO (decisão dele, 20/09): o servidor voltou antes do
 	 * previsto — o afastamento encurta até a véspera, com a data e o NUP do
-	 * retorno. É fato que a unidade presencia: a unidade e o DPI SUL registram
-	 * direto, sem homologação. Férias não passam por aqui (têm a suspensão).
+	 * retorno. Segue o rito dos outros atos: a unidade PEDE (pedido
+	 * `retorno_antecipado`, pendente até o Admin Geral aprovar) e o DPI SUL
+	 * registra direto. Férias não passam por aqui (têm a suspensão).
 	 */
 	retornoAntecipado: async (event) => {
 		const auth = await carregarFichaDoPolicial(
@@ -1055,7 +1056,7 @@ export const actions: Actions = {
 			event.params.id
 		);
 		if ('erro' in auth) return auth.erro;
-		const { u, db, id, alvo } = auth;
+		const { u, db, id, alvo, modo } = auth;
 
 		const formData = await event.request.formData();
 		const solicitacaoId = inteiroNaFaixa(formData, 'solicitacao_id', 1, 99_999_999);
@@ -1078,6 +1079,64 @@ export const actions: Actions = {
 		);
 		if (!ev) return fail(404, { error: 'Afastamento não encontrado na linha do tempo.' });
 		const eventoId = ev.id;
+		if (retorno <= ev.data_inicio! || (ev.data_fim && retorno > ev.data_fim)) {
+			return fail(409, {
+				error: 'O retorno precisa cair dentro do afastamento (depois do início e até o fim).'
+			});
+		}
+		const rotuloAf =
+			LABEL_SUBTIPO_AFASTAMENTO[ev.subtipo as keyof typeof LABEL_SUBTIPO_AFASTAMENTO] ?? ev.subtipo;
+
+		if (modo === 'solicitacao') {
+			// Um pedido por afastamento: enquanto um está pendente, o botão some.
+			const jaPedido = (await listarSolicitacoesAcaoDoPolicial(db, id)).some(
+				(p) =>
+					p.tipo === 'retorno_antecipado' &&
+					p.status === 'pendente' &&
+					p.subtipo === ev.subtipo &&
+					p.data_inicio === ev.data_inicio
+			);
+			if (jaPedido)
+				return fail(409, {
+					error: 'Já há um pedido de retorno antecipado aguardando o Admin Geral.'
+				});
+			await criarSolicitacaoAcao(db, {
+				policial_id: id,
+				tipo: 'retorno_antecipado',
+				subtipo: ev.subtipo,
+				descricao: `Retorno antecipado — ${rotuloAf} de ${ev.data_inicio}`,
+				data_inicio: ev.data_inicio,
+				data_fim: ev.data_fim,
+				data_evento: retorno,
+				nup: nup.formatado || null,
+				justificativa: '',
+				solicitante_id: u.id,
+				solicitante_nome: u.nome
+			});
+			const { contexto, env } = contextoDeEvento(event);
+			await auditar(
+				db,
+				{
+					acao: 'solicitar_acao_policial',
+					usuario: u,
+					entidade: 'policial',
+					entidade_id: id,
+					alvo_tipo: 'policial',
+					alvo_id: id,
+					alvo_nome: alvo.nome,
+					detalhes: `Solicitação de retorno antecipado em ${retorno}: ${rotuloAf} de ${ev.data_inicio}${nup.formatado ? ` (NUP ${nup.formatado})` : ''}`,
+					metadados: {
+						tipo: 'retorno_antecipado',
+						historico_id: eventoId,
+						retorno,
+						nup: nup.formatado
+					},
+					...contexto
+				},
+				{ env }
+			);
+			return { success: true, solicitacoesAcao: await listarSolicitacoesAcaoDoPolicial(db, id) };
+		}
 
 		const r = await encurtarAfastamento(db, eventoId, retorno, nup.formatado);
 		if (!r) {

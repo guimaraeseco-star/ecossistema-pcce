@@ -42,7 +42,8 @@ const ROTULO_TIPO_AVISO: Record<string, string> = {
 	movimentacao: 'Movimentação',
 	afastamento: 'Afastamento',
 	desvinculacao: 'Desvinculação',
-	direcao: 'Direção de unidade'
+	direcao: 'Direção de unidade',
+	retorno_antecipado: 'Retorno antecipado'
 };
 import { decidirSolicitacaoAcao } from '$lib/server/policiais/solicitacoes';
 
