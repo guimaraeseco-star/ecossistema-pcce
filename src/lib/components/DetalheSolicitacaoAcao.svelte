@@ -21,8 +21,14 @@
 
 	const {
 		solicitacao: s,
-		compacto = false
-	}: { solicitacao: PolicialAcaoSolicitacao; compacto?: boolean } = $props();
+		compacto = false,
+		fimEfetivo = null
+	}: {
+		solicitacao: PolicialAcaoSolicitacao;
+		compacto?: boolean;
+		/** Afastamento com retorno antecipado aprovado: o fim que valeu, no lugar do previsto. */
+		fimEfetivo?: string | null;
+	} = $props();
 
 	/** Rótulo do subtipo do afastamento; o valor cru vira fallback legível. */
 	const subtipo = $derived(
@@ -50,7 +56,10 @@
 			},
 			s.tipo === 'afastamento' && subtipo && { rotulo: 'Tipo', valor: subtipo },
 			// Retorno antecipado: o afastamento alcançado e o dia da volta.
-			s.tipo === 'retorno_antecipado' && subtipo && { rotulo: 'Afastamento', valor: subtipo },
+			s.tipo === 'retorno_antecipado' && {
+				rotulo: 'Afastamento',
+				valor: s.descricao || subtipo || ''
+			},
 			s.tipo === 'retorno_antecipado' &&
 				s.data_evento && { rotulo: 'Retorno ao serviço', valor: formatarData(s.data_evento) },
 			s.tipo === 'afastamento' && s.tipo_cid && { rotulo: 'CID', valor: s.tipo_cid },
@@ -59,11 +68,15 @@
 				s.data_evento && { rotulo: 'Data', valor: formatarData(s.data_evento) },
 			s.data_inicio && { rotulo: 'Início', valor: formatarData(s.data_inicio) },
 			s.data_fim && {
-				rotulo: s.tipo === 'retorno_antecipado' ? 'Término previsto' : 'Término',
+				rotulo: s.tipo === 'retorno_antecipado' || fimEfetivo ? 'Término previsto' : 'Término',
 				valor: formatarData(s.data_fim)
 			},
+			fimEfetivo && { rotulo: 'Término efetivo', valor: formatarData(fimEfetivo) },
 			s.qtd_dias != null && { rotulo: 'Dias', valor: String(s.qtd_dias) },
-			s.nup && { rotulo: 'NUP', valor: s.nup }
+			s.nup && {
+				rotulo: s.tipo === 'retorno_antecipado' ? 'NUP do retorno' : 'NUP',
+				valor: s.nup
+			}
 		].filter((l): l is { rotulo: string; valor: string } => !!l)
 	);
 </script>

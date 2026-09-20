@@ -21,7 +21,7 @@
 	import { invalidateShared } from '$lib/cross-tab-invalidate';
 	import { toaster } from '$lib/toast';
 	import { formatarNUP } from '$lib/utils/formato';
-	import { hojeLocalISO } from '$lib/utils/datas';
+	import { adicionarDias, formatarData, hojeLocalISO } from '$lib/utils/datas';
 
 	const ROTULO_TIPO_ACAO: Record<string, string> = {
 		movimentacao: 'Movimentação',
@@ -51,15 +51,32 @@
 	     APROVADO e ainda em curso — a unidade e o DPI SUL registram direto a
 	     data do retorno e o NUP; o afastamento encurta até a véspera. ── */
 	const hoje = hojeLocalISO();
-	/** Já há retorno pedido (pendente) ou aprovado para este afastamento? Então o botão some; volta se rejeitado. */
-	const retornoJaPedido = (s: PolicialAcaoSolicitacao) =>
-		acoes.some(
-			(r) =>
-				r.tipo === 'retorno_antecipado' &&
-				r.status !== 'rejeitada' &&
-				r.subtipo === s.subtipo &&
-				r.data_inicio === s.data_inicio
-		);
+	/**
+	 * O pedido de retorno antecipado mais recente deste afastamento (mesmo
+	 * subtipo e 1º dia). É informação DO CARD do afastamento — não um card à
+	 * parte: pendente avisa, aprovado muda o término, rejeitado libera o botão.
+	 */
+	const retornoDo = (s: PolicialAcaoSolicitacao) =>
+		acoes
+			.filter(
+				(r) =>
+					r.tipo === 'retorno_antecipado' &&
+					r.subtipo === s.subtipo &&
+					r.data_inicio === s.data_inicio
+			)
+			.sort((a, b) => b.id - a.id)[0] ?? null;
+	/** O fim que valeu: a véspera do retorno aprovado, ou o previsto. */
+	const fimEfetivoDe = (s: PolicialAcaoSolicitacao) => {
+		const r = retornoDo(s);
+		return r?.status === 'aprovada' && r.data_evento ? adicionarDias(r.data_evento, -1) : null;
+	};
+	/** Já há retorno pedido (pendente) ou aprovado? Então o botão some; volta se rejeitado. */
+	const retornoJaPedido = (s: PolicialAcaoSolicitacao) => {
+		const r = retornoDo(s);
+		return !!r && r.status !== 'rejeitada';
+	};
+	/** Os pedidos de retorno não aparecem como cards: moram no card do afastamento. */
+	const acoesVisiveis = $derived(acoes.filter((a) => a.tipo !== 'retorno_antecipado'));
 	const admiteRetorno = (s: PolicialAcaoSolicitacao) =>
 		s.tipo === 'afastamento' &&
 		s.status === 'aprovada' &&
@@ -68,6 +85,7 @@
 		s.data_inicio <= hoje &&
 		(!s.data_fim || s.data_fim >= hoje) &&
 		!retornoJaPedido(s);
+	const fmtDecisao = (iso: string | null) => (iso ? formatarData(iso.slice(0, 10)) : '');
 	let retornoDe = $state<number | null>(null);
 
 	/** Aberto = pendente, ou afastamento aprovado ainda em curso. */
@@ -76,11 +94,11 @@
 		(a.status === 'aprovada' &&
 			a.tipo === 'afastamento' &&
 			!!a.data_inicio &&
-			(!a.data_fim || a.data_fim >= hoje));
+			(fimEfetivoDe(a) ?? a.data_fim ?? '9999-12-31') >= hoje);
 	const camposAbertos = $derived(campos.filter((c) => c.status === 'pendente'));
 	const camposAnteriores = $derived(campos.filter((c) => c.status !== 'pendente'));
-	const acoesAbertas = $derived(acoes.filter(acaoAberta));
-	const acoesAnteriores = $derived(acoes.filter((a) => !acaoAberta(a)));
+	const acoesAbertas = $derived(acoesVisiveis.filter(acaoAberta));
+	const acoesAnteriores = $derived(acoesVisiveis.filter((a) => !acaoAberta(a)));
 	let enviando = $state(false);
 	function aoResponder() {
 		enviando = true;
@@ -237,10 +255,36 @@
 						</span>
 						<StatusSolicitacao status={s.status} />
 					</div>
-					<DetalheSolicitacaoAcao solicitacao={s} compacto />
+					<DetalheSolicitacaoAcao solicitacao={s} compacto fimEfetivo={fimEfetivoDe(s)} />
 					<p class="text-2xs text-surface-600 dark:text-surface-400 mt-2">
 						Solicitado por {s.solicitante_nome || '—'}
 					</p>
+					<!-- O retorno antecipado deste afastamento: dois processos, dois NUPs —
+					     o do afastamento acima, o do retorno aqui. -->
+					{#if s.tipo === 'afastamento' && retornoDo(s)}
+						{@const r = retornoDo(s)!}
+						<p
+							class="mt-2 rounded-md px-3 py-1.5 text-xs font-semibold {r.status === 'pendente'
+								? 'border-l-4 border-warning-500 bg-warning-500/10 text-warning-800 dark:text-warning-300'
+								: r.status === 'aprovada'
+									? 'border-l-4 border-success-500 bg-success-500/10 text-success-800 dark:text-success-300'
+									: 'border-l-4 border-error-500 bg-error-500/10 text-error-700 dark:text-error-300'}"
+						>
+							{#if r.status === 'pendente'}
+								⏳ Retorno antecipado pedido: volta ao serviço em {formatarData(
+									r.data_evento ?? ''
+								)}{#if r.nup}
+									· NUP do retorno {r.nup}{/if} — aguardando o Admin Geral
+							{:else if r.status === 'aprovada'}
+								✔ Retorno antecipado em {formatarData(r.data_evento ?? '')}{#if r.nup}
+									· NUP do retorno {r.nup}{/if} — aprovado em {fmtDecisao(r.decidido_em)}
+							{:else}
+								✖ Retorno antecipado de {formatarData(r.data_evento ?? '')} rejeitado em {fmtDecisao(
+									r.decidido_em
+								)}
+							{/if}
+						</p>
+					{/if}
 					{#if admiteRetorno(s)}
 						{#if retornoDe === s.id}
 							<form

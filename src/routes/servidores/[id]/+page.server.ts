@@ -1104,7 +1104,8 @@ export const actions: Actions = {
 				policial_id: id,
 				tipo: 'retorno_antecipado',
 				subtipo: ev.subtipo,
-				descricao: `Retorno antecipado — ${rotuloAf} de ${ev.data_inicio}`,
+				// Dois processos, dois NUPs: o do afastamento vai aqui, o do retorno em `nup`.
+				descricao: `${rotuloAf} de ${ev.data_inicio}${ev.nup ? ` · NUP do afastamento ${ev.nup}` : ''}`,
 				data_inicio: ev.data_inicio,
 				data_fim: ev.data_fim,
 				data_evento: retorno,
