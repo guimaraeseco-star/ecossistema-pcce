@@ -311,8 +311,7 @@ describe('abono', () => {
 				policial_id: POL,
 				posicao: 'finais',
 				status: 'deferido',
-				nup: '08100.2/2026-00',
-				decidido_em: '2026-09-15'
+				nup: '08100.2/2026-00'
 			},
 			QUEM
 		);

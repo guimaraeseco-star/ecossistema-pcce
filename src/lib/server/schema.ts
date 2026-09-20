@@ -2436,11 +2436,9 @@ export const feriasAbonos = sqliteTable(
 		abono_inicio: text('abono_inicio').notNull(),
 		abono_fim: text('abono_fim').notNull(),
 		nup: text('nup').notNull().default(''),
-		data_requerimento: text('data_requerimento'),
 		status: text('status', { enum: ['deferido', 'indeferido'] })
 			.notNull()
 			.default('deferido'),
-		decidido_em: text('decidido_em'),
 		ciencia_unidade_em: text('ciencia_unidade_em'),
 		ciencia_unidade_por_id: integer('ciencia_unidade_por_id'),
 		ciencia_unidade_por_nome: text('ciencia_unidade_por_nome').notNull().default(''),

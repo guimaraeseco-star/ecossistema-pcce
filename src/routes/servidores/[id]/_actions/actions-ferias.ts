@@ -494,10 +494,11 @@ export const actionsFerias = {
 	},
 
 	/**
-	 * Só o Admin Geral: o abono chega da COGEP ao DPI SUL, não à unidade. As
-	 * checagens do Dec. 37.363 rodam e vão para a auditoria; janela fora do
-	 * prazo é aviso (a decisão já foi do DG), impedimento apurável é aviso
-	 * também — o registro é do que foi decidido, não do que deveria ter sido.
+	 * Só o Admin Geral: o abono chega da COGEP ao DPI SUL, não à unidade — e
+	 * chega só a DECISÃO, sem data de requerimento nem de decisão (por isso o
+	 * formulário não as pede). As checagens do Dec. 37.363 rodam e vão para a
+	 * auditoria; impedimento apurável é aviso — o registro é do que foi
+	 * decidido, não do que deveria ter sido.
 	 */
 	registrarAbono: async (event: Event) => {
 		const auth = await carregarFichaDoPolicial(
@@ -525,8 +526,6 @@ export const actionsFerias = {
 			posicaoBruta === 'iniciais' || posicaoBruta === 'finais' ? posicaoBruta : null;
 		const status = String(fd.get('status') ?? '') === 'indeferido' ? 'indeferido' : 'deferido';
 		const nup = textoLimitado(fd, 'nup', 40);
-		const dataRequerimento = dataIso(fd, 'data_requerimento');
-		const decididoEm = dataIso(fd, 'decidido_em');
 		if (!posicao)
 			return fail(400, { error: 'Indique se converte os 10 dias iniciais ou os finais.' });
 		if (statusPelaData(comoFracao(fracao), hojeBrasilISO()) === 'gozada') {
@@ -541,7 +540,7 @@ export const actionsFerias = {
 		).length;
 		const checagens = conferirAbono({
 			fracao: comoFracao(fracao),
-			dataRequerimentoISO: dataRequerimento ?? hojeBrasilISO(),
+			hojeISO: hojeBrasilISO(),
 			posicao,
 			abonosJaDeferidosNoAno: abonosNoAno,
 			historico: historico
@@ -560,9 +559,7 @@ export const actionsFerias = {
 				policial_id: id,
 				posicao,
 				nup,
-				data_requerimento: dataRequerimento,
-				status,
-				decidido_em: decididoEm
+				status
 			},
 			{ id: u.id, nome: u.nome }
 		);

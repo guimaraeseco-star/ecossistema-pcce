@@ -397,6 +397,8 @@ Servidores.xlsx --enviar --local`): 697/697 importados; relatório lista
       nome abre a ficha do servidor; "Ver em Servidores" abre a lista filtrada;
       zero fica apagado e não abre; a lista tem a linha "Total de DPI SUL com
       vinculadas" batendo com o cabeçalho
+- [ ] Servidores: a tela ABRE SEM FILTRO (nenhum botão aceso, lista inteira),
+      mesmo depois de ter filtrado e saído; filtrar, sair e voltar começa limpo
 - [ ] Servidores: filtro "Situação hoje" (Todos/Ativos/Férias/Afastados) e
       coluna Situação (Ativo; Férias até dd/mm em dourado; tipo de afastamento
       até dd/mm em vermelho); a ficha mostra o mesmo selo ao lado do nome
@@ -442,8 +444,10 @@ HISTORICO.xlsx --enviar --local`): 698/914 linhas casam com a base (os
       "Direção de unidade", e o detalhe mostra Unidade e Papel antes das datas
 - [ ] Férias — lançar (E56, migração 0091): na ficha do servidor, o cartão
       "Férias" (dourado, borda e título — dá para achar de longe) abaixo das
-      solicitações; "Lançar programação" pede o exercício, mostra o período
-      aquisitivo calculado da data de posse e pergunta "Quantos períodos?"
+      solicitações; "Lançar programação" abre com um AVISO em dourado ("só pode
+      ser feito uma vez dentro do período aquisitivo; depois, só por alteração"),
+      pede o exercício, mostra o período aquisitivo calculado da data de posse
+      e pergunta "Quantos períodos?"
       (1 / 2 / 3); com 2 aparecem as formas 10 + 20, 20 + 10 e 15 + 15; depois
       só o 1º dia de cada fração — o último dia aparece ao lado, calculado.
       Um 1º dia em sábado/domingo (01/11/2026 é domingo) ou feriado trava o
@@ -478,13 +482,14 @@ HISTORICO.xlsx --enviar --local`): 698/914 linhas casam com a base (os
       seccional e o departamento mostram "⚠ Férias: 1 pedido aguardando a
       COGEP" em /unidade (tabela e celular) e no topo da ficha da unidade;
       homologado, os alertas somem
-- [ ] Férias — abono (só Admin Geral): "Registrar abono" pede 10 iniciais ou
-      finais, decisão, datas e NUP; deferido, o afastamento passa a cobrir só o
+- [ ] Férias — abono (só Admin Geral): "Registrar abono" pede só 10 iniciais
+      ou finais, decisão e NUP (sem "Requerido em"/"Decidido em" — o DPI SUL
+      não recebe essas datas); deferido, o afastamento passa a cobrir só o
       gozo, o cartão mostra "aguardando ciência da unidade", os alertas dizem
       "abono sem ciência" e, nos dias convertidos, /servidores mostra "Ativo ·
       em abono até dd/mm"; "Estou ciente" (admin de unidade/seccional/geral)
       apaga o alerta; janela fora de 60–90 dias e impedimentos do art. 13 saem
-      como aviso no toast, não travam
+      como aviso no toast, não travam; a janela de 60–90 dias não é conferida
 - [ ] Férias — o ano da unidade: "Férias do ano →" na ficha da unidade abre
       /unidade/[id]/ferias com os 12 meses; cada mês lista, por unidade, "N de
       M · X %" com "⚠ acima do teto" em dourado quando passa de 15 %; numa

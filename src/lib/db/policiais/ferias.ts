@@ -482,9 +482,7 @@ export interface NovoAbono {
 	policial_id: number;
 	posicao: PosicaoDoAbono;
 	nup?: string;
-	data_requerimento?: string | null;
 	status: 'deferido' | 'indeferido';
-	decidido_em?: string | null;
 }
 
 /**
@@ -517,9 +515,7 @@ export async function registrarAbono(
 			abono_inicio: abono.inicio,
 			abono_fim: abono.fim,
 			nup: dados.nup ?? '',
-			data_requerimento: dados.data_requerimento ?? null,
 			status: dados.status,
-			decidido_em: dados.decidido_em ?? null,
 			registrado_por_id: quem.id,
 			registrado_por_nome: quem.nome
 		})

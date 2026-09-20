@@ -532,9 +532,6 @@ export function textoDoOficio(d: DadosDoOficio): string {
 /** Dias convertíveis: 1/3 de 30 (Lei 19.472/2025; Dec. 37.363/2026, art. 1º). */
 const DIAS_DO_ABONO = 10;
 
-/** Janela do requerimento: entre 60 e 90 dias antes do início (art. 3º). */
-const JANELA_ABONO_DIAS = { minimo: 60, maximo: 90 } as const;
-
 export type PosicaoDoAbono = 'iniciais' | 'finais';
 
 /**
@@ -601,30 +598,22 @@ export function impedimentosDoAbono(
 }
 
 /**
- * Confere um pedido de abono contra o Dec. 37.363/2026: janela de 60–90 dias
- * antes do início (art. 3º), posição dos 10 dias numa fração maior (art. 4º),
- * uma vez por ano (art. 11) e os impedimentos do art. 13.
+ * Confere o registro de um abono contra o Dec. 37.363/2026: posição dos 10
+ * dias numa fração maior (art. 4º), uma vez por ano (art. 11) e os
+ * impedimentos do art. 13, apurados em `hojeISO` (a data do registro). A
+ * janela de 60–90 dias do requerimento (art. 3º) NÃO é conferida: o DPI SUL
+ * recebe só a decisão, sem a data do pedido — quem apreciou a janela foi a
+ * COGEP (decisão dele, 17/09).
  */
 export function conferirAbono(entrada: {
 	fracao: Fracao;
-	dataRequerimentoISO: string;
+	hojeISO: string;
 	posicao: PosicaoDoAbono | null;
 	abonosJaDeferidosNoAno: number;
 	historico: readonly AfastamentoParaAbono[];
 }): Checagem[] {
-	const { fracao, dataRequerimentoISO, posicao } = entrada;
+	const { fracao, posicao } = entrada;
 	const checagens: Checagem[] = [];
-	const antecedencia = diffDiasInclusivo(dataRequerimentoISO, fracao.data_inicio) - 1;
-
-	const naJanela =
-		antecedencia >= JANELA_ABONO_DIAS.minimo && antecedencia <= JANELA_ABONO_DIAS.maximo;
-	checagens.push({
-		ok: naJanela,
-		nivel: 'aviso',
-		texto: naJanela
-			? `Requerido ${antecedencia} dias antes do início (janela de ${JANELA_ABONO_DIAS.minimo} a ${JANELA_ABONO_DIAS.maximo}).`
-			: `Requerido ${antecedencia} dias antes do início — fora da janela de ${JANELA_ABONO_DIAS.minimo} a ${JANELA_ABONO_DIAS.maximo} dias (art. 3º); o pedido pode não ser apreciado (art. 5º).`
-	});
 
 	const dias = diasDaFracao(fracao);
 	if (dias > DIAS_DO_ABONO) {
@@ -656,7 +645,7 @@ export function conferirAbono(entrada: {
 				: 'Já há abono deferido neste ano — o decreto limita a uma vez por ano (art. 11).'
 	});
 
-	for (const imp of impedimentosDoAbono(entrada.historico, dataRequerimentoISO)) {
+	for (const imp of impedimentosDoAbono(entrada.historico, entrada.hojeISO)) {
 		checagens.push({ ok: false, nivel: 'erro', texto: imp });
 	}
 

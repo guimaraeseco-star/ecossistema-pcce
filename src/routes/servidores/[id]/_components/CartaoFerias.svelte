@@ -301,6 +301,17 @@
 			class="mb-4 space-y-3 rounded-xl border border-surface-200 bg-white/70 p-3 dark:border-white/10 dark:bg-surface-900/60"
 		>
 			<h3 class="text-sm font-bold">Lançar a programação</h3>
+			<!-- Uma vez por período aquisitivo: o que entra aqui é a programação
+			     homologada no Guardião; depois, as datas só mudam por sustação ou
+			     suspensão (pedido dele, 17/09). -->
+			<p
+				class="rounded-lg border border-warning-500/40 bg-warning-500/10 p-2 text-xs text-warning-800 dark:text-warning-300"
+				role="note"
+			>
+				<strong>Atenção:</strong> este lançamento só pode ser feito <strong>uma vez</strong> dentro
+				do período aquisitivo — é a programação homologada no Guardião. Depois de lançada, as datas
+				só mudam por <strong>alteração</strong> (sustação ou suspensão), com pedido à COGEP.
+			</p>
 			<div class="grid grid-cols-1 gap-3 sm:grid-cols-[8rem_1fr]">
 				<label class="label">
 					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70">Exercício</span>
@@ -722,7 +733,7 @@
 				Decisão do Delegado-Geral, chegada ao DPI SUL. Deferido, nos 10 dias convertidos o servidor
 				TRABALHA — a unidade recebe o alerta e precisa dar ciência.
 			</p>
-			<div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+			<div class="grid grid-cols-2 gap-3">
 				<label class="label">
 					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70"
 						>Dias convertidos</span
@@ -738,14 +749,6 @@
 						<option value="deferido">Deferido</option>
 						<option value="indeferido">Indeferido</option>
 					</select>
-				</label>
-				<label class="label">
-					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70">Requerido em</span>
-					<input class="input px-3 py-1 text-sm" type="date" name="data_requerimento" />
-				</label>
-				<label class="label">
-					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70">Decidido em</span>
-					<input class="input px-3 py-1 text-sm" type="date" name="decidido_em" />
 				</label>
 			</div>
 			<label class="label">

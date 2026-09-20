@@ -89,9 +89,8 @@ CREATE TABLE ferias_abonos (
 	abono_inicio TEXT NOT NULL,
 	abono_fim TEXT NOT NULL,
 	nup TEXT NOT NULL DEFAULT '',
-	data_requerimento TEXT,
+	-- Só a decisão: o DPI SUL não recebe a data do requerimento nem a da decisão.
 	status TEXT NOT NULL DEFAULT 'deferido' CHECK (status IN ('deferido', 'indeferido')),
-	decidido_em TEXT,
 	ciencia_unidade_em TEXT,
 	ciencia_unidade_por_id INTEGER,
 	ciencia_unidade_por_nome TEXT NOT NULL DEFAULT '',

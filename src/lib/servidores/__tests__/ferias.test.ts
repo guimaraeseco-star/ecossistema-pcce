@@ -222,42 +222,25 @@ describe('o ofício do NUP sai com o instituto certo', () => {
 describe('abono pecuniário (Dec. 37.363/2026)', () => {
 	const f = fracao(1, '2026-12-01', '2026-12-30'); // 30 dias
 
-	it('janela de 60 a 90 dias: dentro passa, fora avisa', () => {
-		const dentro = conferirAbono({
-			fracao: f,
-			dataRequerimentoISO: '2026-09-15',
-			posicao: 'finais',
-			abonosJaDeferidosNoAno: 0,
-			historico: []
-		});
-		expect(dentro[0].ok).toBe(true);
-		const fora = conferirAbono({
-			fracao: f,
-			dataRequerimentoISO: '2026-11-20',
-			posicao: 'finais',
-			abonosJaDeferidosNoAno: 0,
-			historico: []
-		});
-		expect(fora[0].ok).toBe(false);
-		expect(fora[0].nivel).toBe('aviso');
-	});
+	// A janela de 60–90 dias (art. 3º) não é conferida: o DPI SUL recebe só a
+	// decisão, sem a data do requerimento — a janela foi apreciada pela COGEP.
 
 	it('fração maior que 10 exige a posição (art. 4º)', () => {
 		const c = conferirAbono({
 			fracao: f,
-			dataRequerimentoISO: '2026-09-15',
+			hojeISO: '2026-09-15',
 			posicao: null,
 			abonosJaDeferidosNoAno: 0,
 			historico: []
 		});
-		expect(c[1].ok).toBe(false);
+		expect(c[0].ok).toBe(false);
 		expect(temErro(c)).toBe(true);
 	});
 
 	it('segundo abono no ano é erro (art. 11)', () => {
 		const c = conferirAbono({
 			fracao: f,
-			dataRequerimentoISO: '2026-09-15',
+			hojeISO: '2026-09-15',
 			posicao: 'iniciais',
 			abonosJaDeferidosNoAno: 1,
 			historico: []

@@ -4,8 +4,10 @@
 	 * pessoa com uma unidade, e por consequência todo o escopo de RBAC.
 	 *
 	 * Listagem paginada no servidor (20 por página) com filtros de lotação,
-	 * cargo, seccional e busca, persistidos em localStorage por
-	 * `useFiltrosPaginados`. O filtro por seccional é do CLIENTE: ele restringe
+	 * cargo, seccional e busca. A tela ABRE SEM FILTRO (decisão dele, 17/09):
+	 * só a URL seleciona — o que vinha do localStorage deixava os botões
+	 * "Afastados"/"OIP" acesos com a lista inteira embaixo, porque o servidor
+	 * lê a URL e não o navegador. O filtro por seccional é do CLIENTE: ele restringe
 	 * as opções de lotação do dropdown, não a consulta. `'__todas__'` é a
 	 * sentinela de "sem filtro" que o servidor entende.
 	 *
@@ -53,7 +55,6 @@
 		useFiltrosPaginados,
 		useSamePathNavigating
 	} from '$lib/composables';
-	import { getSavedFilters } from '$lib/utils/localStorage';
 	import type { Policial, Unidade } from '$lib/types';
 	import {
 		COR_SITUACAO,
@@ -78,14 +79,6 @@
 	const samePathNav = useSamePathNavigating();
 	const isAdminOrSeccional = $derived(auth.isAdminOrSeccional);
 	const isAdminUnidade = $derived(auth.isAdminUnidade);
-	const savedFilters = getSavedFilters('filtros_policiais', {
-		lotacao: '',
-		cargo: '',
-		seccional: 'todas',
-		busca: '',
-		situacao: '',
-		designacao: ''
-	});
 
 	const unidades = $derived(data.unidades as Unidade[]);
 	const designacoes = $derived(data.designacoes as { id: number; nome: string; simbolo: string }[]);
@@ -109,19 +102,19 @@
 	const ITEMS_POR_PAGINA = 20;
 
 	// Filtros
-	let filtroLotacao = $state(untrack(() => data.filtros.lotacao || savedFilters.lotacao));
-	let filtroCargo = $state(untrack(() => data.filtros.cargo || savedFilters.cargo));
+	let filtroLotacao = $state(untrack(() => data.filtros.lotacao || ''));
+	let filtroCargo = $state(untrack(() => data.filtros.cargo || ''));
 	// Situação de hoje: '' (todos) | ativos | ferias | afastados. Vem da URL
 	// quando o link parte da Gestão de unidade.
-	let filtroSituacao = $state(untrack(() => data.filtros.situacao || savedFilters.situacao));
+	let filtroSituacao = $state(untrack(() => data.filtros.situacao || ''));
 	let filtroSeccional = $state<number | 'todas'>(
 		untrack(() => {
-			const raw = data.filtros.seccional || savedFilters.seccional;
+			const raw = data.filtros.seccional || 'todas';
 			return raw === 'todas' ? 'todas' : Number(raw);
 		})
 	);
-	let filtroBusca = $state(untrack(() => data.filtros.busca || savedFilters.busca));
-	let filtroDesignacao = $state(untrack(() => data.filtros.designacao || savedFilters.designacao));
+	let filtroBusca = $state(untrack(() => data.filtros.busca || ''));
+	let filtroDesignacao = $state(untrack(() => data.filtros.designacao || ''));
 
 	const seccionais = $derived(unidades.filter((u) => u.tipo === 'seccional'));
 	// Toda unidade ATIVA é lotação possível — departamento, subdepartamento,
