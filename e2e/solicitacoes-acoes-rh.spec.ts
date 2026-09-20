@@ -94,6 +94,8 @@ test('admin de unidade PEDE o afastamento — nada entra no histórico', async (
 	await page.goto(`/servidores/${FIXTURE.policialA.id}`);
 	await page.getByRole('button', { name: /Afastamento/ }).click();
 	const modal = page.getByRole('dialog').filter({ hasText: 'Registrar Afastamento' });
+	// Abre SEM tipo: "Selecione o tipo…" é a primeira coisa que o usuário vê.
+	await expect(modal.locator('select[name="subtipo"]')).toHaveValue('');
 	// Férias não estão na lista: entram pelo cartão Férias.
 	await expect(modal.locator('select[name="subtipo"] option', { hasText: 'Férias' })).toHaveCount(
 		0
@@ -103,7 +105,9 @@ test('admin de unidade PEDE o afastamento — nada entra no histórico', async (
 	await modal.getByLabel(/CID-F/).check();
 	await expect(modal.getByRole('alert')).toContainText('Portaria nº 39/2026');
 	await modal.getByLabel('Data Início').fill(INICIO);
-	await modal.getByLabel('Qtd Dias').fill('5');
+	await modal.getByLabel(/Qtd Dias/).fill('5');
+	// A data final é calculada, nunca digitada.
+	await expect(modal.locator('input[name="data_fim"]')).toHaveValue('2026-09-05');
 	// Sem descrição, PDF ou justificativa: o NUP é o fundamento do pedido.
 	await modal.getByLabel(/NUP do processo/).fill('10051028034202664');
 	await expect(modal.getByLabel('Justificativa do pedido')).toHaveCount(0);

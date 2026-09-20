@@ -27,10 +27,11 @@
 	 * logo abaixo (`HistoricoServidor`) precisa refletir o que acabou de ser
 	 * gravado, e no modo solicitação é o quadro de pedidos que precisa.
 	 *
-	 * No afastamento, "Qtd de dias" e "Data final" são o MESMO dado por dois
-	 * caminhos, e cada campo recalcula o outro. A contagem é INCLUSIVA (um
-	 * afastamento de 1 dia começa e termina no mesmo dia), daí o `q - 1` em
-	 * `adicionarDias` — tratar como exclusiva desloca todo afastamento em um dia.
+	 * No afastamento o usuário informa a DATA INICIAL e a QUANTIDADE DE DIAS; a
+	 * data final é sempre calculada (pedido dele, 20/09). A contagem é
+	 * INCLUSIVA (um afastamento de 1 dia começa e termina no mesmo dia), daí o
+	 * `q - 1` em `adicionarDias` — tratar como exclusiva desloca todo
+	 * afastamento em um dia.
 	 *
 	 * O modal de afastamento segue a tabela do responsável (20/09/2026, adotada
 	 * do sistema anterior): tipos por categoria, caixa com a base legal e a
@@ -46,7 +47,7 @@
 	import { invalidateShared } from '$lib/cross-tab-invalidate';
 	import { toaster } from '$lib/toast';
 	import { loading } from '$lib/loading.svelte';
-	import { adicionarDias, diffDiasInclusivo } from '$lib/utils/datas';
+	import { adicionarDias } from '$lib/utils/datas';
 	import { formatarNUP } from '$lib/utils/formato';
 	import { MAX_JUSTIFICATIVA } from '$lib/cadastro-campos';
 	import ArrowRightLeft from '@lucide/svelte/icons/arrow-right-left';
@@ -81,12 +82,12 @@
 	let unidadeDestino = $state('');
 	/** Os tipos que ESTE perfil pode lançar, por categoria (disciplinares só no modo direto). */
 	const grupos = $derived(subtiposPorCategoria(!solicitando));
-	const primeiroSubtipo = $derived(grupos[0]?.subtipos[0] ?? 'outros');
-	let subtipo = $state<SubtipoAfastamento>('casamento');
+	/** Sem tipo até o usuário escolher — "Selecione o tipo" é a primeira coisa que ele vê. */
+	let subtipo = $state<SubtipoAfastamento | ''>('');
 	let tipoCid = $state<'CID-Outras' | 'CID-F'>('CID-Outras');
 	let adicional = $state(false);
-	const meta = $derived(AFASTAMENTOS[subtipo]);
-	const regra = $derived(regraDePrazo(subtipo, adicional));
+	const meta = $derived(subtipo ? AFASTAMENTOS[subtipo] : null);
+	const regra = $derived(subtipo ? regraDePrazo(subtipo, adicional) : null);
 	let dataInicio = $state('');
 	let qtdDias = $state('');
 	let dataFim = $state('');
@@ -100,12 +101,12 @@
 	const bloqueado = $derived(
 		enviando ||
 			(solicitando && modal !== 'afastamento' && justificativa.trim().length === 0) ||
-			(modal === 'afastamento' && !nupConferido.ok)
+			(modal === 'afastamento' && (!subtipo || !nupConferido.ok))
 	);
 
 	function resetCampos() {
 		unidadeDestino = '';
-		subtipo = primeiroSubtipo;
+		subtipo = '';
 		tipoCid = 'CID-Outras';
 		adicional = false;
 		dataInicio = '';
@@ -133,15 +134,11 @@
 		if (dataInicio && q > 0) dataFim = adicionarDias(dataInicio, q - 1);
 		else if (!q) dataFim = '';
 	}
-	function recalcularQtd() {
-		const dias = diffDiasInclusivo(dataInicio, dataFim);
-		if (dias > 0) qtdDias = String(dias);
-	}
 	/** Ao trocar o tipo (ou o adicional): a quantidade ZERA; prazo fixo entra travado. */
 	function aoMudarTipo() {
 		qtdDias = '';
 		dataFim = '';
-		if (regra.diasFixos != null) {
+		if (regra?.diasFixos != null) {
 			qtdDias = String(regra.diasFixos);
 			recalcularDataFim();
 		}
@@ -404,6 +401,7 @@
 							onchange={aoMudarTipo}
 							required
 						>
+							<option value="" disabled>Selecione o tipo…</option>
 							{#each grupos as g (g.categoria)}
 								<optgroup label={g.rotulo}>
 									{#each g.subtipos as s (s)}
@@ -455,7 +453,7 @@
 
 				<!-- A base legal e a observação do tipo escolhido — o que a tela antiga
 				     mostrava e que evita o tipo errado. -->
-				{#if meta.base || meta.obs}
+				{#if meta && (meta.base || meta.obs)}
 					<div
 						class="rounded-lg border border-primary-500/30 bg-primary-500/10 px-3 py-2 text-xs leading-relaxed"
 					>
@@ -469,7 +467,7 @@
 				{/if}
 
 				<!-- LTS: a classificação do CID. CID-F dispara a Portaria 39/2026. -->
-				{#if regra.exigeCid}
+				{#if regra?.exigeCid}
 					<fieldset
 						class="rounded-lg border border-warning-500/40 bg-warning-500/10 px-3 py-2 text-xs space-y-1"
 					>
@@ -518,7 +516,7 @@
 				{/if}
 
 				<!-- Maternidade: 120 dias, mais 60 se a servidora pediu a prorrogação. -->
-				{#if meta.adicional}
+				{#if meta?.adicional}
 					<label class="flex items-center gap-2 text-sm cursor-pointer">
 						<input
 							type="checkbox"
@@ -532,6 +530,21 @@
 					</label>
 				{/if}
 
+				<!-- O que o usuário preenche: a data inicial e a quantidade de dias; a
+				     data final é sempre calculada. Nos tipos de prazo fixo a quantidade
+				     vem travada; nos sem prazo, pode ficar vazia. -->
+				{#if regra}
+					<p class="text-2xs text-surface-600 dark:text-surface-400">
+						{#if regra.diasFixos != null}
+							Prazo fixo de {regra.diasFixos} dias: informe só a <b>data inicial</b>.
+						{:else if regra.semPrazo}
+							Sem prazo definido: informe a <b>data inicial</b> e, se houver, a
+							<b>quantidade de dias</b>.
+						{:else}
+							Informe a <b>data inicial</b> e a <b>quantidade de dias</b>; a data final é calculada.
+						{/if}
+					</p>
+				{/if}
 				<div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
 					<label class="label">
 						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1">Data Início</span>
@@ -546,11 +559,14 @@
 					</label>
 					<label class="label">
 						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"
-							>Qtd Dias{#if regra.diasFixos != null}
-								<span class="normal-case font-normal opacity-70"> · fixo</span>{/if}</span
+							>Qtd Dias{#if regra?.diasFixos != null}
+								<span class="normal-case font-normal opacity-70">
+									· fixo</span
+								>{:else if regra?.semPrazo}
+								<span class="normal-case font-normal opacity-70"> · opcional</span>{/if}</span
 						>
 						<input
-							class="input py-1 px-3 text-sm {regra.diasFixos != null
+							class="input py-1 px-3 text-sm {regra?.diasFixos != null
 								? 'opacity-70 cursor-not-allowed'
 								: ''}"
 							type="number"
@@ -558,31 +574,27 @@
 							min="1"
 							bind:value={qtdDias}
 							oninput={recalcularDataFim}
-							readonly={regra.diasFixos != null}
+							readonly={regra?.diasFixos != null}
+							required={!!regra && regra.diasFixos == null && !regra.semPrazo}
 						/>
 					</label>
 					<label class="label">
 						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"
-							>Data Final{#if regra.semPrazo}
-								<span class="normal-case font-normal opacity-70"> · opcional</span>{/if}</span
+							>Data Final <span class="normal-case font-normal opacity-70">· calculada</span></span
 						>
 						<input
-							class="input py-1 px-3 text-sm {regra.diasFixos != null
-								? 'opacity-70 cursor-not-allowed'
-								: ''}"
+							class="input py-1 px-3 text-sm opacity-70 cursor-not-allowed"
 							type="date"
 							name="data_fim"
-							bind:value={dataFim}
-							oninput={recalcularQtd}
-							readonly={regra.diasFixos != null}
-							required={!regra.semPrazo}
+							value={dataFim}
+							readonly
+							tabindex="-1"
 						/>
 					</label>
 				</div>
-				{#if regra.semPrazo}
+				{#if regra?.semPrazo}
 					<p class="text-2xs text-warning-700 dark:text-warning-400">
-						Este afastamento não tem prazo definido: sem data final, o servidor consta como afastado
-						até o registro do retorno.
+						Sem data final, o servidor consta como afastado até o registro do retorno.
 					</p>
 				{/if}
 
