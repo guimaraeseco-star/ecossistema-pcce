@@ -467,6 +467,7 @@ HISTORICO.xlsx --enviar --local`): 698/914 linhas casam com a base (os
       novos períodos) com botão Copiar, e o pedido fica em amarelo "aguardando
       a COGEP" no exercício, com NUP para anotar; enquanto pendente, os botões
       de sustar/suspender/excluir somem
+- [ ] Férias — sustar com venda (abono): fração TODA vendida (10 dias com abono deferido) fica fora da sustação — o botão diz "Sustar a fração" (só a outra) e as divisões partem dos dias que restam (20 → 20 ou 10 + 10); fração de 30 com 10 vendidos entra com "10 vendidos — restam 20" e a divisão parte de 20; deferida, a fração antiga fica sustada COM o abono (os dias vendidos ficam vendidos) e a nova nasce só com os dias a gozar
 - [ ] Férias — suspender: "Suspender" só aparece na fração EM GOZO hoje; o
       formulário diz SUSPENSÃO, pede o retorno ao serviço (limitado ao período
       da fração) e mostra "N gozados · restam M dias"; pede só o 1º dia do

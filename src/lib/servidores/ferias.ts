@@ -56,6 +56,12 @@ export interface Fracao {
 	data_inicio: string;
 	data_fim: string;
 	status: StatusFracao;
+	/**
+	 * Dias VENDIDOS (abono deferido) dentro da fração. Não se gozam nem se
+	 * sustam: o que resta à sustação é o que sobra deles (decisão dele,
+	 * 20/09). Ausente = nenhum.
+	 */
+	diasAbonados?: number;
 }
 
 /**
@@ -85,6 +91,11 @@ export function fracionamentoValido(diasPorFracao: readonly number[]): boolean {
 /** Dias de uma fração, inclusivos ("01/07 a 15/07" = 15). */
 export function diasDaFracao(f: Pick<Fracao, 'data_inicio' | 'data_fim'>): number {
 	return diffDiasInclusivo(f.data_inicio, f.data_fim);
+}
+
+/** Os dias que ainda se GOZAM (e, portanto, se sustam): a fração menos os vendidos. */
+export function diasAGozar(f: Pick<Fracao, 'data_inicio' | 'data_fim' | 'diasAbonados'>): number {
+	return Math.max(0, diasDaFracao(f) - (f.diasAbonados ?? 0));
 }
 
 /**
@@ -371,27 +382,33 @@ export function situacaoDaReprogramacao(
 	hojeISO: string
 ): SituacaoDaReprogramacao {
 	const vivas = fracoesDoExercicio.filter((f) => f.status === 'programada');
-	const sustaveis = vivas.filter((f) => statusPelaData(f, hojeISO) === 'programada');
+	// Fração inteira vendida (abono sobre todos os dias) não se susta: já está
+	// resolvida em pecúnia. Com venda parcial, entra só o que resta a gozar.
+	const sustaveis = vivas.filter(
+		(f) => statusPelaData(f, hojeISO) === 'programada' && diasAGozar(f) > 0
+	);
 	const emGozo = vivas.find((f) => statusPelaData(f, hojeISO) === 'em_gozo') ?? null;
 
 	let sustacao: SituacaoDaReprogramacao['sustacao'] = null;
 	if (sustaveis.length > 0) {
-		const diasRestantes = sustaveis.reduce((n, f) => n + diasDaFracao(f), 0);
-		const atual = sustaveis.map(diasDaFracao);
+		const diasRestantes = sustaveis.reduce((n, f) => n + diasAGozar(f), 0);
+		const atual = sustaveis.map(diasAGozar);
 		const igual = (d: readonly number[]) => d.join('+') === atual.join('+');
 		// A divisão atual sempre cabe (mesmo quando não é uma das cinco formas —
 		// o que resta depois de uma suspensão pode somar 22, por exemplo); as
 		// outras são as formas do decreto que somam o mesmo.
 		const divisoes = [atual, ...divisoesPossiveis(diasRestantes).filter((d) => !igual(d))];
 		const lista = sustaveis.map((f) => `${f.ordem}ª (${formatarData(f.data_inicio)})`).join(', ');
+		const vendidos = sustaveis.reduce((n, f) => n + (f.diasAbonados ?? 0), 0);
+		const notaVenda = vendidos > 0 ? ` Os ${vendidos} dias vendidos (abono) ficam vendidos.` : '';
 		sustacao = {
 			fracoes: sustaveis,
 			diasRestantes,
 			divisoes,
 			motivo:
 				sustaveis.length === 1
-					? `A ${lista} fração ainda não começou: é SUSTAÇÃO. Não precisa de motivo, e os ${diasRestantes} dias podem voltar divididos de outro jeito.`
-					: `As frações ${lista} ainda não começaram: é SUSTAÇÃO, das ${sustaveis.length} juntas — as férias são um período só. Não precisa de motivo, e os ${diasRestantes} dias podem voltar divididos de outro jeito.`
+					? `A ${lista} fração ainda não começou: é SUSTAÇÃO. Não precisa de motivo, e os ${diasRestantes} dias podem voltar divididos de outro jeito.${notaVenda}`
+					: `As frações ${lista} ainda não começaram: é SUSTAÇÃO, das ${sustaveis.length} juntas — as férias são um período só. Não precisa de motivo, e os ${diasRestantes} dias podem voltar divididos de outro jeito.${notaVenda}`
 		};
 	}
 

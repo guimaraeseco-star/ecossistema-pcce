@@ -338,7 +338,7 @@ describe('abono', () => {
 		expect((await pendenciasDeFerias(db, [POL])).get(POL)).toBeUndefined();
 	});
 
-	it('segundo abono na mesma fração é recusado; fração com abono não se susta', async () => {
+	it('segundo abono na mesma fração é recusado; fração toda vendida não se susta; a parcial susta o que resta', async () => {
 		await registrarAbono(
 			db,
 			{ fracao_id: fracaoId, policial_id: POL, posicao: 'finais', status: 'deferido' },
@@ -350,6 +350,7 @@ describe('abono', () => {
 			QUEM
 		);
 		expect(r).toEqual({ ok: false, motivo: 'ja_tem' });
+		// 30 dias com 10 vendidos: sustam-se os 20 que restam; os 10 ficam vendidos.
 		const s = await abrirReprogramacao(
 			db,
 			{
@@ -357,11 +358,45 @@ describe('abono', () => {
 				exercicio: 2026,
 				tipo: 'sustacao',
 				fracoes_ids: [fracaoId],
-				novos_periodos: [P('2027-02-01', '2027-03-02', 30)],
+				novos_periodos: [P('2027-02-01', '2027-02-20', 20)],
 				texto_oficio: 'x'
 			},
 			QUEM
 		);
-		expect(s).toEqual({ ok: false, motivo: 'tem_abono' });
+		expect(s.ok).toBe(true);
+		if (!s.ok) return;
+		await decidirReprogramacao(db, s.id, true, QUEM, '2026-09-20');
+		const { fracoes } = await listarFeriasDoPolicial(db, POL);
+		expect(fracoes.find((f) => f.id === fracaoId)?.status).toBe('sustada');
+		expect(fracoes.find((f) => f.id === fracaoId)?.abono?.status).toBe('deferido');
+		expect(eventosDeFerias()).toEqual([
+			{ data_inicio: '2027-02-01', data_fim: '2027-02-20', qtd_dias: 20 }
+		]);
+
+		// Fração de 10 toda vendida: nada a sustar.
+		const r10 = await registrarProgramacao(
+			db,
+			{ policial_id: POL, exercicio: 2027, periodos: [P('2027-06-01', '2027-06-10', 10)] },
+			QUEM
+		);
+		if (!r10.ok) throw new Error('não criou');
+		await registrarAbono(
+			db,
+			{ fracao_id: r10.ids[0], policial_id: POL, posicao: 'finais', status: 'deferido' },
+			QUEM
+		);
+		const toda = await abrirReprogramacao(
+			db,
+			{
+				policial_id: POL,
+				exercicio: 2027,
+				tipo: 'sustacao',
+				fracoes_ids: [r10.ids[0]],
+				novos_periodos: [P('2027-08-02', '2027-08-11', 10)],
+				texto_oficio: 'x'
+			},
+			QUEM
+		);
+		expect(toda).toEqual({ ok: false, motivo: 'toda_vendida' });
 	});
 });

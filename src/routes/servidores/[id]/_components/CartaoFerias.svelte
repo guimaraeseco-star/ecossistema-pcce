@@ -35,6 +35,7 @@
 	import type { FeriasDoPolicial, FracaoCompleta } from '$lib/db';
 	import {
 		criteriosDaSuspensao,
+		diasAGozar,
 		diasDaFracao,
 		diasRestantesNaSuspensao,
 		divisoesPossiveis,
@@ -75,7 +76,12 @@
 		ordem: f.ordem as 1 | 2 | 3,
 		data_inicio: f.data_inicio,
 		data_fim: f.data_fim,
-		status: f.status
+		status: f.status,
+		// Os dias vendidos (abono deferido) não se sustam: a regra desconta.
+		diasAbonados:
+			f.abono?.status === 'deferido'
+				? diasDaFracao({ data_inicio: f.abono.abono_inicio, data_fim: f.abono.abono_fim })
+				: 0
 	});
 
 	/** Por exercício, mais recente primeiro; dentro, pela ordem e pelo id. */
@@ -602,7 +608,9 @@
 							<li>
 								{f.ordem}ª fração: {formatarData(f.data_inicio)} – {formatarData(f.data_fim)} ({diasDaFracao(
 									f
-								)} dias)
+								)} dias{#if f.diasAbonados}, {f.diasAbonados} vendidos — restam {diasAGozar(
+										f
+									)}{/if})
 							</li>
 						{/each}
 					</ul>

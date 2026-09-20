@@ -48,6 +48,7 @@ import { MAX_JUSTIFICATIVA } from '$lib/cadastro-campos';
 import {
 	avisoDoTeto,
 	conferirAbono,
+	diasDaFracao,
 	criteriosDaSuspensao,
 	diasRestantesNaSuspensao,
 	divisoesPossiveis,
@@ -98,13 +99,24 @@ function comoFracao(f: {
 	data_inicio: string;
 	data_fim: string;
 	status: 'programada' | 'sustada' | 'suspensa';
+	abono?: { status: string; abono_inicio: string; abono_fim: string } | null;
 }): Fracao {
 	return {
 		ordem: f.ordem as 1 | 2 | 3,
 		data_inicio: f.data_inicio,
 		data_fim: f.data_fim,
-		status: f.status
+		status: f.status,
+		diasAbonados: diasVendidos(f.abono)
 	};
+}
+
+/** Os dias vendidos de uma fração: o abono deferido, se houver. */
+function diasVendidos(
+	abono: { status: string; abono_inicio: string; abono_fim: string } | null | undefined
+): number {
+	return abono?.status === 'deferido'
+		? diasDaFracao({ data_inicio: abono.abono_inicio, data_fim: abono.abono_fim })
+		: 0;
 }
 
 /** A primeira checagem com erro, como mensagem — ou `null`. */
@@ -299,8 +311,10 @@ export const actionsFerias = {
 		if (!situacao.sustacao) {
 			return fail(409, { error: 'Não há fração por começar neste exercício: nada a sustar.' });
 		}
+		// Os alvos são os que a REGRA disse (fração inteira vendida fica de fora).
+		const chaves = new Set(situacao.sustacao.fracoes.map((f) => `${f.ordem}|${f.data_inicio}`));
 		const alvos = doExercicio.filter(
-			(f) => f.status === 'programada' && statusPelaData(comoFracao(f), hoje) === 'programada'
+			(f) => f.status === 'programada' && chaves.has(`${f.ordem}|${f.data_inicio}`)
 		);
 		const lidos = await lerPeriodos(db, fd, situacao.sustacao.divisoes);
 		if ('erro' in lidos) return lidos.erro;
@@ -712,7 +726,7 @@ export const actionsFerias = {
 const MOTIVO_RECUSA = {
 	ja_pendente: 'Já há um pedido deste exercício aguardando a COGEP.',
 	fracao_fechada: 'Alguma das frações não está mais programada.',
-	tem_abono: 'Há abono registrado numa das frações: resolva o abono antes de reprogramar.'
+	toda_vendida: 'Uma das frações foi vendida por inteiro (abono): não há o que sustar nela.'
 } as const;
 
 /**

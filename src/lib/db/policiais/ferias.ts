@@ -312,7 +312,8 @@ export async function abrirReprogramacao(
 	dados: NovaReprogramacao,
 	quem: Registrador
 ): Promise<
-	{ ok: true; id: number } | { ok: false; motivo: 'ja_pendente' | 'fracao_fechada' | 'tem_abono' }
+	| { ok: true; id: number }
+	| { ok: false; motivo: 'ja_pendente' | 'fracao_fechada' | 'toda_vendida' }
 > {
 	const alvo = dados.tipo === 'sustacao' ? (dados.fracoes_ids ?? []) : [dados.fracao_id ?? 0];
 	if (alvo.length === 0) return { ok: false, motivo: 'fracao_fechada' };
@@ -326,12 +327,23 @@ export async function abrirReprogramacao(
 				f.status === 'programada'
 		);
 	if (!todasValidas) return { ok: false, motivo: 'fracao_fechada' };
-	const abono = await db
-		.select({ n: sql<number>`count(*)` })
+	// Fração inteira vendida não se susta (está resolvida em pecúnia); a venda
+	// parcial não impede — a sustação alcança só o que resta a gozar, e os dias
+	// vendidos ficam vendidos (decisão dele, 20/09).
+	const abonos = await db
+		.select({
+			fracao_id: feriasAbonos.fracao_id,
+			inicio: feriasAbonos.abono_inicio,
+			fim: feriasAbonos.abono_fim
+		})
 		.from(feriasAbonos)
-		.where(inArray(feriasAbonos.fracao_id, alvo))
-		.get();
-	if ((abono?.n ?? 0) > 0) return { ok: false, motivo: 'tem_abono' };
+		.where(and(inArray(feriasAbonos.fracao_id, alvo), eq(feriasAbonos.status, 'deferido')));
+	for (const a of abonos) {
+		const f = fracoes.find((x) => x.id === a.fracao_id);
+		if (f && diasDaFracao({ data_inicio: a.inicio, data_fim: a.fim }) >= diasDaFracao(f)) {
+			return { ok: false, motivo: 'toda_vendida' };
+		}
+	}
 
 	const pendente = await db
 		.select({ id: feriasReprogramacoes.id })
@@ -386,6 +398,10 @@ export async function anotarNupDaReprogramacao(db: Database, id: number, nup: st
  *     afastamento de verdade e ficam.
  *
  * INDEFERIDA: só fecha o pedido; as frações permanecem como estavam.
+ *
+ * Fração sustada com abono parcial: o abono continua ligado a ela (os dias
+ * vendidos ficam vendidos); o evento de gozo dela some, e a nova fração já
+ * nasce só com os dias que restavam a gozar.
  *
  * Devolve `null` quando o pedido já não estava pendente (segundo clique).
  */

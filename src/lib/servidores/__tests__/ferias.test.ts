@@ -133,6 +133,26 @@ describe('sustação × suspensão — decidido pelos fatos', () => {
 		expect(s.sustacao?.divisoes.map((d) => d.join('+'))).toEqual(['12+10']);
 	});
 
+	it('venda de férias: a fração toda vendida sai da sustação; a parcial entra só com o que resta', () => {
+		// 1ª de 10 toda vendida (abono), 2ª de 20 por gozar → sustam-se só os 20.
+		const ex = [
+			{ ...fracao(1, '2026-10-01', '2026-10-10'), diasAbonados: 10 },
+			fracao(2, '2027-01-11', '2027-01-30')
+		];
+		const s = situacaoDaReprogramacao(ex, '2026-09-20');
+		expect(s.sustacao?.fracoes.map((f) => f.ordem)).toEqual([2]);
+		expect(s.sustacao?.diasRestantes).toBe(20);
+		expect(s.sustacao?.divisoes.map((d) => d.join('+'))).toEqual(['20', '10+10']);
+
+		// 1ª de 30 com 10 vendidos → restam 20; a divisão atual é [20].
+		const parcial = situacaoDaReprogramacao(
+			[{ ...fracao(1, '2026-12-01', '2026-12-30'), diasAbonados: 10 }],
+			'2026-09-20'
+		);
+		expect(parcial.sustacao?.diasRestantes).toBe(20);
+		expect(parcial.sustacao?.motivo).toContain('10 dias vendidos');
+	});
+
 	it('tudo gozado: não há o que reprogramar', () => {
 		const s = situacaoDaReprogramacao([fracao(1, '2026-01-05', '2026-02-03')], '2026-06-01');
 		expect(s).toEqual({ sustacao: null, suspensao: null });
