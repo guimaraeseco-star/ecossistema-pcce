@@ -31,6 +31,15 @@
 	 * caminhos, e cada campo recalcula o outro. A contagem é INCLUSIVA (um
 	 * afastamento de 1 dia começa e termina no mesmo dia), daí o `q - 1` em
 	 * `adicionarDias` — tratar como exclusiva desloca todo afastamento em um dia.
+	 *
+	 * O modal de afastamento segue a tabela do responsável (20/09/2026, adotada
+	 * do sistema anterior): tipos por categoria, caixa com a base legal e a
+	 * observação, prazo FIXO travado (casamento 8, luto 8/2, paternidade 20,
+	 * maternidade 120 + 60 a pedido, adotante 180), sem prazo onde não há
+	 * (estudante, dispensa de ponto), CID na LTS — e CID-F abre a caixa
+	 * vermelha da Portaria 39/2026 (recolher o armamento), que avisa quem
+	 * cadastra na hora e o DPI SUL na fila/ficha. NUP obrigatório, 17 dígitos.
+	 * A action reaplica tudo.
 	 */
 	import { Dialog } from '@skeletonlabs/skeleton-svelte';
 	import { enhance } from '$app/forms';
@@ -44,7 +53,14 @@
 	import CalendarOff from '@lucide/svelte/icons/calendar-off';
 	import UserMinus from '@lucide/svelte/icons/user-minus';
 	import type { ActionResult } from '@sveltejs/kit';
-	import { AFASTAMENTOS, SUBTIPOS_CADASTRAVEIS } from '$lib/servidores/afastamentos';
+	import {
+		AFASTAMENTOS,
+		conferirNup,
+		PORTARIA_39,
+		regraDePrazo,
+		subtiposPorCategoria,
+		type SubtipoAfastamento
+	} from '$lib/servidores/afastamentos';
 
 	interface Props {
 		policial: { id: number; nome: string; matricula: string; lotacao: string };
@@ -63,7 +79,14 @@
 
 	// ---- Campos controlados (resetados ao fechar) ----
 	let unidadeDestino = $state('');
-	let subtipo = $state<string>(SUBTIPOS_CADASTRAVEIS[0]);
+	/** Os tipos que ESTE perfil pode lançar, por categoria (disciplinares só no modo direto). */
+	const grupos = $derived(subtiposPorCategoria(!solicitando));
+	const primeiroSubtipo = $derived(grupos[0]?.subtipos[0] ?? 'outros');
+	let subtipo = $state<SubtipoAfastamento>('casamento');
+	let tipoCid = $state<'CID-Outras' | 'CID-F'>('CID-Outras');
+	let adicional = $state(false);
+	const meta = $derived(AFASTAMENTOS[subtipo]);
+	const regra = $derived(regraDePrazo(subtipo, adicional));
 	let descricao = $state('');
 	let dataInicio = $state('');
 	let qtdDias = $state('');
@@ -72,13 +95,20 @@
 	let dataEvento = $state('');
 	let nup = $state('');
 	let justificativa = $state('');
+	const nupConferido = $derived(conferirNup(nup, modal === 'afastamento'));
 
-	/** No modo solicitação, nada é enviado sem motivo escrito. */
-	const bloqueado = $derived(enviando || (solicitando && justificativa.trim().length === 0));
+	/** No modo solicitação, nada é enviado sem motivo escrito; no afastamento, sem NUP válido. */
+	const bloqueado = $derived(
+		enviando ||
+			(solicitando && justificativa.trim().length === 0) ||
+			(modal === 'afastamento' && !nupConferido.ok)
+	);
 
 	function resetCampos() {
 		unidadeDestino = '';
-		subtipo = SUBTIPOS_CADASTRAVEIS[0];
+		subtipo = primeiroSubtipo;
+		tipoCid = 'CID-Outras';
+		adicional = false;
 		descricao = '';
 		dataInicio = '';
 		qtdDias = '';
@@ -103,10 +133,21 @@
 	function recalcularDataFim() {
 		const q = parseInt(qtdDias, 10);
 		if (dataInicio && q > 0) dataFim = adicionarDias(dataInicio, q - 1);
+		else if (!q) dataFim = '';
 	}
 	function recalcularQtd() {
 		const dias = diffDiasInclusivo(dataInicio, dataFim);
 		if (dias > 0) qtdDias = String(dias);
+	}
+	/** Ao trocar o tipo (ou o adicional): prazo fixo entra travado; sem prazo limpa o fim. */
+	function aoMudarTipo() {
+		if (regra.diasFixos != null) {
+			qtdDias = String(regra.diasFixos);
+			recalcularDataFim();
+		} else if (regra.semPrazo) {
+			qtdDias = '';
+			dataFim = '';
+		}
 	}
 
 	function handleSubmit() {
@@ -357,10 +398,21 @@
 						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"
 							>Tipo de Afastamento</span
 						>
-						<!-- Os 19 tipos do Estatuto (fase 2-C); os valores legados não se cadastram. -->
-						<select class="select py-1 px-3 text-sm" name="subtipo" bind:value={subtipo} required>
-							{#each SUBTIPOS_CADASTRAVEIS as s (s)}
-								<option value={s}>{AFASTAMENTOS[s].rotulo}</option>
+						<!-- Por categoria, como na tabela do responsável; as medidas disciplinares
+						     só aparecem para o Admin Geral. Férias não estão aqui (cartão Férias). -->
+						<select
+							class="select py-1 px-3 text-sm"
+							name="subtipo"
+							bind:value={subtipo}
+							onchange={aoMudarTipo}
+							required
+						>
+							{#each grupos as g (g.categoria)}
+								<optgroup label={g.rotulo}>
+									{#each g.subtipos as s (s)}
+										<option value={s}>{AFASTAMENTOS[s].rotulo}</option>
+									{/each}
+								</optgroup>
 							{/each}
 						</select>
 					</label>
@@ -377,6 +429,86 @@
 						/>
 					</label>
 				</div>
+
+				<!-- A base legal e a observação do tipo escolhido — o que a tela antiga
+				     mostrava e que evita o tipo errado. -->
+				{#if meta.base || meta.obs}
+					<div
+						class="rounded-lg border border-primary-500/30 bg-primary-500/10 px-3 py-2 text-xs leading-relaxed"
+					>
+						{#if meta.base}
+							<p class="font-semibold text-primary-700 dark:text-primary-400">
+								Base legal: {meta.base}
+							</p>
+						{/if}
+						{#if meta.obs}<p class="text-surface-700 dark:text-surface-300">{meta.obs}</p>{/if}
+					</div>
+				{/if}
+
+				<!-- LTS: a classificação do CID. CID-F dispara a Portaria 39/2026. -->
+				{#if regra.exigeCid}
+					<fieldset
+						class="rounded-lg border border-warning-500/40 bg-warning-500/10 px-3 py-2 text-xs space-y-1"
+					>
+						<legend class="px-1 text-2xs font-bold uppercase opacity-70"
+							>Classificação do diagnóstico (CID)</legend
+						>
+						<div class="flex flex-wrap gap-x-4 gap-y-1">
+							<label class="flex items-center gap-1.5 cursor-pointer">
+								<input
+									type="radio"
+									class="radio"
+									name="tipo_cid"
+									value="CID-Outras"
+									bind:group={tipoCid}
+								/>
+								CID-Outras (clínica geral, ortopedia, cirurgias…)
+							</label>
+							<label
+								class="flex items-center gap-1.5 cursor-pointer font-semibold text-error-600 dark:text-error-400"
+							>
+								<input
+									type="radio"
+									class="radio"
+									name="tipo_cid"
+									value="CID-F"
+									bind:group={tipoCid}
+								/>
+								CID-F (transtornos mentais e comportamentais)
+							</label>
+						</div>
+						{#if tipoCid === 'CID-F'}
+							<div
+								class="mt-1 rounded-md border border-error-500/40 bg-error-500/10 px-3 py-2 text-error-700 dark:text-error-300"
+								role="alert"
+							>
+								<p class="font-bold">⚠ {PORTARIA_39.titulo}</p>
+								<ul class="mt-1 list-disc pl-4 space-y-0.5">
+									{#each PORTARIA_39.providencias as prov (prov)}
+										<li>{prov}</li>
+									{/each}
+								</ul>
+								<p class="mt-1 text-2xs opacity-80">O DPI SUL é avisado deste afastamento.</p>
+							</div>
+						{/if}
+					</fieldset>
+				{/if}
+
+				<!-- Maternidade: 120 dias, mais 60 se a servidora pediu a prorrogação. -->
+				{#if meta.adicional}
+					<label class="flex items-center gap-2 text-sm cursor-pointer">
+						<input
+							type="checkbox"
+							class="checkbox"
+							name="adicional"
+							bind:checked={adicional}
+							onchange={aoMudarTipo}
+						/>
+						A servidora pediu a prorrogação de {meta.adicional} dias (total {(meta.dias ?? 0) +
+							meta.adicional})
+					</label>
+				{/if}
+
 				<div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
 					<label class="label">
 						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1">Data Início</span>
@@ -390,30 +522,66 @@
 						/>
 					</label>
 					<label class="label">
-						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1">Qtd Dias</span>
+						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"
+							>Qtd Dias{#if regra.diasFixos != null}
+								<span class="normal-case font-normal opacity-70"> · fixo</span>{/if}</span
+						>
 						<input
-							class="input py-1 px-3 text-sm"
+							class="input py-1 px-3 text-sm {regra.diasFixos != null
+								? 'opacity-70 cursor-not-allowed'
+								: ''}"
 							type="number"
 							name="qtd_dias"
 							min="1"
 							bind:value={qtdDias}
 							oninput={recalcularDataFim}
+							readonly={regra.diasFixos != null}
 						/>
 					</label>
 					<label class="label">
-						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1">Data Final</span>
+						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"
+							>Data Final{#if regra.semPrazo}
+								<span class="normal-case font-normal opacity-70"> · opcional</span>{/if}</span
+						>
 						<input
-							class="input py-1 px-3 text-sm"
+							class="input py-1 px-3 text-sm {regra.diasFixos != null
+								? 'opacity-70 cursor-not-allowed'
+								: ''}"
 							type="date"
 							name="data_fim"
 							bind:value={dataFim}
 							oninput={recalcularQtd}
-							required
+							readonly={regra.diasFixos != null}
+							required={!regra.semPrazo}
 						/>
 					</label>
 				</div>
+				{#if regra.semPrazo}
+					<p class="text-2xs text-warning-700 dark:text-warning-400">
+						Este afastamento não tem prazo definido: sem data final, o servidor consta como afastado
+						até o registro do retorno.
+					</p>
+				{/if}
+
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-					{@render campoNup()}
+					<label class="label">
+						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"
+							>NUP do processo <span class="text-error-500">*</span></span
+						>
+						<input
+							class="input py-1 px-3 text-sm font-mono"
+							type="text"
+							name="nup"
+							value={nup}
+							oninput={(e) => (nup = formatarNUP(e.currentTarget.value))}
+							placeholder="00000.000000/0000-00"
+							maxlength="20"
+							required
+						/>
+						{#if nup && !nupConferido.ok}
+							<span class="text-2xs text-error-600 ml-1">{nupConferido.erro}</span>
+						{/if}
+					</label>
 					<label class="label">
 						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"
 							>Documento (PDF)</span

@@ -16,6 +16,7 @@
 	import { formatarData } from '$lib/utils/datas';
 	import { LABEL_SUBTIPO_AFASTAMENTO } from '$lib/schemas/policial-historico';
 	import type { PolicialAcaoSolicitacao } from '$lib/types';
+	import { PORTARIA_39 } from '$lib/servidores/afastamentos';
 	import FileText from '@lucide/svelte/icons/file-text';
 
 	const {
@@ -48,6 +49,7 @@
 				valor: s.subtipo === 'respondente' ? 'Respondente' : 'Titular'
 			},
 			s.tipo === 'afastamento' && subtipo && { rotulo: 'Tipo', valor: subtipo },
+			s.tipo === 'afastamento' && s.tipo_cid && { rotulo: 'CID', valor: s.tipo_cid },
 			s.tipo === 'afastamento' && s.descricao && { rotulo: 'Descrição/Motivo', valor: s.descricao },
 			s.data_evento && { rotulo: 'Data', valor: formatarData(s.data_evento) },
 			s.data_inicio && { rotulo: 'Início', valor: formatarData(s.data_inicio) },
@@ -71,6 +73,22 @@
 			</div>
 		{/each}
 	</dl>
+
+	<!-- CID-F: quem decide precisa ver a Portaria 39 ANTES de aprovar — aprovar
+	     é também assumir o recolhimento do armamento. -->
+	{#if s.tipo_cid === 'CID-F'}
+		<div
+			class="rounded-lg border border-error-500/40 bg-error-500/10 px-3 py-2 text-xs text-error-700 dark:text-error-300"
+			role="alert"
+		>
+			<p class="font-bold">⚠ {PORTARIA_39.titulo}</p>
+			<ul class="mt-1 list-disc pl-4 space-y-0.5">
+				{#each PORTARIA_39.providencias as prov (prov)}
+					<li>{prov}</li>
+				{/each}
+			</ul>
+		</div>
+	{/if}
 
 	<div class="rounded-lg bg-surface-500/10 border-l-4 border-primary-500 px-3 py-2">
 		<p class="text-2xs uppercase font-bold opacity-60">Justificativa</p>

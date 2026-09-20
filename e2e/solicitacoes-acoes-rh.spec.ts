@@ -99,8 +99,12 @@ test('admin de unidade PEDE o afastamento — nada entra no histórico', async (
 		0
 	);
 	await modal.locator('select[name="subtipo"]').selectOption('lts');
+	// LTS pede o CID; CID-F abre a Portaria 39 na hora, para quem cadastra.
+	await modal.getByLabel(/CID-F/).check();
+	await expect(modal.getByRole('alert')).toContainText('Portaria nº 39/2026');
 	await modal.getByLabel('Data Início').fill(INICIO);
 	await modal.getByLabel('Qtd Dias').fill('5');
+	await modal.getByLabel(/NUP do processo/).fill('10051028034202664');
 	await modal.getByLabel('Justificativa do pedido').fill(JUSTIFICATIVA);
 
 	// O verbo do botão é parte do contrato: "Salvar" faria o administrador
@@ -121,7 +125,9 @@ test('admin geral vê o pedido inteiro na fila e aprova', async ({ page }) => {
 	await expect(page.getByText('Movimentação, afastamento e desvinculação')).toBeVisible();
 	// Decidir sem ver o período e o motivo seria decidir no escuro.
 	await expect(page.getByText(JUSTIFICATIVA)).toBeVisible();
-	await expect(page.getByText(/tratamento de saúde/).first()).toBeVisible();
+	await expect(page.getByText(/tratamento de saúde/i).first()).toBeVisible();
+	// O DPI SUL vê a Portaria 39 ANTES de aprovar.
+	await expect(page.getByRole('alert').filter({ hasText: 'Portaria nº 39/2026' })).toBeVisible();
 
 	await page.getByRole('button', { name: /Aprovar afastamento de Policial Fixture A/ }).click();
 	await expect(page.getByText('Afastamento aprovada e aplicada')).toBeVisible();
@@ -137,7 +143,8 @@ test('aprovado: a linha do tempo credita quem PEDIU', async ({ page }) => {
 	const historico = page
 		.locator('section, div', { has: page.getByRole('heading', { name: /Histórico do Servidor/ }) })
 		.last();
-	await expect(historico.getByText(/tratamento de saúde/).first()).toBeVisible();
+	await expect(historico.getByText(/tratamento de saúde/i).first()).toBeVisible();
+	await expect(historico.getByText('CID-F').first()).toBeVisible();
 	// A linha do tempo credita o solicitante: foi ele quem apurou o fato; o
 	// Admin Geral autorizou, e isso fica na auditoria.
 	await expect(page.getByText(FIXTURE.adminUnidade.nome).first()).toBeVisible();

@@ -19,6 +19,7 @@
 	import type { PolicialHistorico } from '$lib/types';
 	import { formatarData } from '$lib/utils/datas';
 	import { LABEL_SUBTIPO_AFASTAMENTO } from '$lib/schemas/policial-historico';
+	import { PORTARIA_39 } from '$lib/servidores/afastamentos';
 	import Paginador from '$lib/components/Paginador.svelte';
 	import ArrowRightLeft from '@lucide/svelte/icons/arrow-right-left';
 	import CalendarOff from '@lucide/svelte/icons/calendar-off';
@@ -228,12 +229,31 @@
 									{LABEL_SUBTIPO_AFASTAMENTO[
 										ev.subtipo as keyof typeof LABEL_SUBTIPO_AFASTAMENTO
 									] ?? ev.subtipo}
+									{#if ev.tipo_cid}
+										<span
+											class="ml-1 rounded px-1.5 py-0.5 text-2xs font-bold {ev.tipo_cid === 'CID-F'
+												? 'bg-error-500/15 text-error-700 dark:text-error-400'
+												: 'bg-surface-500/15'}">{ev.tipo_cid}</span
+										>
+									{/if}
 								</p>
 								{#if ev.descricao}<p class="text-xs">{ev.descricao}</p>{/if}
 								<p class="text-xs text-surface-600 dark:text-surface-400">
-									{formatarData(ev.data_inicio ?? '')} a {formatarData(ev.data_fim ?? '')}
+									{#if ev.data_fim}
+										{formatarData(ev.data_inicio ?? '')} a {formatarData(ev.data_fim)}
+									{:else}
+										a partir de {formatarData(ev.data_inicio ?? '')} (sem prazo)
+									{/if}
 									{#if ev.qtd_dias}· {ev.qtd_dias} dia(s){/if}
 								</p>
+								<!-- CID-F: a Portaria 39 fica visível no evento — é o DPI SUL e a
+								     unidade lendo a mesma obrigação, sem depender de memória. -->
+								{#if ev.tipo_cid === 'CID-F'}
+									<p class="mt-1 text-2xs font-semibold text-error-700 dark:text-error-400">
+										⚠ {PORTARIA_39.titulo}: armamento recolhido sob cautela, porte suspenso até
+										perícia da DIPEM.
+									</p>
+								{/if}
 							{:else if ev.tipo === 'desvinculacao'}
 								<p>
 									Destino: <span class="font-medium">{ev.descricao || ev.unidade_destino}</span>

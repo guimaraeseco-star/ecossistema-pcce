@@ -42,6 +42,8 @@ export interface CamposDoEventoFuncional {
 	nup?: string | null;
 	documento_r2_key?: string | null;
 	documento_nome?: string | null;
+	/** LTS: `CID-F` | `CID-Outras` (Portaria 39/2026). */
+	tipo_cid?: string | null;
 }
 
 /** Dados para registrar um evento no histórico funcional do policial. */
@@ -79,6 +81,7 @@ function inserirHistoricoQuery(db: Database, evento: NovoEventoHistorico) {
 		data_fim: evento.data_fim ?? null,
 		qtd_dias: evento.qtd_dias ?? null,
 		nup: evento.nup ?? null,
+		tipo_cid: evento.tipo_cid ?? null,
 		documento_r2_key: evento.documento_r2_key ?? null,
 		documento_nome: evento.documento_nome ?? null,
 		dados_antes: comoJson(evento.dados_antes),

@@ -1664,6 +1664,8 @@ export const policialAcaoSolicitacoes = sqliteTable(
 		nup: text('nup'),
 		documento_r2_key: text('documento_r2_key'),
 		documento_nome: text('documento_nome'),
+		/** LTS: `CID-F` | `CID-Outras` (Portaria 39/2026). Vazio nos demais afastamentos. */
+		tipo_cid: text('tipo_cid'),
 		/** Motivo do pedido (até 300 caracteres). Obrigatório. */
 		justificativa: text('justificativa').notNull(),
 		solicitante_id: integer('solicitante_id'),
@@ -1721,6 +1723,8 @@ export const policialHistorico = sqliteTable(
 		// ---- Documento anexo (PDF no R2) ----
 		documento_r2_key: text('documento_r2_key'),
 		documento_nome: text('documento_nome'),
+		/** LTS: `CID-F` | `CID-Outras` (Portaria 39/2026). Vazio nos demais afastamentos. */
+		tipo_cid: text('tipo_cid'),
 		// ---- Diff (edição de cadastro / mudança de papel) ----
 		/** JSON: snapshot ANTES da edição. */
 		dados_antes: text('dados_antes'),

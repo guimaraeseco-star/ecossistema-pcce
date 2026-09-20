@@ -116,7 +116,7 @@ import {
 	desvinculacaoSchema,
 	LABEL_SUBTIPO_AFASTAMENTO
 } from '$lib/schemas/policial-historico';
-import { AFASTAMENTOS } from '$lib/servidores/afastamentos';
+import { AFASTAMENTOS, conferirNup, regraDePrazo } from '$lib/servidores/afastamentos';
 import { isAdminGeral } from '$lib/auth';
 import {
 	lotacoesAdministradas,
@@ -141,7 +141,7 @@ import {
 import { decifrarCpfDoDB } from '$lib/crypto/cpf-cripto';
 import { limparCPF, limparMatricula, limparTelefone } from '$lib/utils/formato';
 import { resolverCredencial } from '$lib/server/auth/credencial';
-import { adicionarDias, hojeBrasilISO } from '$lib/utils/datas';
+import { adicionarDias, diffDiasInclusivo, hojeBrasilISO } from '$lib/utils/datas';
 import { feriadosNoIntervalo } from '$lib/db/diarias/feriados';
 import type { RequestEvent } from './$types';
 import { mensagemDeErro } from '$lib/utils/erro';
@@ -902,6 +902,9 @@ export const actions: Actions = {
 	},
 
 	// ---- Afastamento: férias/licenças (apenas registra na linha do tempo) ----
+	// A regra de cada tipo (prazo fixo, sem prazo, CID, só gestão) vem do
+	// catálogo e é reaplicada aqui — a tela já a mostrou, mas o POST direto não
+	// passa pela tela. NUP obrigatório em todo afastamento (17 dígitos).
 	registrarAfastamento: async (event) => {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
@@ -913,41 +916,88 @@ export const actions: Actions = {
 
 		const formData = await event.request.formData();
 		const qtdRaw = formData.get('qtd_dias')?.toString() || '';
+		const nup = conferirNup(formData.get('nup')?.toString() || '', true);
+		if (!nup.ok) return fail(400, { error: nup.erro });
 		const parsed = afastamentoSchema.safeParse({
 			subtipo: formData.get('subtipo')?.toString() || '',
 			descricao: formData.get('descricao')?.toString() || '',
 			data_inicio: formData.get('data_inicio')?.toString() || '',
 			data_fim: formData.get('data_fim')?.toString() || '',
 			qtd_dias: qtdRaw === '' ? undefined : qtdRaw,
-			nup: formData.get('nup')?.toString() || ''
+			nup: nup.formatado,
+			tipo_cid: formData.get('tipo_cid')?.toString() || '',
+			adicional: formData.get('adicional')?.toString() === 'on'
 		});
 		if (!parsed.success) return fail(400, { error: parsed.error.issues[0].message });
-		if (parsed.data.data_fim < parsed.data.data_inicio) {
-			return fail(400, { error: 'A data final não pode ser anterior à data inicial.' });
-		}
+		const { subtipo, data_inicio } = parsed.data;
 		// Férias entram só pelo cartão Férias (E56): o modal não as oferece, e o
 		// POST direto não passa por aqui.
-		if (!AFASTAMENTOS[parsed.data.subtipo].cadastravel) {
+		if (!AFASTAMENTOS[subtipo].cadastravel) {
 			return fail(400, {
 				error:
-					parsed.data.subtipo === 'ferias'
+					subtipo === 'ferias'
 						? 'Férias são lançadas pelo cartão Férias, não como afastamento.'
 						: 'Este tipo de afastamento não é lançado pela tela.'
 			});
 		}
+		const regra = regraDePrazo(subtipo, parsed.data.adicional === true);
+		if (regra.soGestao && modo !== 'direto') {
+			return fail(403, { error: 'Medidas disciplinares e processuais são lançadas pelo DPI SUL.' });
+		}
+		if (regra.exigeCid && !parsed.data.tipo_cid) {
+			return fail(400, { error: 'Na LTS, informe a classificação do CID (CID-F ou CID-Outras).' });
+		}
+		const tipoCid = regra.exigeCid ? parsed.data.tipo_cid || null : null;
+
+		// O prazo: fixo → o fim sai do catálogo; sem prazo → pode faltar; senão,
+		// o que veio, coerente.
+		let dataFim: string | null = parsed.data.data_fim || null;
+		let qtdDias: number | null;
+		if (regra.diasFixos != null) {
+			qtdDias = regra.diasFixos;
+			dataFim = adicionarDias(data_inicio, regra.diasFixos - 1);
+		} else if (!dataFim) {
+			if (!regra.semPrazo)
+				return fail(400, { error: 'Informe a quantidade de dias ou a data final.' });
+			qtdDias = null;
+		} else {
+			if (dataFim < data_inicio) {
+				return fail(400, { error: 'A data final não pode ser anterior à data inicial.' });
+			}
+			qtdDias = diffDiasInclusivo(data_inicio, dataFim);
+		}
+		const descricao =
+			[
+				parsed.data.descricao?.trim() || null,
+				subtipo === 'maternidade' && parsed.data.adicional ? 'Com a prorrogação de 60 dias.' : null
+			]
+				.filter(Boolean)
+				.join(' ') || null;
+		const rotulo = LABEL_SUBTIPO_AFASTAMENTO[subtipo];
+		const periodo = dataFim
+			? `${data_inicio} a ${dataFim}`
+			: `a partir de ${data_inicio} (sem prazo)`;
 
 		return concluirAcaoRH(event, auth, formData, {
 			acao: {
 				tipo: 'afastamento',
-				subtipo: parsed.data.subtipo,
-				descricao: parsed.data.descricao || null,
-				data_inicio: parsed.data.data_inicio,
-				data_fim: parsed.data.data_fim,
-				qtd_dias: parsed.data.qtd_dias ?? null,
-				nup: parsed.data.nup || null
+				subtipo,
+				descricao,
+				data_inicio,
+				data_fim: dataFim,
+				qtd_dias: qtdDias,
+				nup: nup.formatado,
+				tipo_cid: tipoCid
 			},
-			resumo: `${LABEL_SUBTIPO_AFASTAMENTO[parsed.data.subtipo]}: ${parsed.data.data_inicio} a ${parsed.data.data_fim}`,
-			metadados: { subtipo: parsed.data.subtipo, nup: parsed.data.nup || null },
+			resumo: `${rotulo}${tipoCid ? ` (${tipoCid})` : ''}: ${periodo}`,
+			metadados: {
+				subtipo,
+				nup: nup.formatado,
+				tipo_cid: tipoCid,
+				// CID-F: a Portaria 39/2026 obriga o recolhimento do armamento — fica
+				// na auditoria e é o que o aviso ao DPI SUL vai ler.
+				portaria_39: tipoCid === 'CID-F'
+			},
 			recarregar: () =>
 				modo === 'solicitacao' ? listarSolicitacoesAcaoDoPolicial(db, id) : Promise.resolve(null)
 		});
