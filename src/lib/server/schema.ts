@@ -2455,12 +2455,47 @@ export const feriasAbonos = sqliteTable(
 	(table) => [index('idx_ferias_abonos_policial').on(table.policial_id, table.status)]
 );
 
+// ---- Avisos (E59): notícias para a delegacia e para o DPI SUL ----
+
+export const avisos = sqliteTable(
+	'avisos',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		destinatario_tipo: text('destinatario_tipo', { enum: ['admin_geral', 'lotacao'] }).notNull(),
+		/** O nome da lotação, quando o destinatário é uma unidade. */
+		destinatario_lotacao: text('destinatario_lotacao'),
+		/** O cartão da home que o aviso acende: `servidores`, `unidade`… */
+		cartao: text('cartao').notNull(),
+		tipo: text('tipo').notNull(),
+		titulo: text('titulo').notNull(),
+		texto: text('texto').notNull().default(''),
+		/** O lugar exato da alteração. */
+		link: text('link').notNull().default(''),
+		autor_id: integer('autor_id'),
+		autor_nome: text('autor_nome').notNull().default(''),
+		lido_em: text('lido_em'),
+		lido_por_id: integer('lido_por_id'),
+		lido_por_nome: text('lido_por_nome').notNull().default(''),
+		created_at: text('created_at')
+			.notNull()
+			.default(sql`(datetime('now', '-3 hours'))`)
+	},
+	(table) => [
+		index('idx_avisos_destinatario').on(
+			table.destinatario_tipo,
+			table.destinatario_lotacao,
+			table.lido_em
+		)
+	]
+);
+
 // ---- Tipos inferidos ----
 
 export type Policial = typeof policiais.$inferSelect;
 export type FeriasFracao = typeof feriasFracoes.$inferSelect;
 export type FeriasReprogramacao = typeof feriasReprogramacoes.$inferSelect;
 export type FeriasAbono = typeof feriasAbonos.$inferSelect;
+export type Aviso = typeof avisos.$inferSelect;
 export type Designacao = typeof designacoes.$inferSelect;
 export type UnidadeResponsavel = typeof unidadeResponsaveis.$inferSelect;
 export type PolicialHistorico = typeof policialHistorico.$inferSelect;

@@ -41,6 +41,7 @@ import { municipiosDaUnidade } from '$lib/db/cobertura';
 import { escopoDeUnidades, unidadeNoEscopo } from '$lib/server/unidades/escopo';
 import { nivelTipoUnidade, rotuloTipoUnidade } from '$lib/unidades/tipos';
 import { hojeBrasilISO } from '$lib/utils/datas';
+import { avisarOutroLado } from '$lib/server/avisos/emitir';
 
 export const load: PageServerLoad = async ({ locals, platform, params }) => {
 	const u = locals.usuario;
@@ -257,6 +258,15 @@ export const actions: Actions = {
 			},
 			{ env }
 		);
+		// A unidade fica sabendo de quem passou a dirigi-la (E59).
+		await avisarOutroLado(db, u, {
+			cartao: 'unidade',
+			tipo: 'direcao_registrada',
+			titulo: `${papel === 'titular' ? 'Titular' : 'Respondente'} de ${unidade.nome} registrado pelo DPI SUL`,
+			texto: `Desde ${dataInicio}${nup ? ` · NUP ${nup}` : ''}`,
+			link: `/unidade/${id}`,
+			lotacoes: [unidade.nome]
+		});
 		return { success: true };
 	},
 

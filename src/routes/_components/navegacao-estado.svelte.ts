@@ -62,6 +62,7 @@ export function criarNavegacaoEstado() {
 	const isSupervisorGise = $derived(page.data.isSupervisorGise ?? false);
 	const adminModulo = $derived((page.data.adminModulo as 'ambas' | 'gise' | 'escalas') ?? 'ambas');
 	const recebidosNaoVistos = $derived(Number(page.data.recebidosNaoVistos ?? 0));
+	const avisosTotal = $derived(Number(page.data.avisosResumo?.total ?? 0));
 
 	const flags = $derived(
 		visibilidadeDoMenu({
@@ -151,6 +152,9 @@ export function criarNavegacaoEstado() {
 		},
 		get recebidosNaoVistos() {
 			return recebidosNaoVistos;
+		},
+		get avisosTotal() {
+			return avisosTotal;
 		},
 		get flags() {
 			return flags;

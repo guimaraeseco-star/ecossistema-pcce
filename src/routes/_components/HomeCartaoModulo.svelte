@@ -19,11 +19,12 @@
 	import { ICONE } from '$lib/constants/icones';
 	import IconeSvg from '$lib/components/bem-vindo/IconeSvg.svelte';
 	import type { CartaoHome } from './home-modulos';
+	import BadgeAvisos from './BadgeAvisos.svelte';
 
-	const { cartao }: { cartao: CartaoHome } = $props();
+	const { cartao, avisos = 0 }: { cartao: CartaoHome; avisos?: number } = $props();
 
 	const base =
-		'flex h-full flex-col gap-4 rounded-2xl bg-gestao p-5 text-white shadow-lg shadow-black/15';
+		'relative flex h-full flex-col gap-4 rounded-2xl bg-gestao p-5 text-white shadow-lg shadow-black/15';
 	const ativo =
 		'group transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 hover:shadow-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gestao';
 </script>
@@ -48,6 +49,7 @@
 
 {#if cartao.href}
 	<div class="{base} {ativo}">
+		<BadgeAvisos n={avisos} />
 		<a
 			href={cartao.href}
 			data-sveltekit-preload-data="hover"

@@ -142,6 +142,7 @@ import { decifrarCpfDoDB } from '$lib/crypto/cpf-cripto';
 import { limparCPF, limparMatricula, limparTelefone } from '$lib/utils/formato';
 import { resolverCredencial } from '$lib/server/auth/credencial';
 import { adicionarDias, diffDiasInclusivo, hojeBrasilISO } from '$lib/utils/datas';
+import { avisarOutroLado } from '$lib/server/avisos/emitir';
 import { feriadosNoIntervalo } from '$lib/db/diarias/feriados';
 import type { RequestEvent } from './$types';
 import { mensagemDeErro } from '$lib/utils/erro';
@@ -557,6 +558,18 @@ export const actions: Actions = {
 				},
 				{ env }
 			);
+			// A delegacia fica sabendo do que o DPI SUL mudou no cadastro dela (E59).
+			const camposMudados = Object.keys(diff.depois);
+			if (camposMudados.length > 0) {
+				await avisarOutroLado(db, u, {
+					cartao: 'servidores',
+					tipo: 'cadastro_editado',
+					titulo: `Cadastro de ${parsed.data.nome} alterado pelo DPI SUL`,
+					texto: `Campos: ${camposMudados.join(', ')}`,
+					link: `/servidores/${id}`,
+					lotacoes: [alvo.lotacao, parsed.data.lotacao]
+				});
+			}
 			return { success: true };
 		} catch (e: unknown) {
 			// A violação de índice único fica em `e.cause` (ver `db-errors.ts`).
@@ -1145,6 +1158,24 @@ async function concluirAcaoRH(
 		},
 		{ env }
 	);
+
+	// O aviso (E59): no modo direto a delegacia fica sabendo do ato do DPI SUL
+	// (na movimentação, a de origem E a de destino). No modo solicitação a
+	// fila já é a pendência do Admin Geral — só a LTS por CID-F vira notícia
+	// também, porque a Portaria 39 não espera a homologação para valer.
+	const ehCidF = acao.tipo === 'afastamento' && acao.tipo_cid === 'CID-F';
+	if (modo === 'direto' || ehCidF) {
+		await avisarOutroLado(db, u, {
+			cartao: 'servidores',
+			tipo: ehCidF ? 'afastamento_cid_f' : `rh_${acao.tipo}`,
+			titulo: ehCidF
+				? `LTS por CID-F: ${alvo.nome} — Portaria 39/2026 (recolher o armamento)`
+				: `${ROTULO_ACAO[acao.tipo]} de ${alvo.nome} registrada pelo DPI SUL`,
+			texto: pedido.resumo,
+			link: `/servidores/${id}`,
+			lotacoes: [alvo.lotacao, acao.unidade_destino]
+		});
+	}
 
 	const solicitacoesAcao = await pedido.recarregar();
 	return { success: true, tipo: acao.tipo, modo, solicitacoesAcao };

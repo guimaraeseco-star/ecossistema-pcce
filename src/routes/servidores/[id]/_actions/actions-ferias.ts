@@ -53,6 +53,7 @@ import {
 	divisoesPossiveis,
 	montarPeriodos,
 	periodosDoPedido,
+	ROTULO_TIPO_REPROGRAMACAO,
 	situacaoDaReprogramacao,
 	statusPelaData,
 	temErro,
@@ -63,8 +64,33 @@ import {
 	type PosicaoDoAbono
 } from '$lib/servidores/ferias';
 import { adicionarDias, hojeBrasilISO } from '$lib/utils/datas';
+import { avisarOutroLado } from '$lib/server/avisos/emitir';
 
 type Event = RequestEvent<{ id: string }>;
+
+/**
+ * O aviso de férias ao OUTRO LADO (E59): a unidade lançou/pediu/homologou →
+ * o DPI SUL fica sabendo; o DPI SUL lançou/registrou → a unidade fica
+ * sabendo. O texto termina com quem fez.
+ */
+function avisoDeFerias(
+	db: ReturnType<typeof getDB>,
+	u: Event['locals']['usuario'] & object,
+	alvo: { lotacao: string },
+	id: number,
+	tipo: string,
+	titulo: string,
+	texto: string
+) {
+	return avisarOutroLado(db, u, {
+		cartao: 'servidores',
+		tipo,
+		titulo,
+		texto: `${texto} — por ${u.nome}`,
+		link: `/servidores/${id}`,
+		lotacoes: [alvo.lotacao]
+	});
+}
 
 /** A fração do banco na forma que as regras leem. */
 function comoFracao(f: {
@@ -183,6 +209,15 @@ export const actionsFerias = {
 			},
 			{ env }
 		);
+		await avisoDeFerias(
+			db,
+			u,
+			alvo,
+			id,
+			'ferias_programada',
+			`Férias de ${alvo.nome} programadas para ${exercicio}`,
+			periodos.map((p) => `${p.inicio} a ${p.fim}`).join(' · ')
+		);
 		return { success: true, ferias: await listarFeriasDoPolicial(db, id), avisos };
 	},
 
@@ -224,6 +259,15 @@ export const actionsFerias = {
 				...contexto
 			},
 			{ env }
+		);
+		await avisoDeFerias(
+			db,
+			u,
+			alvo,
+			id,
+			'ferias_excluida',
+			`Programação de férias de ${alvo.nome} (${exercicio}) excluída`,
+			'a programação inteira'
 		);
 		return { success: true, ferias: await listarFeriasDoPolicial(db, id) };
 	},
@@ -308,6 +352,15 @@ export const actionsFerias = {
 				...contexto
 			},
 			{ env }
+		);
+		await avisoDeFerias(
+			db,
+			u,
+			alvo,
+			id,
+			'ferias_sustacao',
+			`Sustação das férias de ${alvo.nome} (${exercicio}) pedida à COGEP`,
+			`novos períodos: ${periodos.map((p) => `${p.inicio} a ${p.fim}`).join(' · ')}`
 		);
 		return { success: true, ferias: await listarFeriasDoPolicial(db, id), texto, avisos };
 	},
@@ -413,6 +466,15 @@ export const actionsFerias = {
 			},
 			{ env }
 		);
+		await avisoDeFerias(
+			db,
+			u,
+			alvo,
+			id,
+			'ferias_suspensao',
+			`Suspensão das férias de ${alvo.nome} (${fracao.exercicio}) pedida à COGEP`,
+			`retorno em ${dataSuspensao}; ${restantes} dias voltam em ${periodos[0].inicio}`
+		);
 		return { success: true, ferias: await listarFeriasDoPolicial(db, id), texto };
 	},
 
@@ -489,6 +551,15 @@ export const actionsFerias = {
 				...contexto
 			},
 			{ env }
+		);
+		await avisoDeFerias(
+			db,
+			u,
+			alvo,
+			id,
+			'ferias_homologada',
+			`${ROTULO_TIPO_REPROGRAMACAO[r.tipo]} das férias de ${alvo.nome} ${decisao.toUpperCase()} pela COGEP`,
+			r.nup ? `NUP ${r.nup}` : 'sem NUP anotado'
 		);
 		return { success: true, ferias: await listarFeriasDoPolicial(db, id) };
 	},
@@ -589,6 +660,16 @@ export const actionsFerias = {
 			},
 			{ env }
 		);
+		// A unidade fica sabendo — e ainda precisa dar ciência (pendência).
+		await avisoDeFerias(
+			db,
+			u,
+			alvo,
+			id,
+			'abono_registrado',
+			`Abono de férias de ${alvo.nome} ${status} — ${fracao.ordem}ª fração ${fracao.exercicio}`,
+			`10 dias ${posicao}${nup ? ` · NUP ${nup}` : ''}. Nesses dias o servidor TRABALHA: dê ciência na ficha`
+		);
 		return {
 			success: true,
 			ferias: await listarFeriasDoPolicial(db, id),
@@ -604,7 +685,7 @@ export const actionsFerias = {
 			event.params.id
 		);
 		if ('erro' in auth) return auth.erro;
-		const { u, db, id } = auth;
+		const { u, db, id, alvo } = auth;
 
 		const fd = await event.request.formData();
 		const abonoId = inteiroNaFaixa(fd, 'abono_id', 1, 99_999_999);
@@ -615,6 +696,15 @@ export const actionsFerias = {
 		}
 
 		await darCienciaDoAbono(db, abonoId, { id: u.id, nome: u.nome }, hojeBrasilISO());
+		await avisoDeFerias(
+			db,
+			u,
+			alvo,
+			id,
+			'abono_ciencia',
+			`Ciência do abono de férias de ${alvo.nome} registrada pela unidade`,
+			'a unidade sabe que nesses dias o servidor trabalha'
+		);
 		return { success: true, ferias: await listarFeriasDoPolicial(db, id) };
 	}
 };

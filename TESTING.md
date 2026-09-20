@@ -495,6 +495,10 @@ HISTORICO.xlsx --enviar --local`): 698/914 linhas casam com a base (os
       M · X %" com "⚠ acima do teto" em dourado quando passa de 15 %; numa
       delegacia os nomes vêm abertos, na seccional recolhidos em "Ver os N
       nomes"; ← ano / ano → navegam; férias vindas da carga aparecem também
+- [ ] Avisos (E59, migração 0093) — badges: com uma pendência ou notícia não lida, o cartão grande do Início ("Gestão de pessoal" / "Gestão de unidade") mostra o número em dourado no canto superior direito; a tela do grupo mostra o número no cartão do módulo ("Servidores" / "Unidade"); a barra lateral mostra "Avisos" com o mesmo total logo abaixo de "Início"; sem nada, os badges não aparecem
+- [ ] Avisos — a caixa `/avisos`: "Pendências" em dourado com o botão "Resolver →" (admin de unidade: reprogramação de férias a homologar, abono sem ciência; Admin Geral: cadastro, RH e direção aguardando decisão); "Notícias" com "Ver onde →" e "✓ Lida"; "Marcar todas como lidas" zera o badge; "Já lidas" recolhido mostra quem leu e quando
+- [ ] Avisos — a regra do outro lado: logado como admin de unidade, dê ciência de um abono (ou lance/suste férias) → na conta do Admin Geral aparece a notícia (o autor é a unidade); logado como Admin Geral, registre uma movimentação/afastamento/desvinculação, edite o cadastro, decida um pedido em `/solicitacoes` ou registre um titular → na conta da unidade do servidor aparece a notícia; quem fez NUNCA vê a própria notícia
+- [ ] Avisos — LTS por CID-F pedida pela unidade gera notícia ao DPI SUL na hora (além da pendência na fila)
 - [ ] Direção da unidade (E54, migração 0090) — Admin Geral: a ficha de
       `/unidade/[id]` tem o cartão "Direção" acima do efetivo. Unidade com
       titular mostra selo azul, nome com link para a ficha, matrícula, desde
