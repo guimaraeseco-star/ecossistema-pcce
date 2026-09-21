@@ -1,0 +1,88 @@
+# Relatório diário dos colaboradores (E61-b): todo dia às 19h de Brasília,
+# inclusive fim de semana, o admin de cada unidade que tem colaborador recebe
+# por e-mail o que cada um fez no dia.
+#
+# O Cloudflare Pages não tem cron nativo, então este workflow agendado chama
+# o endpoint `/api/webhook/relatorio-colaboradores`, autenticado pelo
+# SYNC_TOKEN e com o anti-replay dos webhooks — o mesmo molde de
+# `cleanup-retencao.yml`. O endpoint é idempotente (grava "já mandei" por
+# unidade e dia), então repetir o disparo não duplica e-mail.
+#
+# `workflow_dispatch` aceita `dia` (AAAA-MM-DD) para reenviar um dia
+# específico à mão.
+name: Relatório diário de colaboradores
+
+on:
+  schedule:
+    # 22:00 UTC = 19:00 em Brasília (UTC-3, sem horário de verão).
+    - cron: '0 22 * * *'
+  workflow_dispatch:
+    inputs:
+      dia:
+        description: 'Dia a relatar (AAAA-MM-DD). Vazio = hoje em Brasília.'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  relatorio:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar o relatório diário
+        env:
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          SYNC_TOKEN: ${{ secrets.SYNC_TOKEN }}
+          DIA: ${{ github.event.inputs.dia }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${APP_BASE_URL}" ] || [ -z "${SYNC_TOKEN}" ]; then
+            echo "::error::Defina os secrets APP_BASE_URL e SYNC_TOKEN em Settings → Secrets and variables → Actions (os mesmos do cleanup-retencao)."
+            exit 1
+          fi
+
+          base="${APP_BASE_URL%/}"
+          if [ -n "${DIA}" ]; then
+            body="{\"dia\":\"${DIA}\"}"
+          else
+            body='{}'
+          fi
+
+          # Nonce novo a cada tentativa (o servidor recusa replay); ver
+          # cleanup-retencao.yml para o porquê de não usar `curl --retry`.
+          code=""
+          for tentativa in 1 2 3; do
+            timestamp="$(date -u +%s)"
+            nonce="$(openssl rand -hex 16)"
+
+            code=$(curl -sS -o /tmp/resp.json -w '%{http_code}' --max-time 120 \
+              -X POST "${base}/api/webhook/relatorio-colaboradores" \
+              -H "Authorization: Bearer ${SYNC_TOKEN}" \
+              -H "X-Webhook-Timestamp: ${timestamp}" \
+              -H "X-Webhook-Nonce: ${nonce}" \
+              -H "Content-Type: application/json" \
+              --data "${body}") || code="000"
+
+            echo "Tentativa ${tentativa}: HTTP ${code}"
+            cat /tmp/resp.json || true
+            echo ""
+
+            case "$code" in
+              200) break ;;
+              000 | 5??)
+                if [ "$tentativa" -lt 3 ]; then sleep $((tentativa * 10)); fi
+                ;;
+              *) break ;;
+            esac
+          done
+
+          if [ "$code" = "401" ]; then
+            echo "::error::401 do endpoint. Causas prováveis: SYNC_TOKEN diferente do configurado no Cloudflare Pages; APP_BASE_URL apontando para um preview; token com menos de 32 caracteres."
+            exit 1
+          fi
+          if [ "$code" != "200" ]; then
+            echo "::error::O relatório diário não completou (HTTP ${code}). O corpo da resposta está acima."
+            exit 1
+          fi

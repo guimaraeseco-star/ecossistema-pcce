@@ -117,6 +117,8 @@ export const DECLARADAS = {
 
 	// ---- Webhook: autenticado por segredo compartilhado + HMAC, não por sessão ----
 	'src/routes/api/webhook/limpeza-retencao/+server.ts → POST': 'segredo compartilhado (cron)',
+	'src/routes/api/webhook/relatorio-colaboradores/+server.ts → POST':
+		'segredo compartilhado (cron do relatório diário, E61-b)',
 	'src/routes/api/webhook/reset-policiais/+server.ts → POST':
 		'segredo compartilhado + 2ª credencial de reset',
 	'src/routes/api/webhook/sync-policiais/+server.ts → POST': 'segredo compartilhado (Apps Script)',
