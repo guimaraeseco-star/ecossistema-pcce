@@ -152,5 +152,5 @@ test('aprovado: a linha do tempo credita quem PEDIU', async ({ page }) => {
 	await expect(historico.getByText('CID-F').first()).toBeVisible();
 	// A linha do tempo credita o solicitante: foi ele quem apurou o fato; o
 	// Admin Geral autorizou, e isso fica na auditoria.
-	await expect(page.getByText(FIXTURE.adminUnidade.nome).first()).toBeVisible();
+	await expect(historico.getByText(FIXTURE.adminUnidade.nome).first()).toBeVisible();
 });
