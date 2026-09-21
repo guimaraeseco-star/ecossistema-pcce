@@ -38,13 +38,16 @@
 		acoes,
 		/** Catálogo para resolver `designacao_id` — sem ele a fila mostraria "11". */
 		designacoes = [],
-		policialId
+		policialId,
+		podePedirRetorno = true
 	}: {
 		campos: CadastroSolicitacao[];
 		acoes: PolicialAcaoSolicitacao[];
 		designacoes?: { id: number; nome: string }[];
 		/** O servidor da ficha, para o `invalidateShared` depois do retorno antecipado. */
 		policialId: number;
+		/** Colaborador sem `servidores.afastamento` (E61) só acompanha: sem o botão de retorno. */
+		podePedirRetorno?: boolean;
 	} = $props();
 
 	/* ── retorno antecipado (decisão dele, 20/09): no pedido de afastamento
@@ -78,6 +81,7 @@
 	/** Os pedidos de retorno não aparecem como cards: moram no card do afastamento. */
 	const acoesVisiveis = $derived(acoes.filter((a) => a.tipo !== 'retorno_antecipado'));
 	const admiteRetorno = (s: PolicialAcaoSolicitacao) =>
+		podePedirRetorno &&
 		s.tipo === 'afastamento' &&
 		s.status === 'aprovada' &&
 		s.subtipo !== 'ferias' &&

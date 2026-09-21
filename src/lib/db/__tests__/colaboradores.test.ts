@@ -13,10 +13,20 @@ import {
 	buscarColaboradorAtivoPorCpf,
 	definirColaboradorAtivo,
 	definirEmailRecuperacao,
+	definirUnidadeDoColaborador,
+	definirAcessosDoColaborador,
+	listarAcessosDoColaborador,
+	colaboradoresDaUnidade,
 	normalizarEmailColaborador,
 	CpfDeColaboradorJaCadastrado
 } from '../colaboradores';
-import { validarSessao, validarSessaoComAceite } from '$lib/auth';
+import {
+	colaboradorComAcesso,
+	colaboradorTemAcesso,
+	nomeParaRastro,
+	validarSessao,
+	validarSessaoComAceite
+} from '$lib/auth';
 
 let db: Database;
 let sqlite: ReturnType<typeof bancoMigrado>;
@@ -181,5 +191,68 @@ describe('sessão de colaborador', () => {
 		expect((await validarSessaoComAceite(db, 'tok-pol', undefined, termo)).usuario?.nome).toBe(
 			'Policial 42'
 		);
+	});
+});
+
+describe('lotação e acessos (E61)', () => {
+	async function colaboradorLotado() {
+		sqlite.exec(
+			`INSERT INTO unidades (id, nome, tipo) VALUES (97010, 'DP de Aurora', 'delegacia')`
+		);
+		const c = await criarColaborador(
+			db,
+			{ nome: 'Ana', cpf: CPF, emailPessoal: 'a@x.br', senhaHash: 'h', criadoPor: SUPER },
+			undefined
+		);
+		expect(await definirUnidadeDoColaborador(db, c.id, 97010)).toBe(true);
+		return c;
+	}
+
+	it('definirAcessos substitui o conjunto, normaliza e devolve antes/depois; a ficha da unidade lista', async () => {
+		const c = await colaboradorLotado();
+		const quem = { id: 1, nome: 'Guardião' };
+		const r1 = await definirAcessosDoColaborador(db, c.id, ['servidores.ferias', 'lixo'], quem);
+		expect(r1).toEqual({ antes: [], depois: ['servidores.ver', 'servidores.ferias'] });
+		const r2 = await definirAcessosDoColaborador(db, c.id, ['avisos.ler'], quem);
+		expect(r2).toEqual({
+			antes: ['servidores.ver', 'servidores.ferias'],
+			depois: ['avisos.ler']
+		});
+		expect(await listarAcessosDoColaborador(db, c.id)).toEqual(['avisos.ler']);
+		const linha = sqlite
+			.prepare('SELECT concedido_por_nome FROM colaborador_acessos WHERE colaborador_id = ?')
+			.get(c.id) as { concedido_por_nome: string };
+		expect(linha.concedido_por_nome).toBe('Guardião');
+
+		const daUnidade = await colaboradoresDaUnidade(db, 97010);
+		expect(daUnidade.map((x) => [x.nome, x.acessos])).toEqual([['Ana', ['avisos.ler']]]);
+		expect(await colaboradoresDaUnidade(db, 999)).toEqual([]);
+	});
+
+	it('a sessão carrega a unidade e as chaves; sem lotação, as chaves não valem', async () => {
+		const c = await colaboradorLotado();
+		await definirAcessosDoColaborador(db, c.id, ['servidores.ver', 'escalas.ver'], {
+			id: 1,
+			nome: 'G'
+		});
+		sqlite.exec(
+			`INSERT INTO sessoes (token, tipo, usuario_id, expires_at) VALUES ('tok-c', 'colaborador', ${c.id}, '2099-01-01T00:00:00.000Z')`
+		);
+		const u = await validarSessao(db, 'tok-c');
+		expect(u).toMatchObject({
+			tipo: 'colaborador',
+			papel_unidade_id: 97010,
+			lotacao: 'DP de Aurora',
+			acessos: ['servidores.ver', 'escalas.ver']
+		});
+		expect(colaboradorTemAcesso(u, 'escalas.ver')).toBe(true);
+		expect(colaboradorTemAcesso(u, 'avisos.ler')).toBe(false);
+		expect(nomeParaRastro(u!)).toBe('Ana (colaborador — DP de Aurora)');
+
+		await definirUnidadeDoColaborador(db, c.id, null);
+		const semLotacao = await validarSessao(db, 'tok-c');
+		expect(semLotacao?.papel_unidade_id ?? null).toBeNull();
+		expect(semLotacao?.acessos).toEqual([]);
+		expect(colaboradorComAcesso(semLotacao)).toBe(false);
 	});
 });

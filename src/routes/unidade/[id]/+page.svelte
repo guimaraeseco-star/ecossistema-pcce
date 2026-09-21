@@ -14,6 +14,7 @@
 	import { COR_SITUACAO } from '$lib/servidores/afastamentos';
 	import ModalEfetivo, { type PedidoEfetivo } from '../_components/ModalEfetivo.svelte';
 	import CartaoDirecao from './_components/CartaoDirecao.svelte';
+	import CartaoColaboradores from './_components/CartaoColaboradores.svelte';
 
 	const { data }: PageProps = $props();
 
@@ -173,6 +174,13 @@
 		modo={data.modoDirecao}
 	/>
 </div>
+
+{#if data.colaboradores}
+	<!-- Colaboradores da unidade e o que ela liberou a cada um (E61). -->
+	<div class="mb-4">
+		<CartaoColaboradores colaboradores={data.colaboradores} />
+	</div>
+{/if}
 
 <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
 	<!-- Efetivo -->

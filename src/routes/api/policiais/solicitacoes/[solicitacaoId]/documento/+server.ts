@@ -27,7 +27,12 @@ export const GET: RequestHandler = async ({ platform, params, locals }) => {
 
 	// O escopo é conferido contra o SERVIDOR ALVO do pedido, não contra o
 	// solicitante: é o alvo que define de quem é o dado pessoal no PDF.
-	const ficha = await carregarFichaDoPolicial(db, locals.usuario, String(pedido.policial_id));
+	const ficha = await carregarFichaDoPolicial(
+		db,
+		locals.usuario,
+		String(pedido.policial_id),
+		'servidores.ver'
+	);
 	if ('erro' in ficha) return recusaComoResposta(ficha.erro);
 
 	if (!hasR2(platform)) {

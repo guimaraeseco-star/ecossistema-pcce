@@ -36,10 +36,12 @@ import {
 	administradores,
 	policiais,
 	colaboradores,
+	colaboradorAcessos,
 	doisFatoresTokens,
 	resetSenhaTokens,
 	aceitesTermos
 } from './server/schema';
+import { normalizarAcessos, type AcessoDoColaborador } from './colaboradores/acessos';
 import type { Database } from './db';
 import { aceiteEhVigente } from './db/termos';
 import { sha256Hex, hashTokenArmazenado, PREFIXO_TOKEN_HASH } from './crypto/digest';
@@ -91,6 +93,32 @@ export interface UsuarioLogado {
 	email?: string | null;
 	/** Colaborador: empresa ou contrato a que a conta pertence. */
 	vinculo?: string;
+	/**
+	 * Colaborador (E61): o que a unidade liberou, do catálogo de
+	 * `lib/colaboradores/acessos.ts`. A unidade em que está lotado vai em
+	 * `papel_unidade_id` (id) e `lotacao` (nome) — os mesmos campos que o
+	 * escopo dos admins lê. Vazio = a tela vazia de boas-vindas.
+	 */
+	acessos?: AcessoDoColaborador[];
+}
+
+/** O colaborador tem esta chave liberada pela unidade? Falso para qualquer outro tipo. */
+export function colaboradorTemAcesso(u: UsuarioLogado | null, chave: AcessoDoColaborador): boolean {
+	return u?.tipo === 'colaborador' && !!u.acessos?.includes(chave);
+}
+
+/**
+ * O nome com que um ato fica registrado (pedidos, férias, avisos): o do
+ * colaborador sai com o rastro "(colaborador — Unidade)", para que a fila, a
+ * linha do tempo e o relatório diário digam quem foi sem consultar nada.
+ */
+export function nomeParaRastro(u: Pick<UsuarioLogado, 'nome' | 'tipo' | 'lotacao'>): string {
+	return u.tipo === 'colaborador' && u.lotacao ? `${u.nome} (colaborador — ${u.lotacao})` : u.nome;
+}
+
+/** Colaborador lotado e com ao menos uma chave: o que o escopo por unidade considera. */
+export function colaboradorComAcesso(u: UsuarioLogado | null): boolean {
+	return u?.tipo === 'colaborador' && u.papel_unidade_id != null && (u.acessos?.length ?? 0) > 0;
 }
 
 export type TipoDesafio2FA =
@@ -324,25 +352,64 @@ async function mapearPolicial(
 /**
  * Sessão de colaborador. Sem CPF na sessão de propósito: nenhuma tela do
  * colaborador precisa dele, e a tela do Protocolo não exibe CPF (plano, 4.3).
+ * A unidade e os acessos (E61) entram aqui: só um colaborador LOTADO tem
+ * acessos que valem — sem unidade, as chaves não têm sobre o que agir.
  */
-function mapearColaborador(c: typeof colaboradores.$inferSelect): UsuarioLogado {
+function mapearColaborador(
+	c: LinhaDoColaboradorDaSessao,
+	acessos: readonly { chave: string }[]
+): UsuarioLogado {
+	const lotado = c.unidade_id != null && !!c.unidade_nome;
 	return {
 		id: c.id,
 		tipo: 'colaborador' as const,
 		nome: c.nome,
 		primeiro_acesso: c.primeiro_acesso === 1,
 		email: c.email_pessoal,
-		vinculo: c.vinculo
+		vinculo: c.vinculo,
+		papel_unidade_id: lotado ? c.unidade_id : null,
+		lotacao: lotado ? (c.unidade_nome ?? undefined) : undefined,
+		acessos: lotado ? normalizarAcessos(acessos.map((a) => a.chave)) : []
 	};
 }
 
-/** A linha do colaborador que ainda autentica: `ativo = 1`, como o policial. */
+type LinhaDoColaboradorDaSessao = {
+	id: number;
+	nome: string;
+	email_pessoal: string;
+	vinculo: string;
+	primeiro_acesso: number;
+	unidade_id: number | null;
+	unidade_nome: string | null;
+};
+
+/** A linha do colaborador que ainda autentica (`ativo = 1`), com o nome da unidade. */
 function queryColaboradorDaSessao(db: Database, id: number) {
 	return db
-		.select()
+		.select({
+			id: colaboradores.id,
+			nome: colaboradores.nome,
+			email_pessoal: colaboradores.email_pessoal,
+			vinculo: colaboradores.vinculo,
+			primeiro_acesso: colaboradores.primeiro_acesso,
+			unidade_id: colaboradores.unidade_id,
+			// Subconsulta, não join: no D1 em `batch` o join com colunas nomeadas
+			// voltava sem o nome da unidade (visto no espelho em 21/09).
+			unidade_nome: sql<
+				string | null
+			>`(SELECT nome FROM unidades WHERE id = ${colaboradores.unidade_id})`
+		})
 		.from(colaboradores)
 		.where(and(eq(colaboradores.id, id), eq(colaboradores.ativo, 1)))
 		.limit(1);
+}
+
+/** As chaves liberadas pela unidade (E61). */
+function queryAcessosDoColaborador(db: Database, id: number) {
+	return db
+		.select({ chave: colaboradorAcessos.chave })
+		.from(colaboradorAcessos)
+		.where(eq(colaboradorAcessos.colaborador_id, id));
 }
 
 /**
@@ -445,8 +512,11 @@ export async function validarSessao(
 	}
 
 	if (sessao.tipo === 'colaborador') {
-		const c = (await queryColaboradorDaSessao(db, sessao.usuario_id))[0];
-		return c ? mapearColaborador(c) : null;
+		const [cols, acessos] = await db.batch([
+			queryColaboradorDaSessao(db, sessao.usuario_id),
+			queryAcessosDoColaborador(db, sessao.usuario_id)
+		]);
+		return cols[0] ? mapearColaborador(cols[0], acessos) : null;
 	}
 
 	// Decide POR TIPO, nunca "o que não é admin é policial": `usuario_id` de
@@ -514,10 +584,11 @@ export async function validarSessaoComAceite(
 		ultimoAceite = aceites[0];
 	} else if (sessao.tipo === 'colaborador') {
 		const userQuery = queryColaboradorDaSessao(db, sessao.usuario_id);
-		const [cols, aceites] = slidingUpdate
-			? await db.batch([userQuery, aceiteQuery, slidingUpdate])
-			: await db.batch([userQuery, aceiteQuery]);
-		usuario = cols[0] ? mapearColaborador(cols[0]) : null;
+		const acessosQuery = queryAcessosDoColaborador(db, sessao.usuario_id);
+		const [cols, acessos, aceites] = slidingUpdate
+			? await db.batch([userQuery, acessosQuery, aceiteQuery, slidingUpdate])
+			: await db.batch([userQuery, acessosQuery, aceiteQuery]);
+		usuario = cols[0] ? mapearColaborador(cols[0], acessos) : null;
 		ultimoAceite = aceites[0];
 	} else if (sessao.tipo !== 'policial') {
 		// Mesma regra de `validarSessao`: tipo desconhecido é sessão inválida,

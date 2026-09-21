@@ -15,7 +15,7 @@
 
 import { eq, or } from 'drizzle-orm';
 import { unidades } from '$lib/server/schema';
-import { isAdminGeral, isAdminSeccional, isAdminUnidade } from '$lib/auth';
+import { colaboradorComAcesso, isAdminGeral, isAdminSeccional, isAdminUnidade } from '$lib/auth';
 import type { Database } from '$lib/db';
 
 /**
@@ -73,6 +73,13 @@ export async function lotacoesAdministradas(
 ): Promise<Set<string> | null> {
 	if (isAdminGeral(u)) return null;
 	if (u.papel_unidade_id == null) return new Set();
+
+	// Colaborador lotado (E61): a unidade dele, e só ela — o que ele pode
+	// fazer nela é conferido chave a chave por quem chama.
+	if (colaboradorComAcesso(u)) {
+		const nome = await nomeDaUnidade(db, u.papel_unidade_id);
+		return new Set(nome ? [nome] : []);
+	}
 
 	if (isAdminSeccional(u)) {
 		return new Set(await lotacoesDaSeccional(db, u.papel_unidade_id));

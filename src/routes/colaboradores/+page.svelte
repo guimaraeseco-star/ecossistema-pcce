@@ -22,6 +22,9 @@
 	let nome = $state('');
 	let cpf = $state('');
 	let emailPessoal = $state('');
+	let unidadeId = $state('');
+	const nomeDaUnidade = (id: number | null) =>
+		id == null ? null : (data.unidades.find((u) => u.id === id)?.nome ?? `#${id}`);
 	let vinculo = $state('');
 	const formId = $props.id();
 
@@ -32,6 +35,7 @@
 		nome = '';
 		cpf = '';
 		emailPessoal = '';
+		unidadeId = '';
 		vinculo = '';
 	}
 
@@ -74,8 +78,8 @@
 	<div>
 		<h1 class="h1 text-2xl font-bold">Colaboradores</h1>
 		<p class="text-sm text-surface-600 dark:text-surface-400 mt-1">
-			Servidores administrativos e terceirizados. Entram com CPF e senha (ou e-CPF); o que alcançam
-			vem das funções designadas no módulo de diárias.
+			Servidores administrativos e terceirizados. Entram com CPF e senha (ou e-CPF). Você os lota
+			numa unidade; o que cada um pode fazer é a unidade que define, na ficha dela.
 		</p>
 	</div>
 	<button
@@ -125,6 +129,7 @@
 			<tr>
 				<th>Nome</th>
 				<th>E-mail pessoal</th>
+				<th>Unidade</th>
 				<th>Vínculo</th>
 				<th>Situação</th>
 				<th class="text-right">Ações</th>
@@ -133,7 +138,7 @@
 		<tbody>
 			{#if data.colaboradores.length === 0}
 				<tr>
-					<td colspan="5" class="text-center text-surface-600 dark:text-surface-400 py-8">
+					<td colspan="6" class="text-center text-surface-600 dark:text-surface-400 py-8">
 						Nenhum colaborador cadastrado.
 					</td>
 				</tr>
@@ -142,6 +147,35 @@
 				<tr>
 					<td class="font-medium {c.ativo ? '' : 'opacity-60 line-through'}">{c.nome}</td>
 					<td class="text-sm">{c.email_pessoal}</td>
+					<td class="text-sm">
+						<form
+							method="POST"
+							action="?/definirUnidade"
+							use:enhance={() => tratarResultado('Lotação salva')}
+							class="flex items-center gap-1"
+						>
+							<input type="hidden" name="colaborador_id" value={c.id} />
+							<select
+								class="select w-48 py-1 text-xs"
+								name="unidade_id"
+								value={c.unidade_id ?? ''}
+								onchange={(e) => e.currentTarget.form?.requestSubmit()}
+								disabled={pending}
+							>
+								<option value="">— sem lotação —</option>
+								{#each data.unidades as un (un.id)}
+									<option value={un.id}>{un.nome}</option>
+								{/each}
+							</select>
+							{#if c.unidade_id != null}
+								<a
+									href="/unidade/{c.unidade_id}"
+									class="text-2xs text-primary-700 underline-offset-2 hover:underline dark:text-primary-400"
+									title={nomeDaUnidade(c.unidade_id) ?? ''}>acessos</a
+								>
+							{/if}
+						</form>
+					</td>
 					<td class="text-sm italic">{c.vinculo || '—'}</td>
 					<td class="text-xs">
 						{#if !c.ativo}
@@ -250,6 +284,18 @@
 		<label class="label">
 			<span class="label-text">Vínculo (empresa ou contrato)</span>
 			<input class="input" type="text" name="vinculo" bind:value={vinculo} maxlength="120" />
+		</label>
+		<label class="label">
+			<span class="label-text">Unidade em que está lotado(a)</span>
+			<select class="select" name="unidade_id" bind:value={unidadeId}>
+				<option value="">— definir depois —</option>
+				{#each data.unidades as un (un.id)}
+					<option value={un.id}>{un.nome}</option>
+				{/each}
+			</select>
+			<span class="text-xs text-surface-600 dark:text-surface-400"
+				>O que a pessoa pode fazer é definido pela unidade, na ficha dela.</span
+			>
 		</label>
 		<p class="text-xs text-surface-600 dark:text-surface-400">
 			A senha provisória é gerada ao salvar e mostrada uma única vez.

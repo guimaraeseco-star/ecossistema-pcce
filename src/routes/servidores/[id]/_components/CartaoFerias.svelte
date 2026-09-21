@@ -61,7 +61,8 @@
 		dataPosse,
 		ocupados,
 		isAdmin,
-		podeDarCiencia
+		podeDarCiencia,
+		podeAgir = true
 	}: {
 		ferias: FeriasDoPolicial;
 		feriados: string[];
@@ -72,6 +73,8 @@
 		isAdmin: boolean;
 		/** Admin de unidade/seccional (e o Admin Geral): dá ciência do abono. */
 		podeDarCiencia: boolean;
+		/** `false` = só leitura (colaborador sem `servidores.ferias`, E61): nenhum botão de ação. */
+		podeAgir?: boolean;
 	} = $props();
 
 	const hoje = hojeLocalISO();
@@ -295,9 +298,11 @@
 				— o sistema diz se é sustação ou suspensão e monta o ofício.
 			</p>
 		</div>
-		<button type="button" class="btn btn-sm preset-filled-warning-500" onclick={abrirLancar}
-			>Lançar programação</button
-		>
+		{#if podeAgir}
+			<button type="button" class="btn btn-sm preset-filled-warning-500" onclick={abrirLancar}
+				>Lançar programação</button
+			>
+		{/if}
 	</div>
 
 	{#if oficioGerado}
@@ -396,7 +401,7 @@
 						Exercício {exercicio}{#if aq}
 							· aquisitivo {formatarData(aq.inicio)} – {formatarData(aq.fim)}{/if}
 					</p>
-					{#if !pendente}
+					{#if !pendente && podeAgir}
 						<div class="flex gap-1">
 							{#if situacao.tipo}
 								<!-- Um botão só: a regra diz se é sustação ou suspensão. -->
@@ -586,7 +591,7 @@
 									estava. Até lá o pedido é pendência da unidade.
 								</li>
 							</ol>
-							<div class="mt-2 flex flex-wrap items-end gap-2">
+							<div class="mt-2 flex flex-wrap items-end gap-2" class:hidden={!podeAgir}>
 								{#if !r.nup}
 									<form
 										method="POST"

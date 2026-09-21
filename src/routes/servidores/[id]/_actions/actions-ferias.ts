@@ -43,7 +43,7 @@ import {
 	registrarProgramacao
 } from '$lib/db';
 import { feriadosNoIntervalo } from '$lib/db/diarias/feriados';
-import { isAdminGeral } from '$lib/auth';
+import { isAdminGeral, nomeParaRastro } from '$lib/auth';
 import { carregarFichaDoPolicial } from '$lib/server/policiais/ficha-permissao';
 import { dataIso, inteiroNaFaixa, textoLimitado } from '$lib/server/form-data';
 import { MAX_JUSTIFICATIVA } from '$lib/cadastro-campos';
@@ -183,7 +183,8 @@ export const actionsFerias = {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
 			event.locals.usuario,
-			event.params.id
+			event.params.id,
+			'servidores.ferias'
 		);
 		if ('erro' in auth) return auth.erro;
 		const { u, db, id, alvo } = auth;
@@ -203,7 +204,7 @@ export const actionsFerias = {
 		const r = await registrarProgramacao(
 			db,
 			{ policial_id: id, exercicio, periodos, observacao },
-			{ id: u.id, nome: u.nome }
+			{ id: u.id, nome: nomeParaRastro(u) }
 		);
 		if (!r.ok) {
 			return fail(409, {
@@ -258,7 +259,8 @@ export const actionsFerias = {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
 			event.locals.usuario,
-			event.params.id
+			event.params.id,
+			null
 		);
 		if ('erro' in auth) return auth.erro;
 		const { u, db, id, alvo } = auth;
@@ -322,7 +324,8 @@ export const actionsFerias = {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
 			event.locals.usuario,
-			event.params.id
+			event.params.id,
+			'servidores.ferias'
 		);
 		if ('erro' in auth) return auth.erro;
 		const { u, db, id, alvo } = auth;
@@ -408,7 +411,7 @@ export const actionsFerias = {
 				justificativa,
 				texto_oficio: texto
 			},
-			{ id: u.id, nome: u.nome }
+			{ id: u.id, nome: nomeParaRastro(u) }
 		);
 		if (!r.ok) return fail(409, { error: MOTIVO_RECUSA[r.motivo] });
 
@@ -451,7 +454,8 @@ export const actionsFerias = {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
 			event.locals.usuario,
-			event.params.id
+			event.params.id,
+			null
 		);
 		if ('erro' in auth) return auth.erro;
 		const { u, db, id, alvo } = auth;
@@ -528,7 +532,8 @@ export const actionsFerias = {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
 			event.locals.usuario,
-			event.params.id
+			event.params.id,
+			'servidores.ferias'
 		);
 		if ('erro' in auth) return auth.erro;
 		const { db, id } = auth;
@@ -552,7 +557,8 @@ export const actionsFerias = {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
 			event.locals.usuario,
-			event.params.id
+			event.params.id,
+			'servidores.ferias'
 		);
 		if ('erro' in auth) return auth.erro;
 		const { u, db, id, alvo } = auth;
@@ -572,7 +578,7 @@ export const actionsFerias = {
 			db,
 			reprogId,
 			decisao === 'deferida',
-			{ id: u.id, nome: u.nome },
+			{ id: u.id, nome: nomeParaRastro(u) },
 			hojeBrasilISO()
 		);
 		if (!r) return fail(409, { error: 'Este pedido já foi homologado.' });
@@ -634,7 +640,8 @@ export const actionsFerias = {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
 			event.locals.usuario,
-			event.params.id
+			event.params.id,
+			null
 		);
 		if ('erro' in auth) return auth.erro;
 		const { u, db, id, alvo } = auth;
@@ -707,7 +714,7 @@ export const actionsFerias = {
 				nup,
 				status
 			},
-			{ id: u.id, nome: u.nome }
+			{ id: u.id, nome: nomeParaRastro(u) }
 		);
 		if (!r.ok) {
 			return fail(409, {
@@ -757,7 +764,8 @@ export const actionsFerias = {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
 			event.locals.usuario,
-			event.params.id
+			event.params.id,
+			'servidores.ferias'
 		);
 		if ('erro' in auth) return auth.erro;
 		const { u, db, id, alvo } = auth;
@@ -770,7 +778,7 @@ export const actionsFerias = {
 			return fail(404, { error: 'Abono não encontrado para este servidor.' });
 		}
 
-		await darCienciaDoAbono(db, abonoId, { id: u.id, nome: u.nome }, hojeBrasilISO());
+		await darCienciaDoAbono(db, abonoId, { id: u.id, nome: nomeParaRastro(u) }, hojeBrasilISO());
 		await avisoDeFerias(
 			db,
 			u,

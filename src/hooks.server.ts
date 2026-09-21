@@ -281,7 +281,7 @@ const handleAuth: Handle = async ({ event, resolve }) => {
 	// antes de qualquer rota rodar — o que não está em
 	// `colaboradorPodeAcessarRota` responde 403 ou volta para a área dele. Fica
 	// DEPOIS dos portões de primeiro acesso e termo, que ele também atravessa.
-	if (usuario.tipo === 'colaborador' && !colaboradorPodeAcessarRota(pathname)) {
+	if (usuario.tipo === 'colaborador' && !colaboradorPodeAcessarRota(pathname, usuario)) {
 		if (pathname.startsWith('/api/')) {
 			return apiError('Acesso não liberado para colaborador', 403, ErrorCode.FORBIDDEN);
 		}

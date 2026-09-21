@@ -229,6 +229,8 @@ export const colaboradores = sqliteTable(
 		senha: text('senha').notNull(),
 		/** Empresa ou contrato — a quem a conta pertence, para saber quando revogar. */
 		vinculo: text('vinculo').notNull().default(''),
+		/** A unidade em que está lotado (E61, migração 0096) — por id, na linha da E51. Nulo = ainda não lotado. */
+		unidade_id: integer('unidade_id'),
 		primeiro_acesso: integer('primeiro_acesso').notNull().default(1),
 		ativo: integer('ativo').notNull().default(1),
 		/** Quem criou (Admin Geral), em snapshot. */
@@ -2530,6 +2532,25 @@ export type PlantaoCobertura = typeof plantaoCobertura.$inferSelect;
 export type DistanciaMunicipios = typeof distanciasMunicipios.$inferSelect;
 export type Feriado = typeof feriados.$inferSelect;
 export type Colaborador = typeof colaboradores.$inferSelect;
+
+/**
+ * O que a unidade liberou para cada colaborador (E61, migração 0096): uma
+ * linha por chave do catálogo de `lib/colaboradores/acessos.ts`. Quem
+ * concedeu fica em snapshot para o relatório diário e a auditoria.
+ */
+export const colaboradorAcessos = sqliteTable(
+	'colaborador_acessos',
+	{
+		colaborador_id: integer('colaborador_id').notNull(),
+		chave: text('chave').notNull(),
+		concedido_por_id: integer('concedido_por_id'),
+		concedido_por_nome: text('concedido_por_nome').notNull().default(''),
+		created_at: text('created_at')
+			.notNull()
+			.default(sql`(datetime('now', '-3 hours'))`)
+	},
+	(table) => [primaryKey({ columns: [table.colaborador_id, table.chave] })]
+);
 export type TempoMunicipios = typeof temposMunicipios.$inferSelect;
 export type GiseEscala = typeof giseEscalas.$inferSelect;
 export type GiseSeccional = typeof giseSeccionais.$inferSelect;

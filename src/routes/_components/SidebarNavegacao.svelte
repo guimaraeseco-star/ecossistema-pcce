@@ -257,11 +257,22 @@
 				{@render itemMenu(filho.href, filho.rotulo, filho.icone, filho.ativo)}
 			{/each}
 		{:else if usuario?.tipo === 'colaborador'}
-			<!-- Colaborador (terceira identidade): só a própria área. As funções
-			     designadas no módulo de diárias acrescentam itens aqui quando
-			     existirem; até lá a lista é esta, e o portão do hooks.server.ts
-			     recusa qualquer outra rota. -->
+			<!-- Colaborador (terceira identidade): a própria área e o que a
+			     UNIDADE liberou (E61) — a mesma lista que o portão do
+			     hooks.server.ts confere; item sem chave nem aparece. -->
 			{@render itemMenu('/colaborador', 'Boas-vindas', ICONE.casa)}
+			{#if usuario.acessos?.includes('avisos.ler')}
+				{@render itemMenu('/avisos', 'Avisos', ICONE.sino, undefined, nav.avisosTotal)}
+			{/if}
+			{#if usuario.acessos?.includes('servidores.ver')}
+				{@render itemMenu('/servidores', 'Servidores', ICONE.pessoas)}
+				{#if usuario.papel_unidade_id != null}
+					{@render itemMenu(`/unidade/${usuario.papel_unidade_id}`, 'Minha unidade', ICONE.predio)}
+				{/if}
+			{/if}
+			{#if usuario.acessos?.includes('escalas.ver')}
+				{@render itemMenu('/colaborador/escalas', 'Escalas', ICONE.calendario)}
+			{/if}
 		{:else if usuario?.isSuperAdmin}
 			<!-- Super Admin: menu exclusivo — apenas estas 8 abas, nesta ordem.
 

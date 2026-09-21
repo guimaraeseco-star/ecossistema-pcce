@@ -53,6 +53,8 @@
 	// Derivado gravável: espelha o load, mas admite o que a action devolve.
 	let feriasDaFicha = $derived(data.ferias);
 	const solicitando = $derived(data.modo === 'solicitacao');
+	/** O que a unidade liberou para o colaborador (E61); tudo `true` para os demais. */
+	const acessos = $derived(data.acessos);
 	const seccionaisParaPapel = $derived(
 		data.unidades.filter((u: { tipo: string }) => u.tipo === 'seccional')
 	);
@@ -441,10 +443,15 @@
 
 		<div class="flex justify-end gap-2 pt-1 border-t border-surface-200 dark:border-white/5 mt-2">
 			<a href="/servidores" class="btn btn-sm preset-outlined-surface-500">Cancelar</a>
+			{#if !acessos.cadastro}
+				<span class="self-center text-2xs text-surface-500"
+					>A unidade não liberou a proposta de alteração de cadastro para você.</span
+				>
+			{/if}
 			<button
 				type="submit"
 				class="btn btn-sm sm:btn-md preset-filled-primary-500 flex items-center gap-2 disabled:opacity-40"
-				disabled={loading.active || (solicitando && !podeSolicitar)}
+				disabled={loading.active || (solicitando && !podeSolicitar) || !acessos.cadastro}
 			>
 				{#if loading.active}
 					{solicitando ? 'Enviando...' : 'Guardando...'}
@@ -567,23 +574,26 @@
 	/>
 </div>
 
-<PainelAcoesServidor
-	policial={{
-		id: data.policial.id,
-		nome: data.policial.nome,
-		matricula: data.policial.matricula,
-		lotacao: data.policial.lotacao
-	}}
-	lotacoes={data.lotacoes}
-	modo={data.modo}
-	ocupados={data.ocupados}
-/>
+{#if acessos.afastamento}
+	<PainelAcoesServidor
+		policial={{
+			id: data.policial.id,
+			nome: data.policial.nome,
+			matricula: data.policial.matricula,
+			lotacao: data.policial.lotacao
+		}}
+		lotacoes={data.lotacoes}
+		modo={data.modo}
+		ocupados={data.ocupados}
+	/>
+{/if}
 
 <SolicitacoesServidor
 	designacoes={data.designacoes}
 	campos={data.solicitacoesCampo}
 	acoes={data.solicitacoesAcao}
 	policialId={data.policial.id}
+	podePedirRetorno={acessos.afastamento}
 />
 
 <!-- Férias: frações do Guardião, o assistente do NUP e o abono (E56). O que a
@@ -595,7 +605,8 @@
 		dataPosse={data.dataPosse}
 		ocupados={data.ocupados}
 		{isAdmin}
-		podeDarCiencia={true}
+		podeDarCiencia={acessos.ferias}
+		podeAgir={acessos.ferias}
 	/>
 </div>
 
