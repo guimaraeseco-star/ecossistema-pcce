@@ -42,6 +42,14 @@ import { escopoDeUnidades, unidadeNoEscopo } from '$lib/server/unidades/escopo';
 import { nivelTipoUnidade, rotuloTipoUnidade } from '$lib/unidades/tipos';
 import { hojeBrasilISO } from '$lib/utils/datas';
 import { avisarOutroLado } from '$lib/server/avisos/emitir';
+import { criarAvisos } from '$lib/db/avisos';
+import {
+	colaboradoresDaUnidade,
+	definirAcessosDoColaborador,
+	buscarColaborador
+} from '$lib/db/colaboradores';
+import { isAdminGeral, isAdminSeccional, isAdminUnidade } from '$lib/auth';
+import { diferencaDeAcessos, rotuloDoAcesso } from '$lib/colaboradores/acessos';
 
 export const load: PageServerLoad = async ({ locals, platform, params }) => {
 	const u = locals.usuario;
@@ -58,13 +66,16 @@ export const load: PageServerLoad = async ({ locals, platform, params }) => {
 	const unidade = await db.select().from(unidades).where(eq(unidades.id, id)).get();
 	if (!unidade) error(404, 'Unidade não encontrada');
 
-	const [efetivos, municipiosAtendidos, direcao, sucessao, pendenciasPorLotacao] =
+	const [efetivos, municipiosAtendidos, direcao, sucessao, pendenciasPorLotacao, colaboradores] =
 		await Promise.all([
 			efetivoPorLotacao(db, hojeBrasilISO()),
 			municipiosDaUnidade(db, id),
 			responsavelVigente(db, id),
 			historicoDaDirecao(db, id),
-			pendenciasDeFeriasPorLotacao(db)
+			pendenciasDeFeriasPorLotacao(db),
+			// O bloco "Colaboradores" (E61): só para quem administra a unidade —
+			// o colaborador não vê os colegas nem o que cada um pode.
+			podeGerirColaboradores(u) ? colaboradoresDaUnidade(db, id) : Promise.resolve(null)
 		]);
 	const porNome = (n: NoUnidade) => efetivos.get(n.nome) ?? efetivoVazio();
 	const efetivo = porNome({ ...unidade });
@@ -137,6 +148,18 @@ export const load: PageServerLoad = async ({ locals, platform, params }) => {
 		sucessao,
 		modoDirecao: modoDaDirecao(u),
 		/**
+		 * Os colaboradores lotados aqui e o que a unidade liberou a cada um (E61).
+		 * `null` = esta sessão não gere colaboradores (o bloco não aparece).
+		 */
+		colaboradores:
+			colaboradores?.map((c) => ({
+				id: c.id,
+				nome: c.nome,
+				vinculo: c.vinculo,
+				ativo: c.ativo === 1,
+				acessos: c.acessos
+			})) ?? null,
+		/**
 		 * Pendências de férias desta unidade e das vinculadas — alerta no topo
 		 * da ficha até a unidade resolver (pedido homologado, abono com ciência).
 		 */
@@ -199,6 +222,19 @@ async function portaoDaDirecao(event: Parameters<Actions[string]>[0]) {
 	if (!unidade) return { erro: fail(404, { error: 'Unidade não encontrada' }) };
 
 	return { u, db, id, unidade, modo: modoDaDirecao(u) };
+}
+
+/**
+ * Quem define o que o colaborador da unidade pode (E61): o admin da unidade,
+ * o da seccional acima (com aviso à unidade) e o Admin Geral. O escopo é
+ * conferido pelo portão da unidade, como nas demais actions desta rota.
+ */
+function podeGerirColaboradores(u: { tipo: string; papel?: string | null }) {
+	return (
+		isAdminGeral(u as Parameters<typeof isAdminGeral>[0]) ||
+		isAdminSeccional(u as Parameters<typeof isAdminSeccional>[0]) ||
+		isAdminUnidade(u as Parameters<typeof isAdminUnidade>[0])
+	);
 }
 
 /** Os campos que os dois caminhos (registrar e propor) leem igual. */
@@ -357,5 +393,80 @@ export const actions: Actions = {
 			{ env }
 		);
 		return { success: true };
+	},
+
+	/**
+	 * A unidade marca o que o colaborador pode (E61). Substitui o conjunto
+	 * inteiro pelo que veio marcado; o que mudou vai para a auditoria e, quando
+	 * quem mudou foi a seccional, vira notícia à unidade (decisão dele:
+	 * "o seccional pode liberar/retirar com aviso à unidade").
+	 */
+	definirAcessosColaborador: async (event) => {
+		const auth = await portaoDaDirecao(event);
+		if ('erro' in auth) return auth.erro;
+		const { u, db, id, unidade } = auth;
+		if (!podeGerirColaboradores(u)) {
+			return fail(403, { error: 'Só quem administra a unidade define os acessos do colaborador.' });
+		}
+
+		const fd = await event.request.formData();
+		const colaboradorId = inteiroNaFaixa(fd, 'colaborador_id', 1, 99_999_999);
+		if (!colaboradorId) return fail(400, { error: 'Colaborador inválido.' });
+		const alvo = await buscarColaborador(db, colaboradorId);
+		if (!alvo || alvo.unidade_id !== id) {
+			return fail(404, { error: 'Este colaborador não está lotado nesta unidade.' });
+		}
+		// As chaves marcadas: só texto curto, e só o que o catálogo conhece.
+		const marcadas = fd
+			.getAll('acesso')
+			.map((v) => (typeof v === 'string' ? v.slice(0, 40) : ''))
+			.filter(Boolean);
+
+		const { antes, depois } = await definirAcessosDoColaborador(db, colaboradorId, marcadas, {
+			id: u.id,
+			nome: u.nome
+		});
+		const { concedidas, retiradas } = diferencaDeAcessos(antes, depois);
+		const mudou = concedidas.length + retiradas.length > 0;
+		const resumo = [
+			...concedidas.map((c) => `+ ${rotuloDoAcesso(c)}`),
+			...retiradas.map((c) => `− ${rotuloDoAcesso(c)}`)
+		].join('; ');
+
+		const { contexto, env } = contextoDeEvento(event);
+		if (mudou) {
+			await auditar(
+				db,
+				{
+					acao: 'definir_acessos_colaborador',
+					usuario: u,
+					entidade: 'colaborador',
+					entidade_id: colaboradorId,
+					alvo_tipo: 'colaborador',
+					alvo_id: colaboradorId,
+					alvo_nome: alvo.nome,
+					detalhes: `Acessos de ${alvo.nome} na ${unidade.nome}: ${resumo}`,
+					dados_antes: { acessos: antes },
+					dados_depois: { acessos: depois },
+					...contexto
+				},
+				{ env }
+			);
+			// A seccional mexeu no que é da unidade: a unidade fica sabendo.
+			if (!isAdminUnidade(u)) {
+				await criarAvisos(db, [
+					{
+						destinatario: { tipo: 'lotacao', lotacao: unidade.nome },
+						cartao: 'unidade',
+						tipo: 'acessos_colaborador',
+						titulo: `Acessos do colaborador ${alvo.nome} alterados`,
+						texto: `${u.nome} (${isAdminGeral(u) ? 'Admin Geral' : 'seccional'}) alterou: ${resumo}.`,
+						link: `/unidade/${id}`,
+						autor: { id: u.id, nome: u.nome }
+					}
+				]);
+			}
+		}
+		return { success: true, acessos: depois };
 	}
 };

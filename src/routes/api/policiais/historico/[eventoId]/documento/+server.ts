@@ -22,7 +22,12 @@ export const GET: RequestHandler = async ({ platform, params, locals }) => {
 
 	// O escopo é conferido contra o SERVIDOR do evento: é dele o dado pessoal
 	// que o PDF carrega.
-	const ficha = await carregarFichaDoPolicial(db, locals.usuario, String(evento.policial_id));
+	const ficha = await carregarFichaDoPolicial(
+		db,
+		locals.usuario,
+		String(evento.policial_id),
+		'servidores.ver'
+	);
 	if ('erro' in ficha) return recusaComoResposta(ficha.erro);
 
 	if (!hasR2(platform)) {

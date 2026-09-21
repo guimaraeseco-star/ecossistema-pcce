@@ -25,12 +25,20 @@
 		return data.ferias.filter((f) => f.data_inicio <= fim && f.data_fim >= ini);
 	};
 
-	/** Pessoas distintas por lotação no mês — duas frações de alguém contam uma. */
-	const porLotacaoNoMes = (m: number) => {
+	/**
+	 * O que o TETO mede (decisão dele, 21/09): só o 1º período (ou o único —
+	 * evento sem fração registrada conta como tal), e só no mês em que COMEÇA.
+	 * É o que paga o terço; a 2ª e a 3ª frações ficam fora.
+	 */
+	const iniciandoNoMes = (m: number) =>
+		data.ferias.filter((f) => (f.ordem ?? 1) === 1 && f.data_inicio.startsWith(mesISO(m)));
+
+	/** Pessoas distintas por lotação — duas frações de alguém contam uma. */
+	const porLotacao = (lista: typeof data.ferias) => {
 		// Estruturas locais à função, montadas e devolvidas — não são estado vivo.
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity
 		const mapa = new Map<string, Set<number>>();
-		for (const f of noMes(m)) {
+		for (const f of lista) {
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity
 			const s = mapa.get(f.lotacao) ?? new Set<number>();
 			s.add(f.policial_id);
@@ -67,7 +75,8 @@
 		<h1 class="h1 mt-0.5 text-2xl font-bold">Programação de {data.ano}</h1>
 		<p class="mt-1 text-sm text-surface-600 dark:text-surface-400">
 			Quem está de férias em cada mês e quanto da unidade isso representa. O teto de
-			{TETO_PERCENTUAL_EM_FERIAS} % só avisa — a COGEP confere no 1º período.
+			{TETO_PERCENTUAL_EM_FERIAS} % mede só o <b>1º período</b> (o que paga o terço), no mês em que ele
+			começa — e só avisa; a 2ª e a 3ª frações entram no "em férias", não no teto.
 		</p>
 	</div>
 	<div class="flex items-center gap-2">
@@ -96,25 +105,32 @@
 <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
 	{#each MESES_PT as nome, m (m)}
 		{@const lista = noMes(m)}
-		{@const porLot = porLotacaoNoMes(m)}
+		{@const porLot = porLotacao(lista)}
+		{@const porLotTeto = porLotacao(iniciandoNoMes(m))}
 		<section class="card-elevated rounded-2xl p-4" aria-label="{nome} de {data.ano}">
 			<div class="mb-2 flex items-baseline justify-between gap-2">
 				<h2 class="text-sm font-bold text-surface-900 dark:text-surface-50">{nome}</h2>
 				<span class="text-xs text-surface-500">{lista.length === 0 ? '—' : `${lista.length}`}</span>
 			</div>
 
-			<!-- O percentual, por unidade: é assim que o teto se aplica. -->
+			<!-- Dois percentuais por unidade: o do TETO (1ºs períodos iniciando no
+			     mês) e o de quem está em férias no mês em qualquer fração. -->
 			{#each [...porLot.entries()] as [lotacao, pessoas] (lotacao)}
 				{@const efetivo = data.efetivos[lotacao] ?? 0}
+				{@const noTeto = porLotTeto.get(lotacao)?.size ?? 0}
+				{@const pctTeto = percentualEmFerias(noTeto, efetivo)}
 				{@const pct = percentualEmFerias(pessoas.size, efetivo)}
 				{@const prefixo = varias ? nomeCurtoDeUnidade(lotacao) + ': ' : ''}
-				{@const aviso = pct > TETO_PERCENTUAL_EM_FERIAS ? ' ⚠ acima do teto' : ''}
+				{@const acima = pctTeto > TETO_PERCENTUAL_EM_FERIAS}
 				<p
-					class="text-2xs {pct > TETO_PERCENTUAL_EM_FERIAS
+					class="text-2xs {acima
 						? 'font-semibold text-warning-700 dark:text-warning-400'
 						: 'text-surface-500'}"
 				>
-					{prefixo}{pessoas.size} de {efetivo} · {pct} %{aviso}
+					{prefixo}teto: {noTeto} de {efetivo} · {pctTeto} %{acima ? ' ⚠ acima do teto' : ''}
+				</p>
+				<p class="text-2xs text-surface-500">
+					{prefixo}em férias: {pessoas.size} de {efetivo} · {pct} %
 				</p>
 			{/each}
 
@@ -134,7 +150,7 @@
 							: 'Nomes'}
 					</summary>
 					<ul class="mt-1 space-y-1 text-xs">
-						{#each lista as f (f.policial_id + f.data_inicio)}
+						{#each lista as f (f.historico_id)}
 							<li class="flex flex-wrap items-baseline justify-between gap-x-2">
 								<a href="/servidores/{f.policial_id}" class="font-medium no-underline">{f.nome}</a>
 								<span class="tabular-nums text-surface-500">

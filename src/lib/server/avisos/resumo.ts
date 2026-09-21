@@ -7,7 +7,7 @@
  */
 import { contarNaoLidos, type CaixaDeAvisos } from '$lib/db/avisos';
 import type { Database } from '$lib/db/core';
-import { isAdminGeral, type UsuarioLogado } from '$lib/auth';
+import { colaboradorTemAcesso, isAdminGeral, type UsuarioLogado } from '$lib/auth';
 import { lotacoesAdministradas } from '$lib/server/policial-permissao';
 import { pendenciasDoUsuario } from './pendencias';
 
@@ -29,7 +29,11 @@ export async function caixaDoUsuario(db: Database, u: UsuarioLogado): Promise<Ca
 
 /** Só quem tem home de módulos tem caixa: Admin Geral, admin de seccional e de unidade. */
 export function temCaixaDeAvisos(u: UsuarioLogado | null): boolean {
-	return !!u && !u.isSuperAdmin && (isAdminGeral(u) || !!u.papel);
+	return (
+		!!u &&
+		!u.isSuperAdmin &&
+		(isAdminGeral(u) || !!u.papel || colaboradorTemAcesso(u, 'avisos.ler'))
+	);
 }
 
 /** As contagens do badge. */

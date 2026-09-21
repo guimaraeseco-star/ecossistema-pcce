@@ -59,6 +59,10 @@ export {
 	criarColaborador,
 	definirColaboradorAtivo,
 	definirEmailRecuperacao,
+	definirUnidadeDoColaborador,
+	listarAcessosDoColaborador,
+	definirAcessosDoColaborador,
+	colaboradoresDaUnidade,
 	normalizarEmailColaborador,
 	CpfDeColaboradorJaCadastrado
 } from './db/colaboradores';

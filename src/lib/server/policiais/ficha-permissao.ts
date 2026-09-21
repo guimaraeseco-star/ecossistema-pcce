@@ -10,6 +10,10 @@
  *   - **`'solicitacao'`** — administrador de seccional ou de unidade, dentro do
  *     escopo dele. Vê a mesma ficha, mas nada do que ele submete muda o cadastro:
  *     vira pedido para o Admin Geral decidir.
+ *   - **`'solicitacao'`** também para o COLABORADOR lotado (E61): entra com a
+ *     chave `servidores.ver` e cada action diz, em `acessoExigido`, qual chave
+ *     do catálogo ela exige dele — sem a chave, 403. Para policial e admin o
+ *     parâmetro é indiferente.
  *   - recusa, para todo o resto.
  *
  * O modo é decidido AQUI, uma vez, e não em cada action. Enquanto cada uma
@@ -25,7 +29,14 @@
 
 import { fail } from '@sveltejs/kit';
 import type { ActionFailure } from '@sveltejs/kit';
-import { isAdminGeral, isAdminSeccional, isAdminUnidade, type UsuarioLogado } from '$lib/auth';
+import {
+	colaboradorTemAcesso,
+	isAdminGeral,
+	isAdminSeccional,
+	isAdminUnidade,
+	type UsuarioLogado
+} from '$lib/auth';
+import type { AcessoDoColaborador } from '$lib/colaboradores/acessos';
 import { buscarPolicial, type Database } from '$lib/db';
 import type { Policial } from '$lib/server/schema';
 import { lotacoesAdministradas, lotacaoNoEscopo } from '$lib/server/policial-permissao';
@@ -36,7 +47,12 @@ export type ModoFicha = 'direto' | 'solicitacao';
 
 /** O usuário administra ALGUÉM? (não diz quem — para isso, `escopoDaFicha`.) */
 export function podeAbrirFichaDePolicial(u: UsuarioLogado | null): boolean {
-	return isAdminGeral(u) || isAdminSeccional(u) || isAdminUnidade(u);
+	return (
+		isAdminGeral(u) ||
+		isAdminSeccional(u) ||
+		isAdminUnidade(u) ||
+		colaboradorTemAcesso(u, 'servidores.ver')
+	);
 }
 
 /** O modo desta sessão. Só o Admin Geral executa direto. */
@@ -92,10 +108,16 @@ export interface FichaAutorizada {
 export async function carregarFichaDoPolicial(
 	db: Database,
 	u: UsuarioLogado | null,
-	idBruto: string | undefined
+	idBruto: string | undefined,
+	acessoExigido: AcessoDoColaborador | null = null
 ): Promise<FichaAutorizada | { erro: RecusaDaFicha }> {
 	if (!u || !podeAbrirFichaDePolicial(u)) {
 		return { erro: fail(403, { error: 'Sem permissão para gerir este servidor' }) };
+	}
+	// O colaborador só faz o que a unidade liberou; action sem chave declarada
+	// é action que ele não faz (falha fechado).
+	if (u.tipo === 'colaborador' && (!acessoExigido || !colaboradorTemAcesso(u, acessoExigido))) {
+		return { erro: fail(403, { error: 'A unidade não liberou esta ação para você.' }) };
 	}
 
 	const id = Number(idBruto);

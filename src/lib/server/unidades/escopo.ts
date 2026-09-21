@@ -32,7 +32,13 @@ import {
 } from '$lib/db';
 import { buscarUnidadePorNome } from '$lib/db/unidades';
 import { nivelTipoUnidade } from '$lib/unidades/tipos';
-import { isAdminGeral, isAdminSeccional, isAdminUnidade, type UsuarioLogado } from '$lib/auth';
+import {
+	colaboradorComAcesso,
+	isAdminGeral,
+	isAdminSeccional,
+	isAdminUnidade,
+	type UsuarioLogado
+} from '$lib/auth';
 
 export interface EscopoUnidades {
 	raiz: NoUnidade;
@@ -65,6 +71,8 @@ async function idDaRaiz(
 	arvore: Map<number, NoUnidade>
 ): Promise<number | null> {
 	if (isAdminSeccional(u) || isAdminUnidade(u)) return u.papel_unidade_id ?? null;
+	// Colaborador lotado com acesso (E61): vê a ficha da própria unidade.
+	if (colaboradorComAcesso(u)) return u.papel_unidade_id ?? null;
 	if (!isAdminGeral(u)) return null;
 
 	if (u.adminPolicialId != null) {

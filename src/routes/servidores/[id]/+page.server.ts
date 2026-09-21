@@ -127,7 +127,7 @@ import {
 	ocupadosDoAbono,
 	ocupadosDoHistorico
 } from '$lib/servidores/conflitos';
-import { isAdminGeral } from '$lib/auth';
+import { colaboradorTemAcesso, isAdminGeral, nomeParaRastro } from '$lib/auth';
 import { dataIso, inteiroNaFaixa, textoLimitado } from '$lib/server/form-data';
 import {
 	lotacoesAdministradas,
@@ -262,6 +262,17 @@ export const load: PageServerLoad = async ({ locals, params, platform, depends }
 
 	const isAdm = isAdminGeral(u);
 	const modo = modoDaFicha(u);
+	// O que ESTA sessão pode fazer nesta ficha. Para policial e admin, tudo o
+	// que o modo permite; para o colaborador (E61), só o que a unidade liberou —
+	// a tela esconde, e cada action confere de novo pela mesma chave.
+	const acessos =
+		u.tipo === 'colaborador'
+			? {
+					cadastro: colaboradorTemAcesso(u, 'servidores.cadastro'),
+					afastamento: colaboradorTemAcesso(u, 'servidores.afastamento'),
+					ferias: colaboradorTemAcesso(u, 'servidores.ferias')
+				}
+			: { cadastro: true, afastamento: true, ferias: true };
 
 	// O escopo é reconferido contra o ALVO: a lista só mostra quem o admin
 	// alcança, mas o id chega pela URL. Sem isto, trocar o número na barra de
@@ -327,6 +338,7 @@ export const load: PageServerLoad = async ({ locals, params, platform, depends }
 		unidades: todasUnidades,
 		designacoes,
 		modo,
+		acessos,
 		isAdmin: isAdm,
 		ehAdminGeral,
 		modulosAdmin,
@@ -438,7 +450,8 @@ export const actions: Actions = {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
 			event.locals.usuario,
-			event.params.id
+			event.params.id,
+			null
 		);
 		if ('erro' in auth) return auth.erro;
 		const { u, db, id, alvo, modo, escopo } = auth;
@@ -607,7 +620,8 @@ export const actions: Actions = {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
 			event.locals.usuario,
-			event.params.id
+			event.params.id,
+			'servidores.cadastro'
 		);
 		if ('erro' in auth) return auth.erro;
 		const { u, db, id, alvo, modo } = auth;
@@ -653,7 +667,7 @@ export const actions: Actions = {
 		try {
 			await criarSolicitacoesCadastro(db, id, mudancas, justificativa.texto, {
 				id: u.id,
-				nome: u.nome
+				nome: nomeParaRastro(u)
 			});
 		} catch (e) {
 			logger.error('[policiais/solicitarAlteracao] Falha ao registrar solicitação', {
@@ -892,7 +906,8 @@ export const actions: Actions = {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
 			event.locals.usuario,
-			event.params.id
+			event.params.id,
+			null
 		);
 		if ('erro' in auth) return auth.erro;
 		const { alvo, modo } = auth;
@@ -936,7 +951,8 @@ export const actions: Actions = {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
 			event.locals.usuario,
-			event.params.id
+			event.params.id,
+			'servidores.afastamento'
 		);
 		if ('erro' in auth) return auth.erro;
 		const { db, id, modo } = auth;
@@ -1054,7 +1070,8 @@ export const actions: Actions = {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
 			event.locals.usuario,
-			event.params.id
+			event.params.id,
+			'servidores.afastamento'
 		);
 		if ('erro' in auth) return auth.erro;
 		const { u, db, id, alvo, modo } = auth;
@@ -1113,7 +1130,7 @@ export const actions: Actions = {
 				nup: nup.formatado || null,
 				justificativa: '',
 				solicitante_id: u.id,
-				solicitante_nome: u.nome
+				solicitante_nome: nomeParaRastro(u)
 			});
 			const { contexto, env } = contextoDeEvento(event);
 			await auditar(
@@ -1189,7 +1206,8 @@ export const actions: Actions = {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
 			event.locals.usuario,
-			event.params.id
+			event.params.id,
+			null
 		);
 		if ('erro' in auth) return auth.erro;
 		const { u, db, id, alvo } = auth;
@@ -1294,7 +1312,8 @@ export const actions: Actions = {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
 			event.locals.usuario,
-			event.params.id
+			event.params.id,
+			null
 		);
 		if ('erro' in auth) return auth.erro;
 		const { u, db, id, alvo } = auth;
@@ -1347,7 +1366,8 @@ export const actions: Actions = {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
 			event.locals.usuario,
-			event.params.id
+			event.params.id,
+			null
 		);
 		if ('erro' in auth) return auth.erro;
 		const { alvo, modo } = auth;
@@ -1447,7 +1467,7 @@ async function concluirAcaoRH(
 				...acao,
 				justificativa,
 				solicitante_id: u.id,
-				solicitante_nome: u.nome
+				solicitante_nome: nomeParaRastro(u)
 			});
 		}
 	} catch (e) {

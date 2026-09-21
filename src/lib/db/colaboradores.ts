@@ -16,11 +16,16 @@
  * NORMALIZADO (minúsculas, sem espaços). O de recuperação é opcional e a
  * própria pessoa informa no primeiro acesso.
  */
-import { and, asc, eq } from 'drizzle-orm';
-import { colaboradores, sessoes } from '../server/schema';
+import { and, asc, eq, inArray } from 'drizzle-orm';
+import { colaboradorAcessos, colaboradores, sessoes } from '../server/schema';
 import type { Colaborador } from '../server/schema';
 import { cpfKeys, indiceCPF, prepararCpfParaDB, type CpfCriptoEnv } from '../crypto/cpf-cripto';
 import { limparCPF } from '../utils/formato';
+import {
+	diferencaDeAcessos,
+	normalizarAcessos,
+	type AcessoDoColaborador
+} from '../colaboradores/acessos';
 import { linhasAfetadas, type Database } from './core';
 
 /** O que a tela do Admin Geral informa ao criar. A senha já vem em hash. */
@@ -180,4 +185,96 @@ export async function definirColaboradorAtivo(
 			.where(and(eq(sessoes.tipo, 'colaborador'), eq(sessoes.usuario_id, id)));
 	}
 	return true;
+}
+
+/* ── Lotação e acessos (E61) ─────────────────────────────────────────────── */
+
+/** A unidade em que o colaborador está lotado. `null` desloca. */
+export async function definirUnidadeDoColaborador(
+	db: Database,
+	id: number,
+	unidadeId: number | null
+): Promise<boolean> {
+	const r = await db
+		.update(colaboradores)
+		.set({ unidade_id: unidadeId })
+		.where(eq(colaboradores.id, id));
+	return linhasAfetadas(r) > 0;
+}
+
+/** As chaves liberadas para um colaborador, na ordem do catálogo. */
+export async function listarAcessosDoColaborador(
+	db: Database,
+	id: number
+): Promise<AcessoDoColaborador[]> {
+	const linhas = await db
+		.select({ chave: colaboradorAcessos.chave })
+		.from(colaboradorAcessos)
+		.where(eq(colaboradorAcessos.colaborador_id, id))
+		.all();
+	return normalizarAcessos(linhas.map((l) => l.chave));
+}
+
+/**
+ * Substitui o conjunto de acessos do colaborador pelo que a unidade marcou.
+ * Devolve o que mudou (para o aviso e a auditoria). As sessões dele não caem:
+ * a chave é conferida a cada request (o cache de sessão da borda dura 60 s).
+ */
+export async function definirAcessosDoColaborador(
+	db: Database,
+	id: number,
+	marcadas: readonly string[],
+	quem: { id: number; nome: string }
+): Promise<{ antes: AcessoDoColaborador[]; depois: AcessoDoColaborador[] }> {
+	const antes = await listarAcessosDoColaborador(db, id);
+	const depois = normalizarAcessos(marcadas);
+	const { concedidas, retiradas } = diferencaDeAcessos(antes, depois);
+	if (retiradas.length > 0) {
+		await db
+			.delete(colaboradorAcessos)
+			.where(
+				and(eq(colaboradorAcessos.colaborador_id, id), inArray(colaboradorAcessos.chave, retiradas))
+			);
+	}
+	if (concedidas.length > 0) {
+		await db.insert(colaboradorAcessos).values(
+			concedidas.map((chave) => ({
+				colaborador_id: id,
+				chave,
+				concedido_por_id: quem.id,
+				concedido_por_nome: quem.nome
+			}))
+		);
+	}
+	return { antes, depois };
+}
+
+/** Os colaboradores de uma unidade (ativos e desativados), com os acessos — o bloco da ficha da unidade. */
+export async function colaboradoresDaUnidade(
+	db: Database,
+	unidadeId: number
+): Promise<(ColaboradorResumo & { acessos: AcessoDoColaborador[] })[]> {
+	const lista = (
+		await db
+			.select()
+			.from(colaboradores)
+			.where(eq(colaboradores.unidade_id, unidadeId))
+			.orderBy(asc(colaboradores.nome))
+			.all()
+	).map(semSensiveis);
+	if (lista.length === 0) return [];
+	const chaves = await db
+		.select({ colaborador_id: colaboradorAcessos.colaborador_id, chave: colaboradorAcessos.chave })
+		.from(colaboradorAcessos)
+		.where(
+			inArray(
+				colaboradorAcessos.colaborador_id,
+				lista.map((c) => c.id)
+			)
+		)
+		.all();
+	return lista.map((c) => ({
+		...c,
+		acessos: normalizarAcessos(chaves.filter((k) => k.colaborador_id === c.id).map((k) => k.chave))
+	}));
 }

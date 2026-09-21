@@ -24,6 +24,10 @@
  * **Colaborador não se exclui, só se desativa** — pela mesma razão das
  * unidades e dos policiais: o que ele fizer no módulo de diárias (autuações,
  * pedidos montados) aponta para o id dele.
+ *
+ * A LOTAÇÃO (E61) é do Admin Geral: ele vincula o colaborador a uma unidade,
+ * aqui. O que o colaborador pode naquela unidade é a unidade que define, na
+ * ficha dela (`/unidade/[id]`).
  */
 import { fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
@@ -33,6 +37,8 @@ import {
 	criarColaborador,
 	buscarColaborador,
 	definirColaboradorAtivo,
+	definirUnidadeDoColaborador,
+	listarUnidades,
 	auditar,
 	contextoDeEvento
 } from '$lib/db';
@@ -44,6 +50,7 @@ import { hashSenha } from '$lib/auth';
 import { gerarSenhaProvisoria } from '$lib/server/auth/senha-provisoria';
 import { resolverCredencial, revogarSessoesDaCredencial } from '$lib/server/auth/credencial';
 import { ehViolacaoUnique, mensagemComCausas } from '$lib/server/db-errors';
+import { inteiroNaFaixa } from '$lib/server/form-data';
 import { CpfDeColaboradorJaCadastrado } from '$lib/db/colaboradores';
 import { logger } from '$lib/server/logger';
 
@@ -54,7 +61,16 @@ export const load: PageServerLoad = async ({ locals, platform, depends }) => {
 	if (!isAdminGeral(u)) redirect(302, '/');
 
 	const db = getDB(platform);
-	return { colaboradores: await listarColaboradores(db) };
+	const [colaboradores, unidades] = await Promise.all([
+		listarColaboradores(db),
+		listarUnidades(db)
+	]);
+	return {
+		colaboradores,
+		// Para o campo "Unidade" (E61): só o que uma delegacia/seccional é — o
+		// colaborador é lotado onde há admin de unidade para liberar acessos.
+		unidades: unidades.map((u) => ({ id: u.id, nome: u.nome, tipo: u.tipo }))
+	};
 };
 
 /** O pepper do ambiente — o mesmo de todo hash de senha do sistema. */
@@ -82,6 +98,7 @@ export const actions: Actions = {
 		}
 
 		const db = getDB(platform);
+		const unidadeId = inteiroNaFaixa(data, 'unidade_id', 1, 99_999_999);
 		const senhaProvisoria = gerarSenhaProvisoria();
 		try {
 			const criado = await criarColaborador(
@@ -96,6 +113,7 @@ export const actions: Actions = {
 				},
 				platform?.env
 			);
+			if (unidadeId) await definirUnidadeDoColaborador(db, criado.id, unidadeId);
 			const { contexto, env } = contextoDeEvento(event);
 			await auditar(
 				db,
@@ -112,7 +130,8 @@ export const actions: Actions = {
 					dados_depois: {
 						nome: criado.nome,
 						email_pessoal: criado.email_pessoal,
-						vinculo: criado.vinculo
+						vinculo: criado.vinculo,
+						unidade_id: unidadeId ?? null
 					},
 					...contexto
 				},
@@ -129,6 +148,53 @@ export const actions: Actions = {
 			logger.error('[colaboradores/criar]', { error: mensagemComCausas(e) });
 			return fail(500, { error: 'Erro ao cadastrar o colaborador. Tente novamente.' });
 		}
+	},
+
+	/**
+	 * Lota (ou desloca) o colaborador numa unidade (E61). Deslocar não apaga os
+	 * acessos: eles só valem com lotação, e voltam a valer se ele for lotado de
+	 * novo na mesma unidade — a unidade revê o que quiser na ficha dela.
+	 */
+	definirUnidade: async (event) => {
+		const { request, locals, platform } = event;
+		const u = locals.usuario;
+		if (!u || !isAdminGeral(u)) {
+			return fail(403, { error: 'Acesso restrito a administradores gerais' });
+		}
+		const data = await request.formData();
+		const id = inteiroNaFaixa(data, 'colaborador_id', 1, 99_999_999);
+		if (!id) return fail(400, { error: 'ID inválido' });
+		const unidadeId = inteiroNaFaixa(data, 'unidade_id', 1, 99_999_999);
+		const db = getDB(platform);
+		const alvo = await buscarColaborador(db, id);
+		if (!alvo) return fail(404, { error: 'Colaborador não encontrado' });
+		const unidade = unidadeId
+			? (await listarUnidades(db)).find((x) => x.id === unidadeId)
+			: undefined;
+		if (unidadeId && !unidade) return fail(400, { error: 'Unidade inválida' });
+
+		await definirUnidadeDoColaborador(db, id, unidadeId ?? null);
+		const { contexto, env } = contextoDeEvento(event);
+		await auditar(
+			db,
+			{
+				acao: 'lotar_colaborador',
+				usuario: u,
+				entidade: 'colaborador',
+				entidade_id: id,
+				alvo_tipo: 'colaborador',
+				alvo_id: id,
+				alvo_nome: alvo.nome,
+				detalhes: unidade
+					? `${alvo.nome} lotado(a) na ${unidade.nome}`
+					: `${alvo.nome} sem lotação`,
+				dados_antes: { unidade_id: alvo.unidade_id },
+				dados_depois: { unidade_id: unidadeId ?? null },
+				...contexto
+			},
+			{ env }
+		);
+		return { success: true };
 	},
 
 	definirAtivo: async (event) => {

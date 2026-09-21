@@ -12,7 +12,7 @@ import { eq } from 'drizzle-orm';
 import { criarAvisos, type NovoAviso } from '$lib/db/avisos';
 import { policiais } from '$lib/server/schema';
 import type { Database } from '$lib/db/core';
-import { isAdminGeral, type UsuarioLogado } from '$lib/auth';
+import { isAdminGeral, nomeParaRastro, type UsuarioLogado } from '$lib/auth';
 import { logger } from '$lib/server/logger';
 
 export interface AvisoAEmitir {
@@ -59,7 +59,7 @@ export async function avisarOutroLado(
 				titulo: aviso.titulo,
 				texto: aviso.texto,
 				link: aviso.link,
-				autor: { id: autor.id, nome: autor.nome }
+				autor: { id: autor.id, nome: nomeParaRastro(autor) }
 			}))
 		);
 	} catch (e) {
