@@ -49,7 +49,7 @@ const ROTAS_POR_ACESSO: Record<AcessoDoColaborador, readonly (string | RegExp)[]
 	],
 	'servidores.cadastro': [],
 	'servidores.afastamento': [],
-	'servidores.ferias': [/^\/unidade\/\d+\/ferias$/],
+	'servidores.ferias': ['/ferias', /^\/unidade\/\d+\/ferias$/],
 	'escalas.ver': [/^\/escalas\/\d+$/],
 	'avisos.ler': ['/avisos']
 };

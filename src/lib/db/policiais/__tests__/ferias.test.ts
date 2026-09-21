@@ -13,6 +13,7 @@ import type { Database } from '$lib/db';
 import { bancoMigrado, drizzleSobre } from '$lib/db/__tests__/sqlite-migrado';
 import {
 	abrirReprogramacao,
+	contagemParaTeto,
 	darCienciaDoAbono,
 	decidirReprogramacao,
 	excluirProgramacao,
@@ -393,5 +394,37 @@ describe('abono', () => {
 			QUEM
 		);
 		expect(toda).toEqual({ ok: false, motivo: 'com_abono' });
+	});
+});
+
+describe('contagemParaTeto — o teto mede só o 1º período que começa no mês (decisão de 21/09)', () => {
+	it('separa "iniciando" (1ªs frações do mês) de "em férias" (qualquer fração tocando o mês)', async () => {
+		sqlite.exec(`
+			INSERT INTO policiais (id, matricula, nome, cargo, lotacao, senha, data_posse) VALUES
+				(7002, '7002', 'OUTRO', 'OIP', 'DP de Aurora', 'h', '2019-03-15'),
+				(7003, '7003', 'TERCEIRO', 'OIP', 'DP de Aurora', 'h', '2019-03-15');
+		`);
+		// POL: 1ª em outubro, 2ª em novembro. 7002: 1ª em novembro. 7003: nada.
+		await registrarProgramacao(
+			db,
+			{
+				policial_id: POL,
+				exercicio: 2026,
+				periodos: [P('2026-10-01', '2026-10-15', 15), P('2026-11-01', '2026-11-15', 15)]
+			},
+			QUEM
+		);
+		await registrarProgramacao(
+			db,
+			{ policial_id: 7002, exercicio: 2026, periodos: [P('2026-11-16', '2026-12-15', 30)] },
+			QUEM
+		);
+		const nov = await contagemParaTeto(db, 'DP de Aurora', '2026-11');
+		expect(nov).toEqual({ iniciando: 1, emFerias: 2, efetivo: 3 });
+		const out = await contagemParaTeto(db, 'DP de Aurora', '2026-10');
+		expect(out).toEqual({ iniciando: 1, emFerias: 1, efetivo: 3 });
+		// Dezembro: a 1ª de 7002 continua correndo, mas não COMEÇA em dezembro.
+		const dez = await contagemParaTeto(db, 'DP de Aurora', '2026-12');
+		expect(dez).toEqual({ iniciando: 0, emFerias: 1, efetivo: 3 });
 	});
 });

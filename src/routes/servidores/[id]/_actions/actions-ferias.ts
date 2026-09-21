@@ -172,6 +172,7 @@ async function avisoDoTetoNoMes(
 	const teto = await contagemParaTeto(db, lotacao, inicioISO.slice(0, 7));
 	return avisoDoTeto({
 		ordem,
+		iniciandoNoMes: teto.iniciando + 1,
 		emFeriasNoMes: teto.emFerias + 1,
 		efetivoDaUnidade: teto.efetivo
 	});

@@ -319,6 +319,7 @@
 			{/if}
 			{#if flags.showPoliciais}
 				{@render itemMenu('/servidores', 'Servidores', ICONE.pessoas)}
+				{@render itemMenu('/ferias', 'Férias', ICONE.calendario)}
 			{/if}
 			{#if flags.showSolicitacoes}
 				{@render itemMenu('/solicitacoes', 'Solicitações', ICONE.checkLista)}

@@ -150,6 +150,25 @@ function cardServidores(flags: FlagsMenu): CartaoHome {
 }
 
 /**
+ * Férias — o panorama mensal da unidade raiz do escopo (`/ferias` resolve
+ * qual: a unidade, a seccional ou o departamento), com o teto de 15 % e as
+ * pendências. Pedido dele em 21/09: um cartão para todos que gerem pessoal.
+ */
+function cardFerias(flags: FlagsMenu): CartaoHome {
+	return {
+		id: 'ferias',
+		titulo: 'Férias',
+		descricao: flags.isAdmGeral
+			? 'Quem está de férias em cada mês, por unidade do departamento: o teto de 15 % do 1º período, os pedidos na COGEP e os abonos sem ciência.'
+			: 'Quem está de férias em cada mês na sua unidade: o teto de 15 % do 1º período, os pedidos na COGEP e os abonos sem ciência.',
+		icone: ICONE.calendario,
+		href: '/ferias',
+		cta: 'Ver as férias',
+		atalhos: []
+	};
+}
+
+/**
  * Escala ordinária e de plantão. Para o Admin Geral a porta é o painel de
  * conformidade (ele não monta escala — acompanha e recebe); para os papéis
  * com escopo é a lista de escalas, com o verbo do cargo (DPC assina, OIP
@@ -356,7 +375,7 @@ export function gruposHome({ usuario, flags }: EntradaHome): GrupoHome[] {
 	// `showGrupo1`/`showGrupo2` aqui vêm de `moduloParaHome`: para admin dizem
 	// o que a conta tem LIGADO, não a preferência de tela — ver o cabeçalho.
 	const pessoal: CartaoHome[] = [];
-	if (flags.showPoliciais) pessoal.push(cardServidores(flags));
+	if (flags.showPoliciais) pessoal.push(cardServidores(flags), cardFerias(flags));
 	const escalas = flags.showGrupo1 ? cardEscalas(u, flags) : null;
 	if (escalas) pessoal.push(escalas);
 	pessoal.push(

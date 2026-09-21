@@ -712,20 +712,40 @@ export async function pendenciasDeFerias(
 
 /**
  * Os números para o teto de 15 % (art. 6º I) no mês em que a nova fração
- * começa: quantos da lotação já estarão em férias naquele mês e o efetivo
- * ativo da lotação. Quem decide se avisa é `conferirNovoPeriodo`.
+ * começa: quantos 1ºs períodos da lotação COMEÇAM naquele mês (é o que paga o
+ * terço — o teto, decisão dele de 21/09), quantos estarão em férias no mês em
+ * qualquer fração (informação) e o efetivo ativo. Quem decide se avisa é
+ * `avisoDoTeto`.
  *
- * "Em férias no mês" = tem evento de férias que toca o mês, contado UMA vez
- * por servidor (duas frações no mesmo mês não são duas pessoas).
+ * Cada número conta UMA vez por servidor. Evento de férias sem fração (carga
+ * antiga da planilha) conta como 1º período: sem a divisão registrada,
+ * presume-se o período único.
  */
 export async function contagemParaTeto(
 	db: Database,
 	lotacao: string,
 	anoMes: string
-): Promise<{ emFerias: number; efetivo: number }> {
+): Promise<{ iniciando: number; emFerias: number; efetivo: number }> {
 	const inicioMes = `${anoMes}-01`;
 	const fimMes = `${anoMes}-31`;
-	const [emFerias, efetivo] = await Promise.all([
+	const [iniciando, emFerias, efetivo] = await Promise.all([
+		db
+			.select({ n: sql<number>`count(distinct ${policialHistorico.policial_id})` })
+			.from(policialHistorico)
+			.innerJoin(policiais, eq(policiais.id, policialHistorico.policial_id))
+			.leftJoin(feriasFracoes, eq(feriasFracoes.historico_id, policialHistorico.id))
+			.where(
+				and(
+					eq(policiais.lotacao, lotacao),
+					eq(policiais.ativo, 1),
+					eq(policialHistorico.tipo, 'afastamento'),
+					eq(policialHistorico.subtipo, 'ferias'),
+					sql`coalesce(${feriasFracoes.ordem}, 1) = 1`,
+					sql`${policialHistorico.data_inicio} >= ${inicioMes}`,
+					sql`${policialHistorico.data_inicio} <= ${fimMes}`
+				)
+			)
+			.get(),
 		db
 			.select({ n: sql<number>`count(distinct ${policialHistorico.policial_id})` })
 			.from(policialHistorico)
@@ -747,7 +767,7 @@ export async function contagemParaTeto(
 			.where(and(eq(policiais.lotacao, lotacao), eq(policiais.ativo, 1)))
 			.get()
 	]);
-	return { emFerias: emFerias?.n ?? 0, efetivo: efetivo?.n ?? 0 };
+	return { iniciando: iniciando?.n ?? 0, emFerias: emFerias?.n ?? 0, efetivo: efetivo?.n ?? 0 };
 }
 
 /**

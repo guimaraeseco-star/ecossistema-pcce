@@ -7,18 +7,24 @@
 	 *
 	 * Um cartão por DESTINO, não por chave (pedido dele, 21/09): as três
 	 * chaves de servidores acontecem na mesma ficha, então viram uma linha
-	 * miúda dentro do cartão "Servidores"; férias tem destino próprio (o
-	 * panorama da unidade). Borda cinza; contorno dourado ao passar o mouse.
+	 * dentro do cartão "Servidores"; férias tem destino próprio (o panorama
+	 * da unidade). Os cartões são os MESMOS do Início dos servidores
+	 * (`HomeCartaoModulo`, azul de gestão) — decisão dele: um padrão só.
 	 */
 	import type { PageProps } from './$types';
+	import { page } from '$app/state';
 	import BemVindoPagina from '$lib/components/bem-vindo/BemVindoPagina.svelte';
 	import BemVindoCabecalho from '$lib/components/bem-vindo/BemVindoCabecalho.svelte';
+	import HomeCartaoModulo from '../_components/HomeCartaoModulo.svelte';
+	import type { CartaoHome } from '../_components/home-modulos';
+	import { ICONE } from '$lib/constants/icones';
 
 	const { data }: PageProps = $props();
 	const usuario = $derived(data.usuario);
 	const tem = (chave: string) => data.acessos.some((a) => a.chave === chave && a.liberado);
+	const porCartao = $derived((page.data.avisosResumo?.porCartao ?? {}) as Record<string, number>);
 
-	/** O que ele pode fazer na ficha do servidor — a linha miúda do cartão. */
+	/** O que ele pode fazer na ficha do servidor — a linha do cartão. */
 	const naFicha = $derived(
 		[
 			tem('servidores.ver') ? 'ver a ficha' : null,
@@ -28,38 +34,57 @@
 		].filter((x): x is string => !!x)
 	);
 
-	const cartoes = $derived(
-		[
-			tem('servidores.ver')
-				? {
-						href: '/servidores',
-						titulo: 'Servidores da unidade',
-						descricao: `Lista e ficha dos servidores lotados na unidade. Você pode: ${naFicha.join(' · ')}.`
-					}
-				: null,
-			tem('servidores.ferias') && data.unidade
-				? {
-						href: `/unidade/${data.unidade.id}/ferias`,
-						titulo: 'Férias da unidade',
-						descricao:
-							'Quem está de férias, o que está pendente na COGEP e o teto de 15 % do efetivo.'
-					}
-				: null,
-			tem('escalas.ver')
-				? {
-						href: '/colaborador/escalas',
-						titulo: 'Escalas',
-						descricao: 'Só leitura das escalas ordinárias da unidade — não monta nem altera.'
-					}
-				: null,
-			tem('avisos.ler')
-				? {
-						href: '/avisos',
-						titulo: 'Avisos da unidade',
-						descricao: 'A caixa de avisos e pendências da unidade; pode marcar como lido.'
-					}
-				: null
-		].filter((c): c is NonNullable<typeof c> => !!c)
+	const cartoes = $derived<CartaoHome[]>(
+		(
+			[
+				tem('servidores.ver')
+					? {
+							id: 'servidores',
+							titulo: 'Servidores',
+							descricao: `Lista e ficha dos servidores lotados na unidade. Você pode: ${naFicha.join(' · ')}.`,
+							icone: ICONE.pessoas,
+							href: '/servidores',
+							cta: 'Ver servidores',
+							atalhos: []
+						}
+					: null,
+				tem('servidores.ferias')
+					? {
+							id: 'ferias',
+							titulo: 'Férias',
+							descricao:
+								'Quem está de férias em cada mês na unidade: o teto de 15 % do 1º período, os pedidos na COGEP e os abonos sem ciência.',
+							icone: ICONE.calendario,
+							href: '/ferias',
+							cta: 'Ver as férias',
+							atalhos: []
+						}
+					: null,
+				tem('escalas.ver')
+					? {
+							id: 'escalas',
+							titulo: 'Escalas ordinárias',
+							descricao:
+								'Só leitura das escalas de plantão e expediente da unidade — não monta nem altera.',
+							icone: ICONE.calendario,
+							href: '/colaborador/escalas',
+							cta: 'Ver escalas',
+							atalhos: []
+						}
+					: null,
+				tem('avisos.ler')
+					? {
+							id: 'avisos',
+							titulo: 'Avisos',
+							descricao: 'A caixa de avisos e pendências da unidade; você pode marcar como lido.',
+							icone: ICONE.sino,
+							href: '/avisos',
+							cta: 'Abrir a caixa',
+							atalhos: []
+						}
+					: null
+			] as (CartaoHome | null)[]
+		).filter((c): c is CartaoHome => !!c)
 	);
 </script>
 
@@ -78,15 +103,14 @@
 	/>
 
 	{#if data.unidade && cartoes.length > 0}
-		<div class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-			{#each cartoes as c (c.href)}
-				<a
-					href={c.href}
-					class="rounded-2xl border border-surface-400/60 bg-surface-100/50 p-4 no-underline transition-colors hover:border-warning-500 hover:ring-1 hover:ring-warning-500 dark:border-surface-500/60 dark:bg-surface-800/50"
-				>
-					<p class="font-semibold text-surface-900 dark:text-surface-50">{c.titulo}</p>
-					<p class="mt-1 text-xs text-surface-600 dark:text-surface-400">{c.descricao}</p>
-				</a>
+		<div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+			{#each cartoes as cartao (cartao.id)}
+				<HomeCartaoModulo
+					{cartao}
+					avisos={cartao.id === 'avisos'
+						? (page.data.avisosResumo?.total ?? 0)
+						: (porCartao[cartao.id] ?? 0)}
+				/>
 			{/each}
 		</div>
 	{:else}

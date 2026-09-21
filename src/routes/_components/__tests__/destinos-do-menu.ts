@@ -65,7 +65,7 @@ export function destinosDoMenu(usuario: UsuarioDeTeste, flags: FlagsMenu): strin
 	// item de menu embaixo. O policial sem papel tem a barra plana.
 	for (const g of gruposHome({ usuario, flags })) destinos.push(g.href);
 	// Gestão de pessoal
-	if (flags.showPoliciais) destinos.push('/servidores');
+	if (flags.showPoliciais) destinos.push('/servidores', '/ferias');
 	if (flags.showSolicitacoes) destinos.push('/solicitacoes');
 	if (flags.showValores) destinos.push('/valores');
 	if (flags.showGrupo1) {

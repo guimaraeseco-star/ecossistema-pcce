@@ -552,26 +552,33 @@ export function percentualEmFerias(emFerias: number, efetivo: number): number {
 }
 
 /**
- * O teto de 15 % da unidade no mês do 1º período (art. 6º I) — AVISO, nunca
- * recusa: o decreto tem exceções e a decisão é do gestor. Só se aplica ao
- * PRIMEIRO período, porque é assim que a COGEP confere (segundo o
- * responsável). `null` quando não há o que dizer.
+ * O teto de 15 % da unidade (art. 6º I) — AVISO, nunca recusa: o decreto tem
+ * exceções e a decisão é do gestor. O teto mede o que PAGA o terço: só o 1º
+ * período (ou o único), e só no mês em que ele COMEÇA (decisão dele, 21/09);
+ * a 2ª e a 3ª frações não geram pagamento e ficam fora. Por isso o aviso só
+ * existe ao lançar a 1ª fração, e o percentual do teto conta só os 1ºs
+ * períodos que iniciam naquele mês. "Em férias no mês" (qualquer fração que
+ * toque o mês) vai junto, só como informação. `null` quando não há o que dizer.
  */
 export function avisoDoTeto(entrada: {
 	ordem: number;
-	/** Quantos da unidade já estarão em férias no mês, contando este. */
+	/** 1ºs períodos da unidade que começam no mês, contando este. */
+	iniciandoNoMes: number;
+	/** Quantos da unidade estarão em férias no mês, em qualquer fração, contando este. */
 	emFeriasNoMes: number;
 	efetivoDaUnidade: number;
 }): Checagem | null {
 	if (entrada.ordem !== 1 || entrada.efetivoDaUnidade <= 0) return null;
-	const pct = percentualEmFerias(entrada.emFeriasNoMes, entrada.efetivoDaUnidade);
+	const pct = percentualEmFerias(entrada.iniciandoNoMes, entrada.efetivoDaUnidade);
+	const pctTodos = percentualEmFerias(entrada.emFeriasNoMes, entrada.efetivoDaUnidade);
+	const info = ` No mês, ${entrada.emFeriasNoMes} de ${entrada.efetivoDaUnidade} em férias em qualquer fração (${pctTodos} %).`;
 	return {
 		ok: pct <= TETO_PERCENTUAL_EM_FERIAS,
 		nivel: 'aviso',
 		texto:
 			pct <= TETO_PERCENTUAL_EM_FERIAS
-				? `${pct} % da unidade em férias no mês (teto ${TETO_PERCENTUAL_EM_FERIAS} %).`
-				: `${pct} % da unidade em férias no mês — acima do teto de ${TETO_PERCENTUAL_EM_FERIAS} % (art. 6º I). A COGEP confere isto no 1º período.`
+				? `Teto: ${entrada.iniciandoNoMes} de ${entrada.efetivoDaUnidade} com o 1º período iniciando no mês (${pct} %, teto ${TETO_PERCENTUAL_EM_FERIAS} %).${info}`
+				: `Teto: ${entrada.iniciandoNoMes} de ${entrada.efetivoDaUnidade} com o 1º período iniciando no mês (${pct} %) — acima do teto de ${TETO_PERCENTUAL_EM_FERIAS} % (art. 6º I). A COGEP confere isto no 1º período.${info}`
 	};
 }
 

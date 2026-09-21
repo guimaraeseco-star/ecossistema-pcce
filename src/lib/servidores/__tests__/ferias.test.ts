@@ -283,14 +283,28 @@ describe('critérios da suspensão (art. 6º III)', () => {
 });
 
 describe('teto de 15 % (art. 6º I)', () => {
-	it('só AVISA, e só no 1º período', () => {
-		const acima = avisoDoTeto({ ordem: 1, emFeriasNoMes: 3, efetivoDaUnidade: 12 });
+	it('só AVISA, só no 1º período, e mede só os 1ºs períodos que começam no mês', () => {
+		const acima = avisoDoTeto({
+			ordem: 1,
+			iniciandoNoMes: 3,
+			emFeriasNoMes: 5,
+			efetivoDaUnidade: 12
+		});
 		expect(acima?.ok).toBe(false);
 		expect(acima?.nivel).toBe('aviso');
 		expect(temErro([acima!])).toBe(false);
-		expect(avisoDoTeto({ ordem: 1, emFeriasNoMes: 1, efetivoDaUnidade: 12 })?.ok).toBe(true);
-		expect(avisoDoTeto({ ordem: 2, emFeriasNoMes: 3, efetivoDaUnidade: 12 })).toBeNull();
-		expect(avisoDoTeto({ ordem: 1, emFeriasNoMes: 3, efetivoDaUnidade: 0 })).toBeNull();
+		expect(acima?.texto).toContain('3 de 12 com o 1º período iniciando no mês (25 %)');
+		expect(acima?.texto).toContain('5 de 12 em férias em qualquer fração (41.7 %)');
+		// Cinco em férias no mês, mas só um 1º período começando: dentro do teto.
+		expect(
+			avisoDoTeto({ ordem: 1, iniciandoNoMes: 1, emFeriasNoMes: 5, efetivoDaUnidade: 12 })?.ok
+		).toBe(true);
+		expect(
+			avisoDoTeto({ ordem: 2, iniciandoNoMes: 3, emFeriasNoMes: 3, efetivoDaUnidade: 12 })
+		).toBeNull();
+		expect(
+			avisoDoTeto({ ordem: 1, iniciandoNoMes: 3, emFeriasNoMes: 3, efetivoDaUnidade: 0 })
+		).toBeNull();
 	});
 });
 

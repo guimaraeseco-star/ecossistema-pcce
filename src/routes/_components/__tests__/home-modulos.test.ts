@@ -258,7 +258,7 @@ describe('a organização fixada em 13/09/2026', () => {
 	it('o resumo do cartão grande segue o que o perfil alcança', () => {
 		const pessoalGeral = geral.find((g) => g.id === 'pessoal');
 		expect(pessoalGeral?.descricao).toBe(
-			'Servidores, Escalas ordinárias, Diárias, Extras, Atualização de valores'
+			'Servidores, Férias, Escalas ordinárias, Diárias, Extras, Atualização de valores'
 		);
 		expect(geral.find((g) => g.id === 'unidade')?.descricao).toBe(
 			'Vê os dados da unidade e vinculadas'
