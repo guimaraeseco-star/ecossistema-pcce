@@ -55,6 +55,7 @@ import {
 	divisoesPossiveis,
 	montarPeriodos,
 	planoDaReprogramacao,
+	periodoGozadoComAbono,
 	periodosDoPedido,
 	ROTULO_TIPO_REPROGRAMACAO,
 	situacaoDaReprogramacao,
@@ -663,15 +664,31 @@ export const actionsFerias = {
 
 		const historico = await listarHistoricoPolicial(db, id);
 		const { fracoes } = await listarFeriasDoPolicial(db, id);
-		const anoDaFracao = fracao.data_inicio.slice(0, 4);
-		const abonosNoAno = fracoes.filter(
-			(f) => f.abono?.status === 'deferido' && f.data_inicio.startsWith(anoDaFracao)
+		// E62 (resposta da COGEP): uma venda por EXERCÍCIO e uma por ANO CIVIL —
+		// o ano é o do período vendido, não o da fração (uma fração que vira o
+		// ano pode ter os 10 finais em janeiro).
+		const anoDoAbono = periodoGozadoComAbono(fracao, posicao).abono.inicio.slice(0, 4);
+		const deferidos = fracoes.filter((f) => f.abono?.status === 'deferido' && f.id !== fracao.id);
+		const abonosNoAno = deferidos.filter((f) =>
+			f.abono?.abono_inicio.startsWith(anoDoAbono)
 		).length;
+		const abonosNoExercicio = deferidos.filter((f) => f.exercicio === fracao.exercicio).length;
+		if (status === 'deferido' && abonosNoExercicio > 0) {
+			return fail(409, {
+				error: `O exercício ${fracao.exercicio} já teve abono deferido — só uma venda por exercício (art. 11; COGEP).`
+			});
+		}
+		if (status === 'deferido' && abonosNoAno > 0) {
+			return fail(409, {
+				error: `Já há abono deferido em ${anoDoAbono}, ainda que de outro exercício — só uma venda por ano civil (art. 11; COGEP).`
+			});
+		}
 		const checagens = conferirAbono({
 			fracao: comoFracao(fracao),
 			hojeISO: hojeBrasilISO(),
 			posicao,
 			abonosJaDeferidosNoAno: abonosNoAno,
+			abonosJaDeferidosNoExercicio: abonosNoExercicio,
 			historico: historico
 				.filter((h) => h.tipo === 'afastamento' && h.data_inicio)
 				.map((h) => ({
@@ -770,5 +787,6 @@ export const actionsFerias = {
 const MOTIVO_RECUSA = {
 	ja_pendente: 'Já há um pedido deste exercício aguardando a COGEP.',
 	fracao_fechada: 'Alguma das frações não está mais programada.',
-	toda_vendida: 'Uma das frações foi vendida por inteiro (abono): não há o que sustar nela.'
+	com_abono:
+		'Uma das frações tem abono deferido: não pode ser sustada, suspensa nem redividida (art. 4º § 1º do Dec. 37.363).'
 } as const;

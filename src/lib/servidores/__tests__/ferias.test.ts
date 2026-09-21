@@ -160,13 +160,87 @@ describe('sustação × suspensão — decidido pelos fatos das FÉRIAS, não da
 		expect(planoDaReprogramacao(depois).diasRestantes).toBe(20);
 	});
 
-	it('venda parcial: 30 com 10 vendidos entram com 20; o motivo avisa', () => {
-		const s = situacaoDaReprogramacao(
-			[{ ...fracao(1, '2026-12-01', '2026-12-30'), diasAbonados: 10 }],
-			'2026-09-20'
-		);
-		expect(planoDaReprogramacao(s).diasRestantes).toBe(20);
-		expect(s.motivo).toContain('10 dias vendidos');
+	// E63 (art. 4º § 1º, resposta da COGEP em 21/09): a fração com abono —
+	// toda ou parcialmente vendida — fica intocável; as outras seguem a régua.
+	describe('fração com abono é intocável (art. 4º § 1º, E63) — os cinco casos', () => {
+		it('30 dias, 10 vendidos: nada entra e o motivo explica', () => {
+			const s = situacaoDaReprogramacao(
+				[{ ...fracao(1, '2026-12-01', '2026-12-30'), diasAbonados: 10 }],
+				'2026-09-20'
+			);
+			expect(s.tipo).toBeNull();
+			expect(s.comAbono.map((f) => f.ordem)).toEqual([1]);
+			expect(s.motivo).toContain('art. 4º § 1º');
+			expect(planoDaReprogramacao(s).diasRestantes).toBe(0);
+		});
+
+		it('15 + 15, 10 vendidos da 1ª: só a 2ª entra, redivisão só 15', () => {
+			const s = situacaoDaReprogramacao(
+				[
+					{ ...fracao(1, '2026-10-01', '2026-10-15'), diasAbonados: 10 },
+					fracao(2, '2026-12-01', '2026-12-15')
+				],
+				'2026-09-20'
+			);
+			expect(s.tipo).toBe('sustacao');
+			expect(s.futuras.map((f) => f.ordem)).toEqual([2]);
+			expect(s.comAbono.map((f) => f.ordem)).toEqual([1]);
+			expect(s.motivo).toContain('1ª fração tem abono');
+			const p = planoDaReprogramacao(s);
+			expect(p.diasRestantes).toBe(15);
+			expect(p.divisoes.map((d) => d.join('+'))).toEqual(['15']);
+		});
+
+		it('10 + 20: vendida a de 10 → a de 20 entra (20 ou 10+10); vendidos 10 da de 20 → a de 10 entra', () => {
+			const vendeuA10 = situacaoDaReprogramacao(
+				[
+					{ ...fracao(1, '2026-10-01', '2026-10-10'), diasAbonados: 10 },
+					fracao(2, '2026-12-01', '2026-12-20')
+				],
+				'2026-09-20'
+			);
+			expect(vendeuA10.futuras.map((f) => f.ordem)).toEqual([2]);
+			expect(planoDaReprogramacao(vendeuA10).divisoes.map((d) => d.join('+'))).toEqual([
+				'20',
+				'10+10'
+			]);
+			const vendeuDa20 = situacaoDaReprogramacao(
+				[
+					fracao(1, '2026-10-01', '2026-10-10'),
+					{ ...fracao(2, '2026-12-01', '2026-12-20'), diasAbonados: 10 }
+				],
+				'2026-09-20'
+			);
+			expect(vendeuDa20.futuras.map((f) => f.ordem)).toEqual([1]);
+			expect(planoDaReprogramacao(vendeuDa20).divisoes.map((d) => d.join('+'))).toEqual(['10']);
+		});
+
+		it('10 + 10 + 10, uma vendida: as outras duas entram (20 ou 10+10)', () => {
+			const s = situacaoDaReprogramacao(
+				[
+					fracao(1, '2026-10-01', '2026-10-10'),
+					{ ...fracao(2, '2026-11-01', '2026-11-10'), diasAbonados: 10 },
+					fracao(3, '2026-12-01', '2026-12-10')
+				],
+				'2026-09-20'
+			);
+			expect(s.futuras.map((f) => f.ordem)).toEqual([1, 3]);
+			expect(planoDaReprogramacao(s).divisoes.map((d) => d.join('+'))).toEqual(['10+10', '20']);
+		});
+
+		it('em gozo COM abono não se interrompe: só as futuras sem abono entram, por suspensão', () => {
+			const s = situacaoDaReprogramacao(
+				[
+					{ ...fracao(1, '2026-09-01', '2026-09-30'), diasAbonados: 10 },
+					fracao(2, '2026-12-01', '2026-12-10')
+				],
+				'2026-09-20'
+			);
+			expect(s.tipo).toBe('suspensao');
+			expect(s.emGozo).toBeNull();
+			expect(s.futuras.map((f) => f.ordem)).toEqual([2]);
+			expect(planoDaReprogramacao(s, '2026-09-25').quebrado).toBe(0);
+		});
 	});
 
 	it('depois de uma suspensão o que resta pode não ser uma das cinco formas — a divisão atual ainda cabe', () => {
@@ -281,15 +355,33 @@ describe('abono pecuniário (Dec. 37.363/2026)', () => {
 		expect(temErro(c)).toBe(true);
 	});
 
-	it('segundo abono no ano é erro (art. 11)', () => {
+	it('segundo abono no ANO CIVIL é erro, mesmo de outro exercício (art. 11; E62)', () => {
 		const c = conferirAbono({
 			fracao: f,
 			hojeISO: '2026-09-15',
 			posicao: 'iniciais',
 			abonosJaDeferidosNoAno: 1,
+			abonosJaDeferidosNoExercicio: 0,
 			historico: []
 		});
-		expect(c.find((x) => x.texto.includes('uma vez'))?.ok).toBe(false);
+		// [1] é o limite do exercício, [2] o do ano.
+		expect(c[1].ok).toBe(true);
+		expect(c[2].ok).toBe(false);
+		expect(c[2].texto).toContain('por ano');
+	});
+
+	it('segundo abono no mesmo EXERCÍCIO é erro, mesmo em outro ano (E62)', () => {
+		const c = conferirAbono({
+			fracao: f,
+			hojeISO: '2026-09-15',
+			posicao: 'iniciais',
+			abonosJaDeferidosNoAno: 0,
+			abonosJaDeferidosNoExercicio: 1,
+			historico: []
+		});
+		expect(c[1].ok).toBe(false);
+		expect(c[1].texto).toContain('por exercício');
+		expect(c[2].ok).toBe(true);
 	});
 
 	it('impedimentos do art. 13 apurados no histórico', () => {
