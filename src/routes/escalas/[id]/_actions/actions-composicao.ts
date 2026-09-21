@@ -30,6 +30,12 @@ import {
 import { calcularDataSaida } from '$lib/rotacao';
 import { dataISOValida } from '$lib/utils/datas';
 import { erroDeDatasForaDoPeriodo } from '$lib/server/escalas/periodo';
+import {
+	afastadosNoPeriodo,
+	afastamentosNasDatas,
+	descreverAfastamento
+} from '$lib/db/policiais/afastamento-escalas';
+import { policiais as tabelaPoliciais } from '$lib/server/schema';
 import { carregarEscalaComPermissao, lerEquipe, MAX_EQUIPE_ESCALA } from './shared';
 import { registrarMudancaEscala, nomeDoPolicial } from './desfecho';
 import { mensagemDeErro } from '$lib/utils/erro';
@@ -84,6 +90,17 @@ export const actionsComposicao = {
 		if (foraDoPeriodo) return fail(400, { error: foraDoPeriodo });
 
 		const dataSaida = dataSaidaOverride || calcularDataSaida(data_plantao, horaEnt, horaSai);
+
+		// Afastado não se escala (decisão dele, 20/09 — E60): férias em gozo ou
+		// qualquer afastamento na data recusam.
+		const afastado = (await afastamentosNasDatas(db, policial_id, [data_plantao])).get(
+			data_plantao
+		);
+		if (afastado) {
+			return fail(409, {
+				error: `${await nomeDoPolicial(db, policial_id)} está afastado — ${descreverAfastamento(afastado)}.`
+			});
+		}
 
 		// -1 = sem exclusão: verifica TODAS as escalas, inclusive a atual (impede duplicatas)
 		const conflito = await verificarConflitoGlobal(
@@ -187,6 +204,11 @@ export const actionsComposicao = {
 		// Verifica conflitos em batch (-1 = sem exclusão, verifica inclusive a escala atual)
 		const datasStr = datas.map((d) => d.data_plantao);
 		const conflitosMap = await verificarConflitoGlobalBatch(db, policial_id, datasStr, he, hs, -1);
+		// Afastado não se escala (E60): as datas cobertas por afastamento saem como
+		// as de choque de horário — recusadas uma a uma, com o motivo.
+		for (const [data, a] of await afastamentosNasDatas(db, policial_id, datasStr)) {
+			conflitosMap.set(data, `afastado — ${descreverAfastamento(a)}`);
+		}
 
 		const datasLimpas = datas.filter((d) => !conflitosMap.has(d.data_plantao));
 		const conflitantes = Array.from(conflitosMap.entries()).map(([data, motivo]) => ({
@@ -249,6 +271,22 @@ export const actionsComposicao = {
 				? escala.data_fim
 				: calcularDataSaida(escala.data_inicio, he, hs);
 
+		// Afastado não se escala (E60): quem tem afastamento tocando o período da
+		// escala fica de fora, e o toast diz quem — o admin decide o resto dia a dia.
+		const daLotacao = await db
+			.select({ id: tabelaPoliciais.id, nome: tabelaPoliciais.nome })
+			.from(tabelaPoliciais)
+			.where(and(eq(tabelaPoliciais.ativo, 1), eq(tabelaPoliciais.lotacao, escala.lotacao)));
+		const afastados = await afastadosNoPeriodo(
+			db,
+			daLotacao.map((p) => p.id),
+			escala.data_inicio,
+			escala.data_fim
+		);
+		const foraPorAfastamento = daLotacao
+			.filter((p) => afastados.has(p.id))
+			.map((p) => `${p.nome} (${descreverAfastamento(afastados.get(p.id)!)})`);
+
 		try {
 			const quantidade = await adicionarTodosPoliciais(
 				db,
@@ -258,7 +296,8 @@ export const actionsComposicao = {
 				escala.data_inicio,
 				ds,
 				he,
-				hs
+				hs,
+				new Set(afastados.keys())
 			);
 			const policiais = await listarPoliciaisEscala(db, escalaId);
 
@@ -270,10 +309,15 @@ export const actionsComposicao = {
 				alvo: { tipo: 'escala', id: escalaId, nome: escala.titulo },
 				detalhes: `${quantidade} servidor(es) da lotação ${escala.lotacao} incluídos de uma vez`,
 				itens: quantidade,
-				metadados: { lotacao: escala.lotacao, hora_entrada: he, hora_saida: hs }
+				metadados: {
+					lotacao: escala.lotacao,
+					hora_entrada: he,
+					hora_saida: hs,
+					fora_por_afastamento: foraPorAfastamento
+				}
 			});
 
-			return { success: true, quantidade, policiais };
+			return { success: true, quantidade, policiais, foraPorAfastamento };
 		} catch (err) {
 			if (ehViolacaoUnique(err)) {
 				return fail(409, { error: 'Há servidor já escalado neste dia.' });

@@ -1,0 +1,13 @@
+-- Direção da unidade: o NUP do processo que pede a designação.
+--
+-- Decisão do responsável em 16/09/2026, quando a tela de titular/respondência
+-- foi desenhada: o fundamento que se registra NÃO é o PDF da portaria (como em
+-- movimentação e afastamento) e sim o **NUP do processo que solicita a
+-- designação**. É o número que existe no momento em que o delegado assume; a
+-- portaria vem depois, e por isso a coluna `portaria` continua e fica opcional.
+--
+-- Duas colunas com papéis distintos, e é essa a razão de não reaproveitar uma
+-- só: `nup` é o PEDIDO, `portaria` é o ATO. Guardar um no campo do outro
+-- produziria a pergunta "este número é do processo ou da portaria?" em toda
+-- consulta futura.
+ALTER TABLE unidade_responsaveis ADD COLUMN nup TEXT NOT NULL DEFAULT '';

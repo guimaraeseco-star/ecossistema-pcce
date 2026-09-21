@@ -17,6 +17,7 @@
 	const grupo = $derived(
 		gruposHomeDaPagina(data.usuario, page.data).find((g) => g.id === data.grupoId) ?? null
 	);
+	const porCartao = $derived((page.data.avisosResumo?.porCartao ?? {}) as Record<string, number>);
 </script>
 
 <svelte:head>
@@ -39,7 +40,7 @@
 
 		<div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
 			{#each grupo.cartoes as cartao (cartao.id)}
-				<HomeCartaoModulo {cartao} />
+				<HomeCartaoModulo {cartao} avisos={porCartao[cartao.id] ?? 0} />
 			{/each}
 		</div>
 	{:else}

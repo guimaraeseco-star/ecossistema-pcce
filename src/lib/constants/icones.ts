@@ -53,6 +53,10 @@ export const ICONE: Record<string, string[]> = {
 	],
 	historico: ['M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'],
 	info: ['M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
+	/** O sino dos avisos (E59). */
+	sino: [
+		'M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9'
+	],
 	setaDireita: ['M17 8l4 4m0 0l-4 4m4-4H3'],
 	/** Volta de um nível do menu para o anterior. */
 	setaEsquerda: ['M10 19l-7-7m0 0l7-7m-7 7h18'],

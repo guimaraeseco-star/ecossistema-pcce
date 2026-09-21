@@ -13,6 +13,7 @@
 	import { rotuloTipoPlantao } from '$lib/unidades/plantao';
 	import { COR_SITUACAO } from '$lib/servidores/afastamentos';
 	import ModalEfetivo, { type PedidoEfetivo } from '../_components/ModalEfetivo.svelte';
+	import CartaoDirecao from './_components/CartaoDirecao.svelte';
 
 	const { data }: PageProps = $props();
 
@@ -142,6 +143,37 @@
 	</div>
 </div>
 
+<!-- Pendências de férias: o que esta unidade (com as vinculadas) ainda tem de
+     resolver. Alerta, não informação — fica até a causa sumir. -->
+{#if data.pendenciasFerias.reprogramacoesPendentes > 0 || data.pendenciasFerias.abonosSemCiencia > 0}
+	<div
+		class="mb-4 rounded-xl border border-warning-500/40 bg-warning-500/10 p-3 text-sm text-warning-800 dark:text-warning-300"
+		role="alert"
+	>
+		<span class="font-semibold">⚠ Férias com pendência:</span>
+		{[
+			data.pendenciasFerias.reprogramacoesPendentes > 0 &&
+				`${data.pendenciasFerias.reprogramacoesPendentes} pedido${data.pendenciasFerias.reprogramacoesPendentes === 1 ? '' : 's'} de reprogramação aguardando a resposta da COGEP`,
+			data.pendenciasFerias.abonosSemCiencia > 0 &&
+				`${data.pendenciasFerias.abonosSemCiencia} abono${data.pendenciasFerias.abonosSemCiencia === 1 ? '' : 's'} deferido${data.pendenciasFerias.abonosSemCiencia === 1 ? '' : 's'} sem ciência da unidade — nesses dias o servidor trabalha`
+		]
+			.filter(Boolean)
+			.join('; ')}.
+		<a href={hrefServidores} class="ml-1 font-semibold">Ver servidores →</a>
+	</div>
+{/if}
+
+<!-- Direção: vem ANTES do efetivo porque "quem dirige" é a primeira pergunta de
+     quem abre a ficha de uma unidade. -->
+<div class="mb-4">
+	<CartaoDirecao
+		unidadeNome={u.nome}
+		direcao={data.direcao}
+		sucessao={data.sucessao}
+		modo={data.modoDirecao}
+	/>
+</div>
+
 <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
 	<!-- Efetivo -->
 	<section class="card-elevated rounded-2xl p-5 lg:col-span-2" aria-labelledby="efetivo">
@@ -149,9 +181,20 @@
 			<h2 id="efetivo" class="text-base font-semibold text-surface-900 dark:text-surface-50">
 				Efetivo
 			</h2>
-			<a href={hrefServidores} class="text-xs font-semibold text-primary-700 dark:text-primary-400">
-				Ver servidores →
-			</a>
+			<div class="flex gap-3">
+				<a
+					href="/unidade/{u.id}/ferias"
+					class="text-xs font-semibold text-primary-700 dark:text-primary-400"
+				>
+					Férias do ano →
+				</a>
+				<a
+					href={hrefServidores}
+					class="text-xs font-semibold text-primary-700 dark:text-primary-400"
+				>
+					Ver servidores →
+				</a>
+			</div>
 		</div>
 		<!-- Uma linha por cargo: ativos hoje, de férias, afastados por outro motivo
 		     e o total lotado. O número de ativos é link para a lista filtrada. -->

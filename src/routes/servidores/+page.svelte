@@ -4,8 +4,10 @@
 	 * pessoa com uma unidade, e por consequência todo o escopo de RBAC.
 	 *
 	 * Listagem paginada no servidor (20 por página) com filtros de lotação,
-	 * cargo, seccional e busca, persistidos em localStorage por
-	 * `useFiltrosPaginados`. O filtro por seccional é do CLIENTE: ele restringe
+	 * cargo, seccional e busca. A tela ABRE SEM FILTRO (decisão dele, 17/09):
+	 * só a URL seleciona — o que vinha do localStorage deixava os botões
+	 * "Afastados"/"OIP" acesos com a lista inteira embaixo, porque o servidor
+	 * lê a URL e não o navegador. O filtro por seccional é do CLIENTE: ele restringe
 	 * as opções de lotação do dropdown, não a consulta. `'__todas__'` é a
 	 * sentinela de "sem filtro" que o servidor entende.
 	 *
@@ -53,7 +55,6 @@
 		useFiltrosPaginados,
 		useSamePathNavigating
 	} from '$lib/composables';
-	import { getSavedFilters } from '$lib/utils/localStorage';
 	import type { Policial, Unidade } from '$lib/types';
 	import {
 		COR_SITUACAO,
@@ -78,14 +79,6 @@
 	const samePathNav = useSamePathNavigating();
 	const isAdminOrSeccional = $derived(auth.isAdminOrSeccional);
 	const isAdminUnidade = $derived(auth.isAdminUnidade);
-	const savedFilters = getSavedFilters('filtros_policiais', {
-		lotacao: '',
-		cargo: '',
-		seccional: 'todas',
-		busca: '',
-		situacao: '',
-		designacao: ''
-	});
 
 	const unidades = $derived(data.unidades as Unidade[]);
 	const designacoes = $derived(data.designacoes as { id: number; nome: string; simbolo: string }[]);
@@ -98,6 +91,8 @@
 		afastamento: { subtipo: string; data_inicio: string; data_fim: string | null } | null;
 		designacao: string | null;
 		designacao_simbolo: string | null;
+		pendenciasFerias: { reprogramacoesPendentes: number; abonosSemCiencia: number } | null;
+		abono: { inicio: string; fim: string } | null;
 	};
 	const policiais = $derived(data.policiais as LinhaServidor[]);
 
@@ -107,19 +102,19 @@
 	const ITEMS_POR_PAGINA = 20;
 
 	// Filtros
-	let filtroLotacao = $state(untrack(() => data.filtros.lotacao || savedFilters.lotacao));
-	let filtroCargo = $state(untrack(() => data.filtros.cargo || savedFilters.cargo));
+	let filtroLotacao = $state(untrack(() => data.filtros.lotacao || ''));
+	let filtroCargo = $state(untrack(() => data.filtros.cargo || ''));
 	// Situação de hoje: '' (todos) | ativos | ferias | afastados. Vem da URL
 	// quando o link parte da Gestão de unidade.
-	let filtroSituacao = $state(untrack(() => data.filtros.situacao || savedFilters.situacao));
+	let filtroSituacao = $state(untrack(() => data.filtros.situacao || ''));
 	let filtroSeccional = $state<number | 'todas'>(
 		untrack(() => {
-			const raw = data.filtros.seccional || savedFilters.seccional;
+			const raw = data.filtros.seccional || 'todas';
 			return raw === 'todas' ? 'todas' : Number(raw);
 		})
 	);
-	let filtroBusca = $state(untrack(() => data.filtros.busca || savedFilters.busca));
-	let filtroDesignacao = $state(untrack(() => data.filtros.designacao || savedFilters.designacao));
+	let filtroBusca = $state(untrack(() => data.filtros.busca || ''));
+	let filtroDesignacao = $state(untrack(() => data.filtros.designacao || ''));
 
 	const seccionais = $derived(unidades.filter((u) => u.tipo === 'seccional'));
 	// Toda unidade ATIVA é lotação possível — departamento, subdepartamento,
@@ -262,6 +257,11 @@
 {#snippet seloSituacao(p: LinhaServidor)}
 	{#if p.situacao === 'ativo'}
 		<span class="text-xs {COR_SITUACAO.ativo}">{ROTULO_SITUACAO.ativo}</span>
+		{#if p.abono}
+			<!-- Está de pé porque converteu os dias em dinheiro — a unidade precisa
+			     ver isso, senão pergunta por que ele não está de férias. -->
+			<span class="block text-3xs text-surface-500">em abono até {formatarData(p.abono.fim)}</span>
+		{/if}
 	{:else}
 		<span class="block text-xs font-semibold {COR_SITUACAO[p.situacao]}"
 			>{p.situacao === 'ferias' ? 'Férias' : rotuloAfastamento(p.afastamento?.subtipo ?? '')}</span
@@ -271,6 +271,31 @@
 				? `até ${formatarData(p.afastamento.data_fim)}`
 				: `desde ${formatarData(p.afastamento?.data_inicio ?? '')}`}</span
 		>
+	{/if}
+	{@render alertaFerias(p.pendenciasFerias)}
+{/snippet}
+
+<!-- Pendência de férias: pedido aguardando a COGEP ou abono sem ciência da
+     unidade. Fica até a unidade resolver na ficha — por isso é alerta, não
+     informação (decisão dele, 17/09). -->
+{#snippet alertaFerias(pend: { reprogramacoesPendentes: number; abonosSemCiencia: number } | null)}
+	{#if pend && (pend.reprogramacoesPendentes > 0 || pend.abonosSemCiencia > 0)}
+		<span
+			class="mt-0.5 block text-3xs font-semibold text-warning-700 dark:text-warning-400"
+			title={[
+				pend.reprogramacoesPendentes > 0 &&
+					`${pend.reprogramacoesPendentes} reprogramação de férias aguardando a COGEP`,
+				pend.abonosSemCiencia > 0 && `${pend.abonosSemCiencia} abono sem ciência da unidade`
+			]
+				.filter(Boolean)
+				.join(' · ')}
+		>
+			⚠ Férias: {pend.reprogramacoesPendentes > 0
+				? 'pedido pendente'
+				: ''}{pend.reprogramacoesPendentes > 0 && pend.abonosSemCiencia > 0
+				? ' · '
+				: ''}{pend.abonosSemCiencia > 0 ? 'abono sem ciência' : ''}
+		</span>
 	{/if}
 {/snippet}
 

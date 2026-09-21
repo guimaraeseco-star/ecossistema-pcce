@@ -32,7 +32,7 @@ const dataISO = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida');
 // O catálogo mora em `$lib/servidores/afastamentos` (fase 2-C): 19 tipos do
 // Estatuto mais os valores legados; o cadastro só oferece os cadastráveis.
 export { SUBTIPOS_AFASTAMENTO } from '$lib/servidores/afastamentos';
-import { AFASTAMENTOS, SUBTIPOS_AFASTAMENTO } from '$lib/servidores/afastamentos';
+import { AFASTAMENTOS, SUBTIPOS_AFASTAMENTO, TIPOS_CID } from '$lib/servidores/afastamentos';
 
 export const movimentacaoSchema = z.object({
 	unidade_destino: z
@@ -48,9 +48,14 @@ export const afastamentoSchema = z.object({
 	subtipo: z.enum(SUBTIPOS_AFASTAMENTO, { message: 'Tipo de afastamento inválido' }),
 	descricao: z.string().trim().max(500, 'Descrição muito longa').optional().nullable(),
 	data_inicio: dataISO,
-	data_fim: dataISO,
+	/** Vazio só nos tipos sem prazo (estudante, dispensa de ponto) — a action confere. */
+	data_fim: dataISO.optional().or(z.literal('')),
 	qtd_dias: z.coerce.number().int().min(1, 'Quantidade de dias inválida').max(3650).optional(),
-	nup: nupSchema
+	nup: nupSchema,
+	/** LTS: a classificação do CID (Portaria 39/2026). */
+	tipo_cid: z.enum(TIPOS_CID).optional().or(z.literal('')),
+	/** Maternidade: a servidora pediu a prorrogação de 60 dias. */
+	adicional: z.coerce.boolean().optional()
 });
 
 export const desvinculacaoSchema = z.object({

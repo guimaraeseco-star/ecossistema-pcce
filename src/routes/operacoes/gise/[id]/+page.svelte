@@ -58,6 +58,7 @@
 	import { publicarQuadroSupervisao } from './_components/supervisao/quadro-supervisao-estado.svelte';
 	import GiseLoteAssinaturas from './_components/GiseLoteAssinaturas.svelte';
 	import GiseStatusAvisos from './_components/GiseStatusAvisos.svelte';
+	import FaixaDesfalques from '$lib/components/FaixaDesfalques.svelte';
 	import GiseSeccional from './_components/GiseSeccional.svelte';
 	import ModalExcluirGise from './_components/modais/ModalExcluirGise.svelte';
 	import ModalReabrir from './_components/modais/ModalReabrir.svelte';
@@ -702,6 +703,8 @@
 				{/if}
 			{/if}
 		</div>
+
+		<FaixaDesfalques desfalques={data.desfalques} />
 
 		<!-- Avisos contextuais de status (retificação seccional, aguardando conclusão) -->
 		<GiseStatusAvisos

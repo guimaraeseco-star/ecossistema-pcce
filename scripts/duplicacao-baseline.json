@@ -68,16 +68,6 @@
 			"nota": "DUP-MANTER: inicialização de estado local do calendário embutido (ano/mês corrente) — cada modal tem seu próprio $effect de reset com gatilho e regras diferentes; não há lógica compartilhável além da linha de $state."
 		},
 		{
-			"id": "21954d687d54",
-			"arquivos": [
-				"src/routes/escalas/bem-vindo/+page.svelte",
-				"src/routes/gise/bem-vindo/+page.svelte"
-			],
-			"ocorrencias": 2,
-			"amostra": "<script lang=\"ts\">",
-			"nota": "DUP-MANTER: preâmbulo de página SvelteKit — `<script lang=\"ts\">`, os imports, `import type { PageProps } from './$types'` (que é POR ROTA e não pode subir) e o `$props()`, que só existe dentro do componente. Irredutível por construção. O markup que estas páginas de fato compartilhavam saiu para `BemVindoGradeAcoes` em ago/2026 — e note que o guard NUNCA apontou aquele markup: a lógica de `descricao`, que difere por página, fica entre o preâmbulo e a grade e quebra a janela. Achado por leitura."
-		},
-		{
 			"id": "224c5c7077df",
 			"arquivos": [
 				"src/routes/api/gise/[id]/presenca/finalizar-assinatura/+server.ts",
@@ -113,6 +103,13 @@
 			"ocorrencias": 2,
 			"amostra": "getClientAddress",
 			"nota": "DUP-MANTER: assinatura de handler SvelteKit + linha de import, não lógica. As rotas de assinatura GISE desestruturam o mesmo `{ platform, params, locals, url, request, getClientAddress }` e importam o mesmo portão — a lógica que compartilhavam saiu para `carregarGiseParaAssinatura` em ago/2026. Não há o que extrair de uma assinatura de handler."
+		},
+		{
+			"id": "39e027a92d1a",
+			"arquivos": ["src/lib/db.ts", "src/lib/db/policiais/index.ts"],
+			"ocorrencias": 2,
+			"amostra": "excluirProgramacao,",
+			"nota": "Barrel de DOIS NÍVEIS, o mesmo caso registrado para planos/ e operacoes/: lib/db/policiais/index.ts é a fachada do domínio e lib/db.ts reexporta por nome (regra do próprio cabeçalho de lib/db.ts). As funções de férias aparecem nas duas listas na mesma ordem. Extrair com export * alargaria a superfície pública sem controle; importar as folhas direto em db.ts tiraria do domínio a fachada que os outros têm."
 		},
 		{
 			"id": "3d2ad9db31c6",
@@ -356,8 +353,8 @@
 		{
 			"id": "cb32fcd937b6",
 			"arquivos": [
-				"src/routes/servidores/+page.svelte",
 				"src/routes/recebidos/+page.svelte",
+				"src/routes/servidores/+page.svelte",
 				"src/routes/unidades/+page.svelte"
 			],
 			"ocorrencias": 3,

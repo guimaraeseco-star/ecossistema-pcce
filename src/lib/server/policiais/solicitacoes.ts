@@ -18,9 +18,34 @@
  * para ser movimentado de novo.
  */
 
+import { eq } from 'drizzle-orm';
 import { fecharSolicitacaoAcao, type Database } from '$lib/db';
-import type { PolicialAcaoSolicitacao } from '$lib/server/schema';
+import { registrarResponsavel } from '$lib/db/unidades-responsaveis';
+import { unidades, type PolicialAcaoSolicitacao } from '$lib/server/schema';
 import { executarAcaoRH, type AtorDaAcao } from './acoes-rh';
+import { encurtarAfastamento, listarHistoricoPolicial } from '$lib/db/policiais/historico';
+
+/** O afastamento que um pedido de retorno antecipado alcança, e o corte. */
+async function aplicarRetornoAntecipado(
+	db: Database,
+	pedido: {
+		policial_id: number;
+		subtipo: string | null;
+		data_inicio: string | null;
+		data_evento: string | null;
+		nup: string | null;
+	}
+): Promise<void> {
+	if (!pedido.data_evento) return;
+	const ev = (await listarHistoricoPolicial(db, pedido.policial_id)).find(
+		(h) =>
+			h.tipo === 'afastamento' &&
+			h.subtipo === pedido.subtipo &&
+			h.data_inicio === pedido.data_inicio
+	);
+	if (!ev) return;
+	await encurtarAfastamento(db, ev.id, pedido.data_evento, pedido.nup ?? '');
+}
 
 /**
  * Decide um pedido de ação de RH. Aprovar EXECUTA o ato (movimentar, afastar,
@@ -42,6 +67,62 @@ export async function decidirSolicitacaoAcao(
 		id: pedido.solicitante_id ?? adminId,
 		nome: pedido.solicitante_nome ?? 'Solicitante'
 	};
-	await executarAcaoRH(db, pedido.policial_id, pedido, ator);
+
+	// `direcao` não é ato sobre o SERVIDOR e sim sobre a UNIDADE: não entra na
+	// linha do tempo funcional dele, entra na sucessão da unidade. Por isso não
+	// passa por `executarAcaoRH` — o executor dos três atos que mexem no
+	// cadastro — e sim por `registrarResponsavel`, que sabe encerrar o vigente
+	// e abrir o novo na mesma transação.
+	// `tipo` sai do objeto para uma variável porque é ela que o `if` ESTREITA:
+	// `AcaoRH` admite só os três atos que aquele executor aplica, e sem isso o
+	// compilador continuaria vendo o quarto do outro lado do early return.
+	const { tipo } = pedido;
+	if (tipo === 'direcao') {
+		await registrarDirecaoDoPedido(db, pedido, adminId);
+		return pedido;
+	}
+	// Retorno antecipado: não cria evento — encurta o afastamento que o pedido
+	// aponta (mesmo servidor, subtipo e 1º dia). Se ele já não existe (o Admin
+	// Geral excluiu), o pedido fecha sem efeito.
+	if (tipo === 'retorno_antecipado') {
+		await aplicarRetornoAntecipado(db, pedido);
+		return pedido;
+	}
+
+	await executarAcaoRH(db, pedido.policial_id, { ...pedido, tipo }, ator);
 	return pedido;
+}
+
+/**
+ * Aplica um pedido de direção aprovado.
+ *
+ * A unidade vem pelo NOME (`unidade_destino`), como todo o resto do sistema
+ * ainda faz — é a dívida que a decisão E51 vai pagar. Unidade que sumiu entre o
+ * pedido e a decisão faz a aprovação NÃO gravar nada: o pedido já está fechado,
+ * e é melhor um pedido aprovado sem efeito, visível na fila, do que uma direção
+ * registrada em unidade errada.
+ */
+async function registrarDirecaoDoPedido(
+	db: Database,
+	pedido: PolicialAcaoSolicitacao,
+	adminId: number
+): Promise<void> {
+	const nome = (pedido.unidade_destino ?? '').trim();
+	if (!nome || !pedido.data_inicio) return;
+	const unidade = await db
+		.select({ id: unidades.id })
+		.from(unidades)
+		.where(eq(unidades.nome, nome))
+		.get();
+	if (!unidade) return;
+	await registrarResponsavel(db, {
+		unidade_id: unidade.id,
+		policial_id: pedido.policial_id,
+		papel: pedido.subtipo === 'respondente' ? 'respondente' : 'titular',
+		data_inicio: pedido.data_inicio,
+		nup: pedido.nup ?? '',
+		observacao: pedido.justificativa,
+		registrado_por_id: adminId,
+		registrado_por_nome: pedido.solicitante_nome ?? 'Solicitante'
+	});
 }

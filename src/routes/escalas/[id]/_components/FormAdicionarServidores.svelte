@@ -162,10 +162,25 @@
 			if (result.type === 'success') {
 				const d = result.data as Record<string, unknown> | undefined;
 				onPoliciaisAtualizados(result.data?.policiais);
+				// Quem ficou de fora por afastamento (E60) é dito pelo nome.
+				const fora = (d?.foraPorAfastamento as string[] | undefined) ?? [];
+				const descricao = fora.length
+					? `Não escalado(s) por afastamento: ${fora.join('; ')}.`
+					: undefined;
 				if (Number(d?.quantidade) === 0)
-					toaster.create({ title: 'Todos os servidores já estão na escala', type: 'warning' });
+					toaster.create({
+						title: fora.length
+							? 'Nenhum servidor adicionado'
+							: 'Todos os servidores já estão na escala',
+						description: descricao,
+						type: 'warning'
+					});
 				else
-					toaster.create({ title: `${d?.quantidade} servidor(es) adicionado(s)`, type: 'success' });
+					toaster.create({
+						title: `${d?.quantidade} servidor(es) adicionado(s)`,
+						description: descricao,
+						type: fora.length ? 'warning' : 'success'
+					});
 			} else {
 				mostrarErroDeResultado(result, 'Erro');
 			}

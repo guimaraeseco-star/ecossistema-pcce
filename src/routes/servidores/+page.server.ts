@@ -48,6 +48,7 @@ import { escopoDaFicha, podeAbrirFichaDePolicial } from '$lib/server/policiais/f
 import { decifrarCpfDoDB } from '$lib/crypto/cpf-cripto';
 import { impedimentoParaExcluirPolicial } from '$lib/db/policiais';
 import { afastamentosVigentesDe, situacaoDe } from '$lib/db/efetivo';
+import { pendenciasDeFerias, abonosVigentesDe } from '$lib/db';
 import { hojeBrasilISO } from '$lib/utils/datas';
 
 export const load: PageServerLoad = async ({ locals, platform, url, depends }) => {
@@ -100,17 +101,23 @@ export const load: PageServerLoad = async ({ locals, platform, url, depends }) =
 	// A situação de hoje de cada linha da página (fase 2-C): férias em dourado,
 	// afastado em vermelho, com o tipo e o fim — o que faltava para saber de
 	// quem se trata sem abrir a ficha.
-	const vigentes = await afastamentosVigentesDe(
-		db,
-		resultado.policiais.map((p) => p.id),
-		hoje
-	);
+	const ids = resultado.policiais.map((p) => p.id);
+	// Pendências de férias — pedido aguardando a COGEP e abono sem ciência —
+	// viram alerta na linha, e só somem quando a unidade resolve (E56).
+	const [vigentes, pendencias, abonos] = await Promise.all([
+		afastamentosVigentesDe(db, ids, hoje),
+		pendenciasDeFerias(db, ids),
+		abonosVigentesDe(db, ids, hoje)
+	]);
 	const policiaisComCpf = await Promise.all(
 		resultado.policiais.map(async (p) => ({
 			...p,
 			cpf: isAdminGeral(u) ? (await decifrarCpfDoDB(p.cpf, platform?.env)) || null : null,
 			situacao: situacaoDe(vigentes.get(p.id)),
-			afastamento: vigentes.get(p.id) ?? null
+			afastamento: vigentes.get(p.id) ?? null,
+			pendenciasFerias: pendencias.get(p.id) ?? null,
+			/** Nos dias convertidos em abono o servidor trabalha: ativo, com o porquê. */
+			abono: abonos.get(p.id) ?? null
 		}))
 	);
 

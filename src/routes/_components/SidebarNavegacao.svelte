@@ -297,6 +297,8 @@
 				(GISE ↔ Escalas), que continua valendo na barra; a home não o usa.
 			-->
 			{@render itemMenu('/', 'Início', ICONE.casa, page.url.pathname === '/')}
+			<!-- A caixa de avisos (E59): pendências e notícias, com o total no badge. -->
+			{@render itemMenu('/avisos', 'Avisos', ICONE.sino, undefined, nav.avisosTotal)}
 
 			<!-- Gestão de pessoal: servidores (os três papéis), a fila de quem
 			     decide, e a escala ordinária — painel + caixa de entrada para o

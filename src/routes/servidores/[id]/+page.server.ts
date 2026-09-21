@@ -93,6 +93,11 @@ import {
 	atualizarModuloAdminVinculado,
 	atualizarPolicialComHistorico,
 	listarHistoricoPolicial,
+	buscarEventoHistorico,
+	buscarSolicitacaoAcao,
+	encurtarAfastamento,
+	corrigirAfastamento,
+	excluirAfastamento,
 	afastamentoVigente,
 	criarSolicitacoesCadastro,
 	criarSolicitacaoAcao,
@@ -101,6 +106,7 @@ import {
 	auditar,
 	contextoDeEvento,
 	listarCredenciaisDoDono,
+	listarFeriasDoPolicial,
 	type MudancaSolicitada
 } from '$lib/db';
 import { descreverVinculoCredencial } from '$lib/server/assinatura/webauthn/authenticator-data';
@@ -115,7 +121,14 @@ import {
 	desvinculacaoSchema,
 	LABEL_SUBTIPO_AFASTAMENTO
 } from '$lib/schemas/policial-historico';
+import { AFASTAMENTOS, conferirNup, regraDePrazo } from '$lib/servidores/afastamentos';
+import {
+	conflitosDoAfastamento,
+	ocupadosDoAbono,
+	ocupadosDoHistorico
+} from '$lib/servidores/conflitos';
 import { isAdminGeral } from '$lib/auth';
+import { dataIso, inteiroNaFaixa, textoLimitado } from '$lib/server/form-data';
 import {
 	lotacoesAdministradas,
 	lotacaoNoEscopo,
@@ -139,9 +152,13 @@ import {
 import { decifrarCpfDoDB } from '$lib/crypto/cpf-cripto';
 import { limparCPF, limparMatricula, limparTelefone } from '$lib/utils/formato';
 import { resolverCredencial } from '$lib/server/auth/credencial';
-import { hojeBrasilISO } from '$lib/utils/datas';
+import { adicionarDias, diffDiasInclusivo, hojeBrasilISO } from '$lib/utils/datas';
+import { avisarOutroLado } from '$lib/server/avisos/emitir';
+import { avisarDesfalques } from '$lib/server/avisos/desfalques';
+import { feriadosNoIntervalo } from '$lib/db/diarias/feriados';
 import type { RequestEvent } from './$types';
 import { mensagemDeErro } from '$lib/utils/erro';
+import { actionsFerias } from './_actions/actions-ferias';
 
 const TAMANHO_MAX_PDF = 10 * 1024 * 1024; // 10 MB
 
@@ -262,7 +279,9 @@ export const load: PageServerLoad = async ({ locals, params, platform, depends }
 		historico,
 		credenciaisPasskey,
 		solicitacoesCampo,
-		solicitacoesAcao
+		solicitacoesAcao,
+		ferias,
+		feriados
 	] = await Promise.all([
 		// A lista de destinos de MOVIMENTAÇÃO é a corporação inteira nos dois
 		// modos, e para o admin com escopo isso é deliberado: transferir servidor
@@ -278,7 +297,11 @@ export const load: PageServerLoad = async ({ locals, params, platform, depends }
 		// linhas, e consultar pelo par cru mostraria "sem chave" para quem tem.
 		resolverCredencial(db, 'policial', id).then((c) => listarCredenciaisDoDono(db, c.dono)),
 		listarSolicitacoesDoPolicial(db, id),
-		listarSolicitacoesAcaoDoPolicial(db, id)
+		listarSolicitacoesAcaoDoPolicial(db, id),
+		listarFeriasDoPolicial(db, id),
+		// Os feriados dos próximos 18 meses, para o assistente de reprogramação
+		// conferir o primeiro dia na tela — a action confere de novo no envio.
+		feriadosNoIntervalo(db, hojeBrasilISO(), adicionarDias(hojeBrasilISO(), 540))
 	]);
 	const ehAdminGeral = modulosAdmin != null;
 
@@ -310,6 +333,12 @@ export const load: PageServerLoad = async ({ locals, params, platform, depends }
 		historico,
 		solicitacoesCampo,
 		solicitacoesAcao,
+		/** Férias: frações, pedidos à COGEP e abono (fase 2-C). */
+		ferias,
+		/** Os períodos ocupados da linha do tempo: o modal de afastamento e o cartão de férias conferem conflito na hora. */
+		ocupados: [...ocupadosDoHistorico(historico), ...ocupadosDoAbono(ferias.fracoes)],
+		feriados: feriados.map((f) => f.data),
+		dataPosse: policial.data_posse,
 		afastamentoVigenteId: afastamentoAtual?.id ?? null,
 		/** Para o selo no cabeçalho: tipo e período em curso hoje (fase 2-C). */
 		afastamentoAtual: afastamentoAtual
@@ -543,6 +572,18 @@ export const actions: Actions = {
 				},
 				{ env }
 			);
+			// A delegacia fica sabendo do que o DPI SUL mudou no cadastro dela (E59).
+			const camposMudados = Object.keys(diff.depois);
+			if (camposMudados.length > 0) {
+				await avisarOutroLado(db, u, {
+					cartao: 'servidores',
+					tipo: 'cadastro_editado',
+					titulo: `Cadastro de ${parsed.data.nome} alterado pelo DPI SUL`,
+					texto: `Campos: ${camposMudados.join(', ')}`,
+					link: `/servidores/${id}`,
+					lotacoes: [alvo.lotacao, parsed.data.lotacao]
+				});
+			}
 			return { success: true };
 		} catch (e: unknown) {
 			// A violação de índice único fica em `e.cause` (ver `db-errors.ts`).
@@ -844,6 +885,9 @@ export const actions: Actions = {
 	},
 
 	// ---- Movimentação: transfere a lotação e registra no histórico ----
+	// Movimentação e desvinculação são do ADMIN GERAL (decisão dele, 20/09): a
+	// unidade e a seccional não as propõem mais — só o afastamento segue no
+	// modo solicitação. O botão some da tela e a action recusa o POST direto.
 	registrarMovimentacao: async (event) => {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
@@ -851,7 +895,10 @@ export const actions: Actions = {
 			event.params.id
 		);
 		if ('erro' in auth) return auth.erro;
-		const { db, id, alvo, modo } = auth;
+		const { alvo, modo } = auth;
+		if (modo !== 'direto') {
+			return fail(403, { error: 'Movimentação e desvinculação são feitas pelo DPI SUL.' });
+		}
 
 		const formData = await event.request.formData();
 		const parsed = movimentacaoSchema.safeParse({
@@ -876,13 +923,15 @@ export const actions: Actions = {
 			},
 			resumo: `${origem || '—'} → ${parsed.data.unidade_destino}`,
 			metadados: { nup: parsed.data.nup || null, data: parsed.data.data_evento },
-			// Recarrega para devolver o que a tela mostra ao lado do painel.
-			recarregar: () =>
-				modo === 'solicitacao' ? listarSolicitacoesAcaoDoPolicial(db, id) : Promise.resolve(null)
+			// Modo direto só: nada a recarregar ao lado do painel.
+			recarregar: () => Promise.resolve(null)
 		});
 	},
 
 	// ---- Afastamento: férias/licenças (apenas registra na linha do tempo) ----
+	// A regra de cada tipo (prazo fixo, sem prazo, CID, só gestão) vem do
+	// catálogo e é reaplicada aqui — a tela já a mostrou, mas o POST direto não
+	// passa pela tela. NUP obrigatório em todo afastamento (17 dígitos).
 	registrarAfastamento: async (event) => {
 		const auth = await carregarFichaDoPolicial(
 			getDB(event.platform),
@@ -894,34 +943,403 @@ export const actions: Actions = {
 
 		const formData = await event.request.formData();
 		const qtdRaw = formData.get('qtd_dias')?.toString() || '';
+		const nup = conferirNup(formData.get('nup')?.toString() || '', true);
+		if (!nup.ok) return fail(400, { error: nup.erro });
 		const parsed = afastamentoSchema.safeParse({
 			subtipo: formData.get('subtipo')?.toString() || '',
 			descricao: formData.get('descricao')?.toString() || '',
 			data_inicio: formData.get('data_inicio')?.toString() || '',
 			data_fim: formData.get('data_fim')?.toString() || '',
 			qtd_dias: qtdRaw === '' ? undefined : qtdRaw,
-			nup: formData.get('nup')?.toString() || ''
+			nup: nup.formatado,
+			tipo_cid: formData.get('tipo_cid')?.toString() || '',
+			adicional: formData.get('adicional')?.toString() === 'on'
 		});
 		if (!parsed.success) return fail(400, { error: parsed.error.issues[0].message });
-		if (parsed.data.data_fim < parsed.data.data_inicio) {
-			return fail(400, { error: 'A data final não pode ser anterior à data inicial.' });
+		const { subtipo, data_inicio } = parsed.data;
+		// Férias entram só pelo cartão Férias (E56): o modal não as oferece, e o
+		// POST direto não passa por aqui.
+		if (!AFASTAMENTOS[subtipo].cadastravel) {
+			return fail(400, {
+				error:
+					subtipo === 'ferias'
+						? 'Férias são lançadas pelo cartão Férias, não como afastamento.'
+						: 'Este tipo de afastamento não é lançado pela tela.'
+			});
 		}
+		const regra = regraDePrazo(subtipo, parsed.data.adicional === true);
+		if (regra.soGestao && modo !== 'direto') {
+			return fail(403, { error: 'Medidas disciplinares e processuais são lançadas pelo DPI SUL.' });
+		}
+		if (regra.exigeCid && !parsed.data.tipo_cid) {
+			return fail(400, { error: 'Na LTS, informe a classificação do CID (CID-F ou CID-Outras).' });
+		}
+		const tipoCid = regra.exigeCid ? parsed.data.tipo_cid || null : null;
+
+		// O prazo: fixo → o fim sai do catálogo; sem prazo → pode faltar; senão,
+		// o que veio, coerente.
+		let dataFim: string | null = parsed.data.data_fim || null;
+		let qtdDias: number | null;
+		if (regra.diasFixos != null) {
+			qtdDias = regra.diasFixos;
+			dataFim = adicionarDias(data_inicio, regra.diasFixos - 1);
+		} else if (!dataFim) {
+			if (!regra.semPrazo)
+				return fail(400, { error: 'Informe a quantidade de dias ou a data final.' });
+			qtdDias = null;
+		} else {
+			if (dataFim < data_inicio) {
+				return fail(400, { error: 'A data final não pode ser anterior à data inicial.' });
+			}
+			qtdDias = diffDiasInclusivo(data_inicio, dataFim);
+		}
+		const descricao =
+			[
+				parsed.data.descricao?.trim() || null,
+				subtipo === 'maternidade' && parsed.data.adicional ? 'Com a prorrogação de 60 dias.' : null
+			]
+				.filter(Boolean)
+				.join(' ') || null;
+		// Afastamento não abrange férias programadas (decisão dele, 20/09): impede.
+		const ocupados = [
+			...ocupadosDoHistorico(await listarHistoricoPolicial(db, id)),
+			...ocupadosDoAbono((await listarFeriasDoPolicial(db, id)).fracoes)
+		];
+		const conflitos = conflitosDoAfastamento({ inicio: data_inicio, fim: dataFim }, ocupados);
+		const conflito = conflitos.find((c) => c.nivel === 'erro');
+		if (conflito) return fail(400, { error: conflito.texto });
+		const avisosArt16 = conflitos.filter((c) => c.nivel === 'aviso').map((c) => c.texto);
+		const rotulo = LABEL_SUBTIPO_AFASTAMENTO[subtipo];
+		const periodo = dataFim
+			? `${data_inicio} a ${dataFim}`
+			: `a partir de ${data_inicio} (sem prazo)`;
 
 		return concluirAcaoRH(event, auth, formData, {
 			acao: {
 				tipo: 'afastamento',
-				subtipo: parsed.data.subtipo,
-				descricao: parsed.data.descricao || null,
-				data_inicio: parsed.data.data_inicio,
-				data_fim: parsed.data.data_fim,
-				qtd_dias: parsed.data.qtd_dias ?? null,
-				nup: parsed.data.nup || null
+				subtipo,
+				descricao,
+				data_inicio,
+				data_fim: dataFim,
+				qtd_dias: qtdDias,
+				nup: nup.formatado,
+				tipo_cid: tipoCid
 			},
-			resumo: `${LABEL_SUBTIPO_AFASTAMENTO[parsed.data.subtipo]}: ${parsed.data.data_inicio} a ${parsed.data.data_fim}`,
-			metadados: { subtipo: parsed.data.subtipo, nup: parsed.data.nup || null },
+			resumo: `${rotulo}${tipoCid ? ` (${tipoCid})` : ''}: ${periodo}`,
+			// O tipo, o período e o NUP são o pedido; não há motivo à parte a escrever.
+			justificativaDispensada: true,
+			metadados: {
+				subtipo,
+				nup: nup.formatado,
+				tipo_cid: tipoCid,
+				// CID-F: a Portaria 39/2026 obriga o recolhimento do armamento — fica
+				// na auditoria e é o que o aviso ao DPI SUL vai ler.
+				portaria_39: tipoCid === 'CID-F',
+				avisos: avisosArt16
+			},
+			avisos: avisosArt16,
 			recarregar: () =>
 				modo === 'solicitacao' ? listarSolicitacoesAcaoDoPolicial(db, id) : Promise.resolve(null)
 		});
+	},
+
+	/**
+	 * RETORNO ANTECIPADO (decisão dele, 20/09): o servidor voltou antes do
+	 * previsto — o afastamento encurta até a véspera, com a data e o NUP do
+	 * retorno. Segue o rito dos outros atos: a unidade PEDE (pedido
+	 * `retorno_antecipado`, pendente até o Admin Geral aprovar) e o DPI SUL
+	 * registra direto. Férias não passam por aqui (têm a suspensão).
+	 */
+	retornoAntecipado: async (event) => {
+		const auth = await carregarFichaDoPolicial(
+			getDB(event.platform),
+			event.locals.usuario,
+			event.params.id
+		);
+		if ('erro' in auth) return auth.erro;
+		const { u, db, id, alvo, modo } = auth;
+
+		const formData = await event.request.formData();
+		const solicitacaoId = inteiroNaFaixa(formData, 'solicitacao_id', 1, 99_999_999);
+		const retorno = dataIso(formData, 'data_retorno');
+		const nup = conferirNup(textoLimitado(formData, 'nup', 40), false);
+		if (!solicitacaoId || !retorno)
+			return fail(400, { error: 'Informe o pedido de afastamento e a data do retorno.' });
+		if (!nup.ok) return fail(400, { error: nup.erro });
+		// O pedido aprovado não guarda o id do evento que gerou: acha-se pelo que
+		// os dois têm em comum (servidor, tipo, subtipo, 1º dia).
+		const pedido = await buscarSolicitacaoAcao(db, solicitacaoId);
+		if (!pedido || pedido.policial_id !== id || pedido.status !== 'aprovada') {
+			return fail(404, { error: 'Pedido de afastamento aprovado não encontrado.' });
+		}
+		const ev = (await listarHistoricoPolicial(db, id)).find(
+			(h) =>
+				h.tipo === 'afastamento' &&
+				h.subtipo === pedido.subtipo &&
+				h.data_inicio === pedido.data_inicio
+		);
+		if (!ev) return fail(404, { error: 'Afastamento não encontrado na linha do tempo.' });
+		const eventoId = ev.id;
+		if (retorno <= ev.data_inicio! || (ev.data_fim && retorno > ev.data_fim)) {
+			return fail(409, {
+				error: 'O retorno precisa cair dentro do afastamento (depois do início e até o fim).'
+			});
+		}
+		const rotuloAf =
+			LABEL_SUBTIPO_AFASTAMENTO[ev.subtipo as keyof typeof LABEL_SUBTIPO_AFASTAMENTO] ?? ev.subtipo;
+
+		if (modo === 'solicitacao') {
+			// Um pedido por afastamento: enquanto um está pendente, o botão some.
+			const jaPedido = (await listarSolicitacoesAcaoDoPolicial(db, id)).some(
+				(p) =>
+					p.tipo === 'retorno_antecipado' &&
+					p.status === 'pendente' &&
+					p.subtipo === ev.subtipo &&
+					p.data_inicio === ev.data_inicio
+			);
+			if (jaPedido)
+				return fail(409, {
+					error: 'Já há um pedido de retorno antecipado aguardando o Admin Geral.'
+				});
+			await criarSolicitacaoAcao(db, {
+				policial_id: id,
+				tipo: 'retorno_antecipado',
+				subtipo: ev.subtipo,
+				// Dois processos, dois NUPs: o do afastamento vai aqui, o do retorno em `nup`.
+				descricao: `${rotuloAf} de ${ev.data_inicio}${ev.nup ? ` · NUP do afastamento ${ev.nup}` : ''}`,
+				data_inicio: ev.data_inicio,
+				data_fim: ev.data_fim,
+				data_evento: retorno,
+				nup: nup.formatado || null,
+				justificativa: '',
+				solicitante_id: u.id,
+				solicitante_nome: u.nome
+			});
+			const { contexto, env } = contextoDeEvento(event);
+			await auditar(
+				db,
+				{
+					acao: 'solicitar_acao_policial',
+					usuario: u,
+					entidade: 'policial',
+					entidade_id: id,
+					alvo_tipo: 'policial',
+					alvo_id: id,
+					alvo_nome: alvo.nome,
+					detalhes: `Solicitação de retorno antecipado em ${retorno}: ${rotuloAf} de ${ev.data_inicio}${nup.formatado ? ` (NUP ${nup.formatado})` : ''}`,
+					metadados: {
+						tipo: 'retorno_antecipado',
+						historico_id: eventoId,
+						retorno,
+						nup: nup.formatado
+					},
+					...contexto
+				},
+				{ env }
+			);
+			return { success: true, solicitacoesAcao: await listarSolicitacoesAcaoDoPolicial(db, id) };
+		}
+
+		const r = await encurtarAfastamento(db, eventoId, retorno, nup.formatado);
+		if (!r) {
+			return fail(409, {
+				error:
+					'O retorno precisa cair dentro do afastamento (depois do início e até o fim); férias voltam pela suspensão.'
+			});
+		}
+		const { contexto, env } = contextoDeEvento(event);
+		await auditar(
+			db,
+			{
+				acao: 'registrar_afastamento',
+				usuario: u,
+				entidade: 'policial',
+				entidade_id: id,
+				alvo_tipo: 'policial',
+				alvo_id: id,
+				alvo_nome: alvo.nome,
+				detalhes: `Retorno antecipado em ${retorno}: ${LABEL_SUBTIPO_AFASTAMENTO[ev.subtipo as keyof typeof LABEL_SUBTIPO_AFASTAMENTO] ?? ev.subtipo} de ${ev.data_inicio} passou a terminar em ${r.data_fim}${nup.formatado ? ` (NUP ${nup.formatado})` : ''}`,
+				metadados: {
+					historico_id: eventoId,
+					retorno,
+					nup: nup.formatado,
+					fim_anterior: ev.data_fim
+				},
+				...contexto
+			},
+			{ env }
+		);
+		await avisarOutroLado(db, u, {
+			cartao: 'servidores',
+			tipo: 'retorno_antecipado',
+			titulo: `Retorno antecipado de ${alvo.nome} em ${retorno}`,
+			texto: `${LABEL_SUBTIPO_AFASTAMENTO[ev.subtipo as keyof typeof LABEL_SUBTIPO_AFASTAMENTO] ?? ev.subtipo} encurtado até ${r.data_fim}${nup.formatado ? ` · NUP ${nup.formatado}` : ''} — por ${u.nome}`,
+			link: `/servidores/${id}`,
+			lotacoes: [alvo.lotacao]
+		});
+		return { success: true };
+	},
+
+	/**
+	 * CORRIGIR um afastamento lançado errado — só o Admin Geral (decisão dele,
+	 * 20/09). As mesmas regras do lançamento (prazo fixo, CID na LTS, NUP);
+	 * o antes e o depois vão para a auditoria e a unidade recebe a notícia.
+	 */
+	corrigirAfastamento: async (event) => {
+		const auth = await carregarFichaDoPolicial(
+			getDB(event.platform),
+			event.locals.usuario,
+			event.params.id
+		);
+		if ('erro' in auth) return auth.erro;
+		const { u, db, id, alvo } = auth;
+		if (!isAdminGeral(u))
+			return fail(403, { error: 'Só o Administrador Geral corrige lançamentos.' });
+
+		const formData = await event.request.formData();
+		const eventoId = inteiroNaFaixa(formData, 'historico_id', 1, 99_999_999);
+		if (!eventoId) return fail(400, { error: 'Afastamento inválido.' });
+		const qtdRaw = formData.get('qtd_dias')?.toString() || '';
+		const nup = conferirNup(textoLimitado(formData, 'nup', 40), false);
+		if (!nup.ok) return fail(400, { error: nup.erro });
+		const parsed = afastamentoSchema.safeParse({
+			subtipo: formData.get('subtipo')?.toString() || '',
+			descricao: formData.get('descricao')?.toString() || '',
+			data_inicio: formData.get('data_inicio')?.toString() || '',
+			data_fim: formData.get('data_fim')?.toString() || '',
+			qtd_dias: qtdRaw === '' ? undefined : qtdRaw,
+			nup: nup.formatado,
+			tipo_cid: formData.get('tipo_cid')?.toString() || '',
+			adicional: formData.get('adicional')?.toString() === 'on'
+		});
+		if (!parsed.success) return fail(400, { error: parsed.error.issues[0].message });
+		const { subtipo, data_inicio } = parsed.data;
+		if (!AFASTAMENTOS[subtipo].cadastravel) {
+			return fail(400, { error: 'Este tipo de afastamento não é lançado pela tela.' });
+		}
+		const regra = regraDePrazo(subtipo, parsed.data.adicional === true);
+		if (regra.exigeCid && !parsed.data.tipo_cid) {
+			return fail(400, { error: 'Na LTS, informe a classificação do CID (CID-F ou CID-Outras).' });
+		}
+		let dataFim: string | null = parsed.data.data_fim || null;
+		let qtdDias: number | null;
+		if (regra.diasFixos != null) {
+			qtdDias = regra.diasFixos;
+			dataFim = adicionarDias(data_inicio, regra.diasFixos - 1);
+		} else if (!dataFim) {
+			if (!regra.semPrazo)
+				return fail(400, { error: 'Informe a quantidade de dias ou a data final.' });
+			qtdDias = null;
+		} else {
+			if (dataFim < data_inicio) {
+				return fail(400, { error: 'A data final não pode ser anterior à data inicial.' });
+			}
+			qtdDias = diffDiasInclusivo(data_inicio, dataFim);
+		}
+		const antes = await corrigirAfastamento(db, eventoId, {
+			subtipo,
+			descricao: parsed.data.descricao?.trim() || null,
+			data_inicio,
+			data_fim: dataFim,
+			qtd_dias: qtdDias,
+			nup: nup.formatado || null,
+			tipo_cid: regra.exigeCid ? parsed.data.tipo_cid || null : null
+		});
+		if (!antes || antes.policial_id !== id)
+			return fail(404, { error: 'Afastamento não encontrado.' });
+
+		const { contexto, env } = contextoDeEvento(event);
+		await auditar(
+			db,
+			{
+				acao: 'registrar_afastamento',
+				usuario: u,
+				entidade: 'policial',
+				entidade_id: id,
+				alvo_tipo: 'policial',
+				alvo_id: id,
+				alvo_nome: alvo.nome,
+				detalhes: `Afastamento corrigido: ${LABEL_SUBTIPO_AFASTAMENTO[subtipo]} ${data_inicio} a ${dataFim ?? '(sem prazo)'}`,
+				dados_antes: {
+					subtipo: antes.subtipo,
+					data_inicio: antes.data_inicio,
+					data_fim: antes.data_fim,
+					nup: antes.nup,
+					tipo_cid: antes.tipo_cid
+				},
+				dados_depois: {
+					subtipo,
+					data_inicio,
+					data_fim: dataFim,
+					nup: nup.formatado,
+					tipo_cid: parsed.data.tipo_cid || null
+				},
+				...contexto
+			},
+			{ env }
+		);
+		await avisarOutroLado(db, u, {
+			cartao: 'servidores',
+			tipo: 'afastamento_corrigido',
+			titulo: `Afastamento de ${alvo.nome} corrigido pelo DPI SUL`,
+			texto: `${LABEL_SUBTIPO_AFASTAMENTO[subtipo]}: ${data_inicio} a ${dataFim ?? '(sem prazo)'}`,
+			link: `/servidores/${id}`,
+			lotacoes: [alvo.lotacao]
+		});
+		return { success: true };
+	},
+
+	/** EXCLUIR um afastamento lançado errado — só o Admin Geral. */
+	excluirAfastamento: async (event) => {
+		const auth = await carregarFichaDoPolicial(
+			getDB(event.platform),
+			event.locals.usuario,
+			event.params.id
+		);
+		if ('erro' in auth) return auth.erro;
+		const { u, db, id, alvo } = auth;
+		if (!isAdminGeral(u))
+			return fail(403, { error: 'Só o Administrador Geral exclui lançamentos.' });
+
+		const formData = await event.request.formData();
+		const eventoId = inteiroNaFaixa(formData, 'historico_id', 1, 99_999_999);
+		if (!eventoId) return fail(400, { error: 'Afastamento inválido.' });
+		const ev = await buscarEventoHistorico(db, eventoId);
+		if (!ev || ev.policial_id !== id) return fail(404, { error: 'Afastamento não encontrado.' });
+		const apagado = await excluirAfastamento(db, eventoId);
+		if (!apagado) return fail(409, { error: 'Férias se excluem pelo cartão Férias.' });
+
+		const { contexto, env } = contextoDeEvento(event);
+		await auditar(
+			db,
+			{
+				acao: 'registrar_afastamento',
+				usuario: u,
+				entidade: 'policial',
+				entidade_id: id,
+				alvo_tipo: 'policial',
+				alvo_id: id,
+				alvo_nome: alvo.nome,
+				detalhes: `Afastamento EXCLUÍDO (lançado errado): ${LABEL_SUBTIPO_AFASTAMENTO[apagado.subtipo as keyof typeof LABEL_SUBTIPO_AFASTAMENTO] ?? apagado.subtipo} ${apagado.data_inicio} a ${apagado.data_fim ?? '(sem prazo)'}`,
+				dados_antes: {
+					subtipo: apagado.subtipo,
+					data_inicio: apagado.data_inicio,
+					data_fim: apagado.data_fim,
+					nup: apagado.nup
+				},
+				...contexto
+			},
+			{ env }
+		);
+		await avisarOutroLado(db, u, {
+			cartao: 'servidores',
+			tipo: 'afastamento_excluido',
+			titulo: `Afastamento de ${alvo.nome} excluído pelo DPI SUL (lançado errado)`,
+			texto: `${LABEL_SUBTIPO_AFASTAMENTO[apagado.subtipo as keyof typeof LABEL_SUBTIPO_AFASTAMENTO] ?? apagado.subtipo}: ${apagado.data_inicio} a ${apagado.data_fim ?? '(sem prazo)'}`,
+			link: `/servidores/${id}`,
+			lotacoes: [alvo.lotacao]
+		});
+		return { success: true };
 	},
 
 	// ---- Desvinculação: baixa do policial (inativa e registra) ----
@@ -932,7 +1350,10 @@ export const actions: Actions = {
 			event.params.id
 		);
 		if ('erro' in auth) return auth.erro;
-		const { db, id, alvo, modo } = auth;
+		const { alvo, modo } = auth;
+		if (modo !== 'direto') {
+			return fail(403, { error: 'Movimentação e desvinculação são feitas pelo DPI SUL.' });
+		}
 
 		const formData = await event.request.formData();
 		const parsed = desvinculacaoSchema.safeParse({
@@ -953,10 +1374,13 @@ export const actions: Actions = {
 			},
 			resumo: `${alvo.nome} (mat. ${alvo.matricula}) → ${parsed.data.destino}`,
 			metadados: { nup: parsed.data.nup || null, data: parsed.data.data_evento },
-			recarregar: () =>
-				modo === 'solicitacao' ? listarSolicitacoesAcaoDoPolicial(db, id) : Promise.resolve(null)
+			// Modo direto só: nada a recarregar ao lado do painel.
+			recarregar: () => Promise.resolve(null)
 		});
-	}
+	},
+
+	// ---- Férias: frações do Guardião, reprogramação à COGEP e abono ----
+	...actionsFerias
 };
 
 /** As três ações de RH divergem só nisto; o resto do caminho é comum. */
@@ -967,6 +1391,13 @@ interface PedidoRH {
 	metadados: Record<string, unknown>;
 	/** No modo solicitação, a lista que a tela repõe sem `invalidateAll`. */
 	recarregar: () => Promise<unknown>;
+	/**
+	 * O pedido não pede motivo à parte (afastamento: tipo, período e NUP já
+	 * são o pedido — decisão dele, 20/09). Grava justificativa vazia.
+	 */
+	justificativaDispensada?: boolean;
+	/** Avisos que não travam (art. 16 do abono…): vão no toast de quem registrou. */
+	avisos?: string[];
 }
 
 /**
@@ -988,7 +1419,7 @@ async function concluirAcaoRH(
 	const { u, db, id, alvo, modo } = auth;
 
 	let justificativa = '';
-	if (modo === 'solicitacao') {
+	if (modo === 'solicitacao' && !pedido.justificativaDispensada) {
 		const lida = lerJustificativa(formData);
 		if ('erro' in lida) return fail(400, { error: lida.erro });
 		justificativa = lida.texto;
@@ -1054,8 +1485,51 @@ async function concluirAcaoRH(
 		{ env }
 	);
 
+	// O aviso (E59): no modo direto a delegacia fica sabendo do ato do DPI SUL
+	// (na movimentação, a de origem E a de destino). No modo solicitação a
+	// fila já é a pendência do Admin Geral — só a LTS por CID-F vira notícia
+	// também, porque a Portaria 39 não espera a homologação para valer.
+	const ehCidF = acao.tipo === 'afastamento' && acao.tipo_cid === 'CID-F';
+	if (modo === 'direto' || ehCidF) {
+		await avisarOutroLado(db, u, {
+			cartao: 'servidores',
+			tipo: ehCidF ? 'afastamento_cid_f' : `rh_${acao.tipo}`,
+			titulo: ehCidF
+				? `LTS por CID-F: ${alvo.nome} — Portaria 39/2026 (recolher o armamento)`
+				: `${ROTULO_ACAO[acao.tipo]} de ${alvo.nome} registrada pelo DPI SUL`,
+			texto: pedido.resumo,
+			link: `/servidores/${id}`,
+			lotacoes: [alvo.lotacao, acao.unidade_destino]
+		});
+	}
+
+	// Escala desfalcada (E60): o afastamento registrado DIRETO cai sobre datas
+	// em que o servidor já está escalado? Avisa (não desescala).
+	const desfalques =
+		modo === 'direto' && acao.tipo === 'afastamento' && acao.data_inicio
+			? await avisarDesfalques(
+					db,
+					u,
+					{ id, nome: alvo.nome, lotacao: alvo.lotacao },
+					{
+						rotulo:
+							LABEL_SUBTIPO_AFASTAMENTO[acao.subtipo as keyof typeof LABEL_SUBTIPO_AFASTAMENTO] ??
+							acao.subtipo ??
+							'afastamento',
+						inicio: acao.data_inicio,
+						fim: acao.data_fim ?? null
+					}
+				)
+			: [];
+
 	const solicitacoesAcao = await pedido.recarregar();
-	return { success: true, tipo: acao.tipo, modo, solicitacoesAcao };
+	return {
+		success: true,
+		tipo: acao.tipo,
+		modo,
+		solicitacoesAcao,
+		avisos: [...(pedido.avisos ?? []), ...desfalques]
+	};
 }
 
 /** O nome do ato em PT-BR — a mesma palavra na trilha e na tela. */

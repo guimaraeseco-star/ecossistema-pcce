@@ -19,8 +19,28 @@ import { policialAcaoSolicitacoes, policiais } from '$lib/server/schema';
 import type { PolicialAcaoSolicitacao } from '$lib/server/schema';
 import type { CamposDoEventoFuncional } from './historico';
 
-/** Os três atos que podem ser pedidos. Espelha `policial_historico.tipo`. */
-type TipoAcaoSolicitada = 'movimentacao' | 'afastamento' | 'desvinculacao';
+/**
+ * Os atos que podem ser pedidos.
+ *
+ * Os três primeiros espelham `policial_historico.tipo` — são atos sobre o
+ * SERVIDOR, e a aprovação os executa na linha do tempo dele.
+ *
+ * **`direcao` é de outra natureza, e por isso vale a ressalva** (16/09/2026):
+ * é ato sobre a UNIDADE — quem passa a dirigi-la, como titular ou respondente.
+ * Ele mora nesta fila porque os campos de que precisa já estavam aqui (unidade
+ * de destino, início da vigência, NUP, justificativa) e porque o rito de
+ * decisão e a trilha de auditoria são os mesmos; mas a aprovação NÃO o manda
+ * para `executarAcaoRH`, e sim para `registrarResponsavel`. Quem faz esse
+ * desvio é `decidirSolicitacaoAcao`.
+ */
+/**
+ * `retorno_antecipado` (20/09): o servidor voltou antes do fim do afastamento.
+ * O pedido guarda o afastamento alcançado por `subtipo` + `data_inicio` (o
+ * evento não tem id no pedido) e o retorno em `data_evento`; aprovado, o
+ * evento encurta até a véspera.
+ */
+type TipoAcaoSolicitada =
+	'movimentacao' | 'afastamento' | 'desvinculacao' | 'direcao' | 'retorno_antecipado';
 
 /**
  * O pedido, na forma em que a aprovação vai executá-lo: os MESMOS campos do
@@ -57,6 +77,7 @@ export async function criarSolicitacaoAcao(
 			data_fim: pedido.data_fim ?? null,
 			qtd_dias: pedido.qtd_dias ?? null,
 			nup: pedido.nup ?? null,
+			tipo_cid: pedido.tipo_cid ?? null,
 			documento_r2_key: pedido.documento_r2_key ?? null,
 			documento_nome: pedido.documento_nome ?? null,
 			justificativa: pedido.justificativa,
@@ -107,6 +128,7 @@ export async function listarSolicitacoesAcaoPendentes(
 			data_fim: policialAcaoSolicitacoes.data_fim,
 			qtd_dias: policialAcaoSolicitacoes.qtd_dias,
 			nup: policialAcaoSolicitacoes.nup,
+			tipo_cid: policialAcaoSolicitacoes.tipo_cid,
 			documento_r2_key: policialAcaoSolicitacoes.documento_r2_key,
 			documento_nome: policialAcaoSolicitacoes.documento_nome,
 			justificativa: policialAcaoSolicitacoes.justificativa,

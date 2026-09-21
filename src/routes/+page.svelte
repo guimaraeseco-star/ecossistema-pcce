@@ -14,11 +14,16 @@
 	import BemVindoPagina from '$lib/components/bem-vindo/BemVindoPagina.svelte';
 	import BemVindoCabecalho from '$lib/components/bem-vindo/BemVindoCabecalho.svelte';
 	import { gruposHomeDaPagina } from './_components/home-modulos';
+	import BadgeAvisos from './_components/BadgeAvisos.svelte';
 
 	const { data }: PageProps = $props();
 	const usuario = $derived(data.usuario);
 
 	const grupos = $derived(gruposHomeDaPagina(usuario, page.data));
+	/** Pendências + notícias por cartão (E59); o grupo soma os seus cartões. */
+	const porCartao = $derived((page.data.avisosResumo?.porCartao ?? {}) as Record<string, number>);
+	const avisosDoGrupo = (cartoes: { id: string }[]) =>
+		cartoes.reduce((s, c) => s + (porCartao[c.id] ?? 0), 0);
 
 	const descricao = $derived.by(() => {
 		if (usuario?.tipo === 'admin') {
@@ -54,8 +59,9 @@
 			<a
 				href={grupo.href}
 				data-sveltekit-preload-data="hover"
-				class="group flex min-h-36 flex-col items-center justify-center rounded-[2rem] bg-gestao px-6 py-6 text-center text-white no-underline shadow-lg shadow-black/20 transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 hover:shadow-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gestao sm:h-[clamp(8rem,calc((100dvh-25.5rem)/2),16rem)]"
+				class="group relative flex min-h-36 flex-col items-center justify-center rounded-[2rem] bg-gestao px-6 py-6 text-center text-white no-underline shadow-lg shadow-black/20 transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 hover:shadow-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-gestao sm:h-[clamp(8rem,calc((100dvh-25.5rem)/2),16rem)]"
 			>
+				<BadgeAvisos n={avisosDoGrupo(grupo.cartoes)} />
 				<h2 class="h2 text-xl font-bold text-white sm:text-2xl">{grupo.titulo}</h2>
 				<p class="mt-3 max-w-md text-sm leading-relaxed text-white/85">{grupo.descricao}</p>
 			</a>

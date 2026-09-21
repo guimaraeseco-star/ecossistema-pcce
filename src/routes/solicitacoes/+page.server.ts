@@ -18,6 +18,8 @@
  * passa a pertencer ao evento em `policial_historico`.
  */
 import { redirect, fail } from '@sveltejs/kit';
+import { avisarOutroLado, servidorParaAviso } from '$lib/server/avisos/emitir';
+import { avisarDesfalques } from '$lib/server/avisos/desfalques';
 import type { PageServerLoad, Actions } from './$types';
 import {
 	getDB,
@@ -35,6 +37,15 @@ import { deletarChavesR2 } from '$lib/server/r2-cleanup';
 import { logger } from '$lib/server/logger';
 import { mensagemDeErro } from '$lib/utils/erro';
 import { ROTULO_CAMPO } from '$lib/cadastro-campos';
+
+/** O nome do ato no título do aviso (E59). */
+const ROTULO_TIPO_AVISO: Record<string, string> = {
+	movimentacao: 'Movimentação',
+	afastamento: 'Afastamento',
+	desvinculacao: 'Desvinculação',
+	direcao: 'Direção de unidade',
+	retorno_antecipado: 'Retorno antecipado'
+};
 import { decidirSolicitacaoAcao } from '$lib/server/policiais/solicitacoes';
 
 export const load: PageServerLoad = async ({ locals, platform }) => {
@@ -123,6 +134,17 @@ export const actions: Actions = {
 			env
 		});
 
+		// A delegacia que pediu fica sabendo da decisão (E59).
+		const servidor = await servidorParaAviso(db, sol.policial_id);
+		await avisarOutroLado(db, u, {
+			cartao: 'servidores',
+			tipo: aprovar ? 'cadastro_aprovado' : 'cadastro_rejeitado',
+			titulo: `Alteração de ${ROTULO_CAMPO[sol.campo]} de ${servidor?.nome ?? 'servidor'} ${aprovar ? 'APROVADA' : 'REJEITADA'} pelo DPI SUL`,
+			texto: sol.campo === 'cpf' ? '' : `"${sol.valor_atual ?? '—'}" → "${sol.valor_novo}"`,
+			link: `/servidores/${sol.policial_id}`,
+			lotacoes: [servidor?.lotacao]
+		});
+
 		const pendentes = await listarSolicitacoesCadastroPendentes(db);
 		return { success: true, pendentes };
 	},
@@ -184,7 +206,35 @@ export const actions: Actions = {
 			env
 		});
 
+		// A delegacia que pediu fica sabendo da decisão (E59). Na direção, o
+		// "servidor" é o delegado e a unidade dirigida é o destino.
+		const servidor = await servidorParaAviso(db, pedido.policial_id);
+		const ehDirecao = pedido.tipo === 'direcao';
+		await avisarOutroLado(db, u, {
+			cartao: ehDirecao ? 'unidade' : 'servidores',
+			tipo: aprovar ? `${pedido.tipo}_aprovada` : `${pedido.tipo}_rejeitada`,
+			titulo: `${ROTULO_TIPO_AVISO[pedido.tipo] ?? pedido.tipo} de ${servidor?.nome ?? 'servidor'} ${aprovar ? 'APROVADA' : 'REJEITADA'} pelo DPI SUL`,
+			texto: ehDirecao ? (pedido.unidade_destino ?? '') : '',
+			link: ehDirecao ? '/unidade' : `/servidores/${pedido.policial_id}`,
+			lotacoes: [servidor?.lotacao, pedido.unidade_origem, pedido.unidade_destino]
+		});
+
+		// Escala desfalcada (E60): o afastamento aprovado cai sobre escalas?
+		const desfalques =
+			aprovar && pedido.tipo === 'afastamento' && pedido.data_inicio && servidor
+				? await avisarDesfalques(
+						db,
+						u,
+						{ id: pedido.policial_id, nome: servidor.nome, lotacao: servidor.lotacao },
+						{
+							rotulo: ROTULO_TIPO_AVISO[pedido.tipo] ?? pedido.tipo,
+							inicio: pedido.data_inicio,
+							fim: pedido.data_fim ?? null
+						}
+					)
+				: [];
+
 		const acoesPendentes = await listarSolicitacoesAcaoPendentes(db);
-		return { success: true, acoesPendentes };
+		return { success: true, acoesPendentes, avisos: desfalques };
 	}
 };

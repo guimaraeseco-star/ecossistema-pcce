@@ -41,6 +41,7 @@ import { actionsEquipe } from './_actions/actions-equipe';
 import { actionsMembros } from './_actions/actions-membros';
 import { actionsUnidade } from './_actions/actions-unidade';
 import { mensagemDeErro } from '$lib/utils/erro';
+import { desfalquesDaGise } from '$lib/db/policiais/afastamento-escalas';
 
 export const load: PageServerLoad = async ({ locals, params, platform, depends, parent }) => {
 	depends('gise:detail');
@@ -218,6 +219,8 @@ export const load: PageServerLoad = async ({ locals, params, platform, depends, 
 
 		return {
 			gise,
+			/** Membros escalados em dia de afastamento — a faixa "desfalcada" (E60). */
+			desfalques: await desfalquesDaGise(db, gise.id),
 			operacaoNome: operacaoDaEscala?.nome ?? null,
 			tiposEquipePermitidos,
 			breveRelatorioEnv: await getBreveRelatorioEnvMergido(db, gise.operacao_id),

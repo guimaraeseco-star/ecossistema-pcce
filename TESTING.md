@@ -397,6 +397,8 @@ Servidores.xlsx --enviar --local`): 697/697 importados; relatório lista
       nome abre a ficha do servidor; "Ver em Servidores" abre a lista filtrada;
       zero fica apagado e não abre; a lista tem a linha "Total de DPI SUL com
       vinculadas" batendo com o cabeçalho
+- [ ] Servidores: a tela ABRE SEM FILTRO (nenhum botão aceso, lista inteira),
+      mesmo depois de ter filtrado e saído; filtrar, sair e voltar começa limpo
 - [ ] Servidores: filtro "Situação hoje" (Todos/Ativos/Férias/Afastados) e
       coluna Situação (Ativo; Férias até dd/mm em dourado; tipo de afastamento
       até dd/mm em vermelho); a ficha mostra o mesmo selo ao lado do nome
@@ -427,6 +429,88 @@ HISTORICO.xlsx --enviar --local`): 698/914 linhas casam com a base (os
       o texto, "APTO/VERIFICAR/EXONERAÇÃO" viram anotação; reexecutar em
       qualquer ordem (folha → histórico → afastamentos ou o inverso) não
       duplica nem ressuscita o suprimido
+- [ ] Lista /unidade: embaixo do nome de cada unidade aparece "Titular: FULANO"
+      (ou "Respondente: FULANO"). Sem titular, o aviso é DOURADO na delegacia e
+      apagado no departamento, no subdepartamento e na unidade de atendimento —
+      onde não ter titular é o estado correto
+- [ ] Botão "Sem titular · N" ao lado da busca: liga o recorte e deixa só as
+      unidades sem direção vigente; N conta apenas as delegacias. Ligado junto
+      com a busca, os dois se somam
+- [ ] Celular (390 px), lista /unidade: o cabeçalho ATIVOS · FÉRIAS · AFAST.
+      fica exatamente EM CIMA dos três números de cada cargo (era um texto solto
+      à esquerda enquanto os números ficavam à direita); nenhuma tela rola na
+      horizontal
+- [ ] Fila /solicitacoes com um pedido de direção: o tipo aparece como
+      "Direção de unidade", e o detalhe mostra Unidade e Papel antes das datas
+- [ ] Férias — lançar (E56, migração 0091): na ficha do servidor, o cartão
+      "Férias" (dourado, borda e título — dá para achar de longe) abaixo das
+      solicitações; "Lançar programação" abre com um AVISO em dourado ("só pode
+      ser feito uma vez dentro do período aquisitivo; depois, só por alteração"),
+      pede o exercício, mostra o período aquisitivo calculado da data de posse
+      e pergunta "Quantos períodos?"
+      (1 / 2 / 3); com 2 aparecem as formas 10 + 20, 20 + 10 e 15 + 15; depois
+      só o 1º dia de cada fração — o último dia aparece ao lado, calculado.
+      Um 1º dia em sábado/domingo (01/11/2026 é domingo) ou feriado trava o
+      botão com a frase em vermelho; 2ª fração começando antes de a 1ª
+      terminar também. Lançada, cada fração aparece com o status pela data
+      (Programada / Em gozo / Gozada) e os afastamentos de férias surgem na
+      linha do tempo; lançar o mesmo exercício de novo é recusado; "Excluir"
+      (só com a programação intacta) some com os afastamentos junto
+- [ ] Férias — reprogramar (um botão só, "Reprogramar", no cabeçalho do exercício; some com pedido pendente ou sem fração por gozar). O instituto sai do estado das FÉRIAS, não da fração: nenhuma fração começou (nem a vendida) → o assistente diz SUSTAÇÃO, lista as frações alcançadas (todas as não iniciadas — a toda vendida fica de fora; a de venda parcial entra "10 vendidos — restam 20") e oferece as divisões dos dias que restam (30 → 1, 2 ou 3 períodos; 20 → 20 ou 10 + 10), com a divisão atual pré-marcada; justificativa opcional
+- [ ] Férias — reprogramar com as férias já iniciadas (1ª em gozo, já gozada, ou vendida e já passada): o assistente diz SUSPENSÃO e exige a justificativa; se há fração EM GOZO hoje, pede o retorno ao serviço (limitado ao período dela), mostra "N gozados · restam M dias desta fração · + K das futuras = T a reprogramar" e só então abre a escolha de períodos; menos de 7 dias gozados trava, reprogramar depois de 10 dias só avisa; as frações futuras entram com os dias inteiros, sem contagem; a escolha de períodos parte do total (quebrado + inteiras)
+- [ ] Afastamento × férias (impede nos dois sentidos): no modal de afastamento, um período que encosta em férias programadas (o gozo — os dias vendidos não contam) mostra "✖ O afastamento abrange férias de … a …" em vermelho e o botão não habilita; POST direto → 400. Em "Lançar programação" e "Reprogramar", um período que cai dentro de um afastamento registrado (LTS, cessão em aberto…) mostra "✖ 1ª fração (…) coincide com …" e trava; as férias já registradas não contam
+- [ ] Afastamento sobre os dias VENDIDOS (abono deferido): não trava, mas mostra em dourado "⚠ … Dec. 37.363/2026, art. 16 … restituição"; registrado, o toast repete o aviso
+- [ ] "Solicitações deste servidor" mostra abertos os pedidos pendentes e os afastamentos aprovados ainda em curso; rejeitados e aprovados já passados ficam recolhidos em "Ver anteriores (N)"; sem nada aberto, "Nenhum pedido em aberto"
+- [ ] Retorno antecipado: no quadro "Solicitações deste servidor", o pedido de afastamento APROVADO e em curso (não férias) mostra o botão "Retorno antecipado", que abre data do retorno (limitada ao período) e NUP. Como admin de unidade, vira um PEDIDO pendente que NÃO aparece como card separado: o card do afastamento ganha a faixa dourada "⏳ Retorno antecipado pedido: volta ao serviço em … · NUP do retorno … — aguardando o Admin Geral" (o NUP do afastamento continua na linha "NUP"); aprovado, a faixa fica verde "✔ Retorno antecipado em … · NUP do retorno … — aprovado em …" e o card mostra "Término previsto" e "Término efetivo"; rejeitado, faixa vermelha e o botão volta; na fila `/solicitacoes` o card do pedido mostra Afastamento (com o NUP do afastamento), Início, Término previsto, Retorno ao serviço e NUP do retorno; "Aprovar retorno antecipado de …" encurta o afastamento até a véspera (descrição "Retorno antecipado em … (NUP …)") e a unidade recebe a notícia; rejeitar não muda nada. Como Admin Geral, registra direto. Retorno fora do período → 409; a linha do tempo NÃO tem esse botão (só Corrigir/Excluir do Admin Geral)
+- [ ] Corrigir / Excluir afastamento (só Admin Geral): na linha do tempo, "Corrigir" abre tipo, datas, NUP, CID e motivo com as regras do lançamento; "Excluir" some com o evento; ambos ficam na auditoria com o antes e viram notícia para a unidade; admin de unidade não vê os botões e o POST direto → 403; férias não têm esses botões ali (têm o cartão)
+- [ ] Férias — Corrigir / Excluir tudo (só Admin Geral): "Corrigir" numa fração intacta (sem abono, sem pedido pendente) abre 1º dia e dias, com as mesmas conferências (dia útil, conflito com afastamento) e move a fração e o afastamento dela; exercício com vínculos mostra "Excluir tudo" com confirmação, que apaga frações, pedidos, abono e afastamentos do exercício (fica na auditoria)
+- [ ] Férias — "Gerar ofício" registra o pedido, mostra o ofício (todas as frações alcançadas, o retorno e os gozados quando há fração em gozo, os novos períodos) com botão Copiar; o pedido fica em amarelo "aguardando a COGEP" com o passo a passo (ofício → NUP → homologação) e o NUP para anotar
+- [ ] Férias — homologar: "COGEP deferiu" na sustação faz a fração antiga
+      aparecer riscada (Sustada), a nova entrar como Programada (reprogramada)
+      e o afastamento antigo sumir; na suspensão, o afastamento antigo encurta
+      até a véspera do retorno; "Indeferiu" fecha o pedido sem mudar nada
+- [ ] Férias — alertas: com um pedido pendente, a linha do servidor em
+      /servidores mostra "⚠ Férias: pedido pendente"; a unidade dele, a
+      seccional e o departamento mostram "⚠ Férias: 1 pedido aguardando a
+      COGEP" em /unidade (tabela e celular) e no topo da ficha da unidade;
+      homologado, os alertas somem
+- [ ] Férias — abono (só Admin Geral): "Registrar abono" pede só 10 iniciais
+      ou finais, decisão e NUP (sem "Requerido em"/"Decidido em" — o DPI SUL
+      não recebe essas datas); deferido, o afastamento passa a cobrir só o
+      gozo, o cartão mostra "aguardando ciência da unidade", os alertas dizem
+      "abono sem ciência" e, nos dias convertidos, /servidores mostra "Ativo ·
+      em abono até dd/mm"; "Estou ciente" (admin de unidade/seccional/geral)
+      apaga o alerta; janela fora de 60–90 dias e impedimentos do art. 13 saem
+      como aviso no toast, não travam; a janela de 60–90 dias não é conferida
+- [ ] Férias — o ano da unidade: "Férias do ano →" na ficha da unidade abre
+      /unidade/[id]/ferias com os 12 meses; cada mês lista, por unidade, "N de
+      M · X %" com "⚠ acima do teto" em dourado quando passa de 15 %; numa
+      delegacia os nomes vêm abertos, na seccional recolhidos em "Ver os N
+      nomes"; ← ano / ano → navegam; férias vindas da carga aparecem também
+- [ ] Avisos (E59, migração 0093) — badges: com uma pendência ou notícia não lida, o cartão grande do Início ("Gestão de pessoal" / "Gestão de unidade") mostra o número em dourado no canto superior direito; a tela do grupo mostra o número no cartão do módulo ("Servidores" / "Unidade"); a barra lateral mostra "Avisos" com o mesmo total logo abaixo de "Início"; sem nada, os badges não aparecem
+- [ ] Avisos — a caixa `/avisos`: "Pendências" em dourado com o botão "Resolver →" (admin de unidade: reprogramação de férias a homologar, abono sem ciência; Admin Geral: cadastro, RH e direção aguardando decisão); "Notícias" com "Ver onde →" e "✓ Lida"; "Marcar todas como lidas" zera o badge; "Já lidas" recolhido mostra quem leu e quando
+- [ ] Avisos — a regra do outro lado: logado como admin de unidade, dê ciência de um abono (ou lance/suste férias) → na conta do Admin Geral aparece a notícia (o autor é a unidade); logado como Admin Geral, registre uma movimentação/afastamento/desvinculação, edite o cadastro, decida um pedido em `/solicitacoes` ou registre um titular → na conta da unidade do servidor aparece a notícia; quem fez NUNCA vê a própria notícia
+- [ ] Avisos — LTS por CID-F pedida pela unidade gera notícia ao DPI SUL na hora (além da pendência na fila)
+- [ ] Afastamento × escalas (E60) — escalar: numa escala ordinária de plantão, "Adicionar" um servidor num dia coberto por afastamento (LTS, ou férias em gozo) → toast "X está afastado — … de … a …" e nada gravado; "várias datas" com uma delas coberta → só as outras entram e o toast lista a recusada com o motivo; "Adicionar todos" deixa de fora quem tem afastamento tocando o período e diz quem no toast (os dias vendidos por abono NÃO bloqueiam); na GISE, "Adicionar membro" num servidor afastado no dia da operação → recusa com o motivo
+- [ ] Afastamento × escalas (E60) — desfalque: registre (ou aprove na fila) um afastamento sobre um dia em que o servidor já está escalado → o toast diz "Escala Y de dd/mm fica desfalcada (X escalado)", a unidade dona da escala recebe a notícia (cartão Escalas) e a escala mostra a faixa vermelha "⚠ Escala desfalcada" com nome, dia e afastamento; o servidor NÃO é desescalado; o mesmo ao lançar/homologar férias sobre dias escalados
+- [ ] Direção da unidade (E54, migração 0090) — Admin Geral: a ficha de
+      `/unidade/[id]` tem o cartão "Direção" acima do efetivo. Unidade com
+      titular mostra selo azul, nome com link para a ficha, matrícula, desde
+      quando e a designação; unidade sem titular explica que o vazio pode ser o
+      estado correto. "Registrar direção" grava e vale na hora
+- [ ] Respondente: escolher o papel "Respondente" e um delegado de OUTRA
+      unidade → selo dourado e a LOTAÇÃO DE ORIGEM ao lado do nome (não
+      aparece no titular, onde ela é a própria unidade); o NUP sai formatado
+- [ ] Troca de direção: registrar outro delegado encerra o anterior na VÉSPERA
+      do novo início e ele passa para "Quem dirigiu antes"; registrar o mesmo
+      no mesmo papel é recusado, e início anterior ao do vigente também
+- [ ] Só DPC dirige: a busca do formulário só oferece delegados, e um POST
+      direto com OIP é recusado com "Só delegado (DPC) dirige unidade"
+- [ ] Proposta pela seccional: entrando como admin de seccional, o botão diz
+      "Propor direção" e a justificativa é obrigatória; o pedido cai em
+      /solicitacoes para o Admin Geral decidir, e aprovar grava a direção sem
+      tocar no cadastro nem na linha do tempo do servidor
+- [ ] Admin de unidade: vê o cartão e NÃO vê botão; POST direto é recusado
 - [ ] Designação em Servidores (E50, migração 0089): a lista tem a coluna
       "Designação" (com o símbolo DAS/DNS embaixo) e o filtro "Todas as
       designações" — escolher "Chefe de seção de expedientes e cartório" traz
@@ -896,10 +980,12 @@ HISTORICO.xlsx --enviar --local`): 698/914 linhas casam com a base (os
 - [ ] Enviar → cria solicitação PENDENTE (cadastro NÃO muda) e aparece no quadro "Solicitações deste servidor"
 - [ ] Nova solicitação do mesmo campo substitui a pendente anterior
 - [ ] CPF aparece em branco (com placeholder dizendo se há ou não CPF cadastrado); preenchê-lo cria pedido, deixá-lo vazio não
-- [ ] Lotação é somente leitura, com o aviso de que se altera por Movimentação
+- [ ] Lotação é somente leitura, com o aviso de que a troca de lotação e a desvinculação são feitas pelo DPI SUL
 - [ ] "Papel Administrativo" e "Admin Geral" aparecem marcados como **informativo**, sem controles; POST direto em `?/salvarPapel` ou `?/toggleAdminGeral` → 403
-- [ ] "Afastar / Movimentar Servidor" aparece; cada modal exige justificativa e o botão diz "Solicitar" (não "Salvar")
-- [ ] Desvinculação pedida por admin de unidade → servidor **continua ativo** até a aprovação
+- [ ] "Afastar / Movimentar Servidor" mostra SÓ o botão "Afastamento" (Movimentação e Desvinculação são do Admin Geral desde 20/09); o modal exige justificativa e o botão diz "Solicitar" (não "Salvar"); POST direto em `?/registrarMovimentacao` ou `?/registrarDesvinculacao` → 403
+- [ ] No modal de afastamento, "Férias" NÃO está na lista de tipos (entram pelo cartão Férias); POST direto com `subtipo=ferias` → 400
+- [ ] Modal de afastamento (E58, migração 0092): o select abre em "Selecione o tipo…" (nada pré-escolhido; o botão só habilita com tipo e NUP); os tipos vêm agrupados por categoria (Curta duração / Licenças / Interesse particular / Mandato / Outros; "Medidas disciplinares" só aparece para o Admin Geral); ao escolher o tipo, a caixa azul mostra a base legal e a observação; Casamento/Luto 2º grau (8), Luto tios e cunhados (2), Paternidade (20), Adotante (180) travam "Qtd Dias" e calculam a data final; Maternidade trava 120 e a caixa "pediu a prorrogação de 60" muda para 180; nos demais tipos a instrução diz "informe a data inicial e a quantidade de dias" e a Data Final é sempre calculada (só leitura); Estudante e Dispensa de ponto aceitam quantidade vazia com aviso; LTS exige o CID e CID-F abre a caixa vermelha da Portaria 39/2026; NUP obrigatório com 17 dígitos (o botão só habilita com NUP válido); o modal é mais largo, com o NUP ao lado do tipo, e NÃO tem Descrição/Motivo, Documento (PDF) nem Justificativa do pedido; só o tipo "Outros" mostra "Justificativa (do que se trata)", opcional, que vai para o motivo do evento; trocar o tipo zera a quantidade de dias
+- [ ] Afastamento CID-F: o pedido na fila `/solicitacoes` e no quadro da ficha mostra a Portaria 39 em vermelho; aprovado, a linha do tempo mostra o selo "CID-F" e a frase da Portaria; POST direto de LTS sem `tipo_cid` → 400; admin de unidade com tipo disciplinar → 403
 
 **Fila do Admin Geral (`/solicitacoes`)**
 

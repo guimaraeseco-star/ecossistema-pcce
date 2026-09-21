@@ -78,6 +78,7 @@ function eventoDaAcao(policialId: number, acao: AcaoRH, ator: AtorDaAcao): NovoE
 		data_fim: acao.data_fim ?? null,
 		qtd_dias: acao.qtd_dias ?? null,
 		nup: acao.nup ?? null,
+		tipo_cid: acao.tipo_cid ?? null,
 		documento_r2_key: acao.documento_r2_key ?? null,
 		documento_nome: acao.documento_nome ?? null,
 		registrado_por_id: ator.id,

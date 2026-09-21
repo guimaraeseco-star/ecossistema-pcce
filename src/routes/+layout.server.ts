@@ -13,6 +13,7 @@ import { lerPapelGise } from '$lib/server/gise/papel-cache';
 import { lerTemLinhaBasePendente } from '$lib/server/operacoes/linha-base-cache';
 import { resumoRecebidosAdmin } from '$lib/server/escalas/sync-estado';
 import { trilhaDaUnidade } from '$lib/server/unidades/escopo';
+import { resumoDeAvisos, temCaixaDeAvisos, type ResumoDeAvisos } from '$lib/server/avisos/resumo';
 import { logger } from '$lib/server/logger';
 import { mensagemDeErro } from '$lib/utils/erro';
 import {
@@ -38,6 +39,8 @@ export const load: LayoutServerLoad = async ({ locals, platform, cookies, depend
 	let exigirPasskeyAssinatura = false;
 	let temChaveAssinatura = false;
 	let recebidosNaoVistos = 0;
+	/** Pendências + notícias não lidas, por cartão da home (E59) — o número dos badges. */
+	let avisosResumo: ResumoDeAvisos | null = null;
 	// Alternância de acesso (ADM Geral ↔ Usuário) para a MESMA pessoa vinculada.
 	// admin → usuário: exige a sessão admin ter policial vinculado (adminPolicialId).
 	// usuário → admin: exige o policial ter conta Admin Geral vinculada.
@@ -65,21 +68,32 @@ export const load: LayoutServerLoad = async ({ locals, platform, cookies, depend
 			depends('app:assinatura-flags');
 			depends('app:chave-assinatura');
 			if (u.tipo === 'policial') depends('app:papel-gise');
-			const [flags, papel, vinculadoAdmin, recebidos, linhaBasePendente, credencial, trilha] =
-				await Promise.all([
-					lerFlagsAssinatura(platform),
-					u.tipo === 'policial' ? lerPapelGise(db, u.id) : Promise.resolve(null),
-					u.tipo === 'policial' ? ehAdminGeralVinculado(db, u.id) : Promise.resolve(false),
-					u.tipo === 'admin' ? resumoRecebidosAdmin(db) : Promise.resolve(null),
-					// Cache próprio (TTL 60s): a resposta cruza operações ativas, modelos e
-					// participação — cara demais para o `load` que roda a cada navegação.
-					lerTemLinhaBasePendente(db, u),
-					temCadastro(u)
-						? buscarCredencialAtiva(db, credencialDoUsuario(u))
-						: Promise.resolve(null),
-					trilhaDaUnidade(db, u)
-				]);
+			// Os badges de avisos mudam quando alguém resolve ou lê: as actions
+			// invalidam esta chave.
+			if (temCaixaDeAvisos(u)) depends('app:avisos');
+			const [
+				flags,
+				papel,
+				vinculadoAdmin,
+				recebidos,
+				linhaBasePendente,
+				credencial,
+				trilha,
+				avisos
+			] = await Promise.all([
+				lerFlagsAssinatura(platform),
+				u.tipo === 'policial' ? lerPapelGise(db, u.id) : Promise.resolve(null),
+				u.tipo === 'policial' ? ehAdminGeralVinculado(db, u.id) : Promise.resolve(false),
+				u.tipo === 'admin' ? resumoRecebidosAdmin(db) : Promise.resolve(null),
+				// Cache próprio (TTL 60s): a resposta cruza operações ativas, modelos e
+				// participação — cara demais para o `load` que roda a cada navegação.
+				lerTemLinhaBasePendente(db, u),
+				temCadastro(u) ? buscarCredencialAtiva(db, credencialDoUsuario(u)) : Promise.resolve(null),
+				trilhaDaUnidade(db, u),
+				temCaixaDeAvisos(u) ? resumoDeAvisos(db, u) : Promise.resolve(null)
+			]);
 			trilhaUnidade = trilha;
+			avisosResumo = avisos;
 			temLinhaBasePendente = linhaBasePendente;
 			podeAlternarParaAdmin = vinculadoAdmin;
 			exigirFotoAssinatura = flags.exigirFotoAssinatura;
@@ -133,6 +147,7 @@ export const load: LayoutServerLoad = async ({ locals, platform, cookies, depend
 		exigirPasskeyAssinatura,
 		temChaveAssinatura,
 		recebidosNaoVistos,
+		avisosResumo,
 		adminModulo,
 		podeAlternarModulo,
 		podeAlternarParaUsuario,

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import FaixaDesfalques from '$lib/components/FaixaDesfalques.svelte';
 	/**
 	 * Tela de UMA ESCALA — cabeçalho, servidores escalados e o painel de
 	 * assinatura. A composição da lista muda com o tipo:
@@ -256,6 +257,8 @@
 		bind:modoEdicao
 		onFinalizarEdicao={() => (confirmFinalizarEdicaoOpen = true)}
 	/>
+
+	<FaixaDesfalques desfalques={data.desfalques} />
 
 	<PainelAssinaturaEscala
 		escalaId={String(data.escalaId)}

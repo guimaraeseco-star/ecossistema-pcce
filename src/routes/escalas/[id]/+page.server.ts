@@ -59,6 +59,7 @@ import { actionsComposicao } from './_actions/actions-composicao';
 import { actionsDatas } from './_actions/actions-datas';
 import { actionsCiclo } from './_actions/actions-ciclo';
 import { actionsProjecao } from './_actions/actions-projecao';
+import { desfalquesDaEscala } from '$lib/db/policiais/afastamento-escalas';
 
 /**
  * Tela de uma escala (`/escalas/[id]`) — o núcleo do módulo de escalas.
@@ -145,6 +146,8 @@ export const load: PageServerLoad = async ({ locals, platform, params, depends }
 	return {
 		escala,
 		policiaisEscala,
+		/** Quem está escalado em dia de afastamento — a faixa "desfalcada" (E60). */
+		desfalques: await desfalquesDaEscala(db, escalaId),
 		documentoAssinadoInfo: docInfo,
 		escalaId,
 		podeEditarEscala,

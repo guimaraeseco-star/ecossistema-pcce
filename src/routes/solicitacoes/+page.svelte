@@ -44,7 +44,11 @@
 	const ROTULO_TIPO_ACAO: Record<string, string> = {
 		movimentacao: 'Movimentação',
 		afastamento: 'Afastamento',
-		desvinculacao: 'Desvinculação'
+		retorno_antecipado: 'Retorno antecipado',
+		desvinculacao: 'Desvinculação',
+		// Ato sobre a UNIDADE, não sobre o servidor: aprovar grava a sucessão da
+		// unidade e não toca na linha do tempo funcional dele (E54).
+		direcao: 'Direção de unidade'
 	};
 
 	const vazio = $derived(pendentes.length === 0 && acoesPendentes.length === 0);
@@ -71,9 +75,12 @@
 			decidindoAcaoId = null;
 			if (result.type === 'success') {
 				acoesPendentes = (result.data?.acoesPendentes as typeof acoesPendentes) ?? acoesPendentes;
+				// Escala desfalcada (E60): o afastamento aprovado cai sobre escalas.
+				const avisos = ((result.data?.avisos as string[] | undefined) ?? []).join(' ');
 				toaster.create({
 					title: decisao === 'aprovar' ? `${rotulo} aprovada e aplicada` : `${rotulo} rejeitada`,
-					type: decisao === 'aprovar' ? 'success' : 'info'
+					description: avisos || undefined,
+					type: avisos ? 'warning' : decisao === 'aprovar' ? 'success' : 'info'
 				});
 			} else {
 				mostrarErroDeResultado(result, 'Erro ao decidir');

@@ -39,11 +39,33 @@ export {
 	atualizarPolicialComHistorico,
 	listarHistoricoPolicial,
 	buscarEventoHistorico,
+	encurtarAfastamento,
+	corrigirAfastamento,
+	excluirAfastamento,
 	afastamentoVigente
 } from './historico';
 export type { NovoEventoHistorico, CamposDoEventoFuncional } from './historico';
 
 export { listarDesignacoes, designacaoAtiva } from './designacoes';
+
+export {
+	listarFeriasDoPolicial,
+	buscarFracao,
+	registrarProgramacao,
+	excluirProgramacao,
+	corrigirFracao,
+	abrirReprogramacao,
+	anotarNupDaReprogramacao,
+	decidirReprogramacao,
+	registrarAbono,
+	darCienciaDoAbono,
+	pendenciasDeFerias,
+	contagemParaTeto,
+	pendenciasDeFeriasPorLotacao,
+	abonosVigentesDe,
+	feriasDoAno
+} from './ferias';
+export type { FracaoCompleta, FeriasDoPolicial, PendenciasDeFerias, FeriasNoMes } from './ferias';
 export type { DesignacaoDaTela } from './designacoes';
 
 export { impedimentoParaExcluirPolicial } from './exclusao';
