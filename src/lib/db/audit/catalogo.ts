@@ -146,6 +146,22 @@ export const CATALOGO_ACOES = {
 		categoria: 'autenticacao',
 		severidade: 'aviso'
 	},
+	// E61: lotação pelo Admin Geral, acessos pela unidade, e o relatório diário.
+	lotar_colaborador: {
+		label: 'Lotação de colaborador',
+		categoria: 'policial',
+		severidade: 'aviso'
+	},
+	definir_acessos_colaborador: {
+		label: 'Acessos de colaborador definidos pela unidade',
+		categoria: 'policial',
+		severidade: 'aviso'
+	},
+	relatorio_colaboradores: {
+		label: 'Relatório diário de colaboradores enviado',
+		categoria: 'sistema',
+		severidade: 'info'
+	},
 
 	// Unidades
 	criar_unidade: { label: 'Criação de unidade', categoria: 'unidade', severidade: 'aviso' },

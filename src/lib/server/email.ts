@@ -811,3 +811,70 @@ export async function enviarNotificacaoAssessorGisePreenchimentoSeccional(
 		{ text: textoPlano, logExtra: { assessor: nomeAssessor } }
 	);
 }
+
+/**
+ * O relatório diário dos colaboradores da unidade (E61-b): o que cada um fez
+ * no dia, para o admin da unidade. Uma tabela simples, colaborador a
+ * colaborador; o e-mail vai ao endereço PESSOAL do admin (o do 2FA), como
+ * decidido em 21/09/2026. Não relança: quem chama registra a falha e segue
+ * para a próxima unidade.
+ */
+export async function enviarRelatorioColaboradores(
+	destinatario: string,
+	nomeAdmin: string,
+	unidade: string,
+	diaISO: string,
+	acoes: readonly {
+		colaborador: string;
+		hora: string;
+		acao: string;
+		alvo: string | null;
+		detalhes: string | null;
+	}[],
+	platform: App.Platform | undefined
+): Promise<void> {
+	const [ano, mes, dia] = diaISO.split('-');
+	const diaBR = `${dia}/${mes}/${ano}`;
+	const porColaborador = new Map<string, typeof acoes>();
+	for (const a of acoes) {
+		porColaborador.set(a.colaborador, [...(porColaborador.get(a.colaborador) ?? []), a]);
+	}
+	const blocos = [...porColaborador.entries()]
+		.map(
+			([nome, lista]) => `
+            <p style="margin:16px 0 4px;color:#1a3a6e;font-size:14px;font-weight:bold;">${escapeHtml(nome)} <span style="color:#777;font-weight:normal;">— ${lista.length} ação${lista.length === 1 ? '' : 'ões'}</span></p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:13px;color:#333;">
+${lista
+	.map(
+		(a) => `              <tr>
+                <td style="padding:4px 8px 4px 0;vertical-align:top;white-space:nowrap;color:#777;">${escapeHtml(a.hora)}</td>
+                <td style="padding:4px 0;vertical-align:top;"><strong>${escapeHtml(a.acao)}</strong>${a.alvo ? ` — ${escapeHtml(a.alvo)}` : ''}${a.detalhes ? `<br><span style="color:#555;">${escapeHtml(a.detalhes)}</span>` : ''}</td>
+              </tr>`
+	)
+	.join('\n')}
+            </table>`
+		)
+		.join('\n');
+
+	const html =
+		layoutEmail(`            <p style="margin:0 0 8px;color:#333;font-size:15px;">Olá, <strong>${escapeHtml(nomeAdmin)}</strong>!</p>
+            <p style="margin:0 0 8px;color:#555;font-size:14px;">
+              Este é o relatório do dia <strong>${diaBR}</strong> das ações dos colaboradores lotados na
+              <strong>${escapeHtml(unidade)}</strong>: ${acoes.length} ação${acoes.length === 1 ? '' : 'ões'}, tirada${acoes.length === 1 ? '' : 's'} da auditoria do ${SISTEMA_NOME}.
+            </p>
+${blocos}
+            <p style="margin:24px 0 0;color:#777;font-size:12px;">
+              O que cada colaborador pode fazer é definido na ficha da unidade (bloco "Colaboradores"). Este e-mail sai todo dia às 19h, só quando houve ação.
+            </p>
+`);
+
+	await enviarERegistrar(
+		platform,
+		'relatorio-colaboradores',
+		destinatario,
+		`Colaboradores — ${unidade} — ${diaBR}`,
+		html,
+		'Relatório enviado',
+		{ logExtra: { unidade, dia: diaISO, acoes: acoes.length } }
+	);
+}

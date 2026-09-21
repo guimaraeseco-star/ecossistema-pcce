@@ -2551,6 +2551,25 @@ export const colaboradorAcessos = sqliteTable(
 	},
 	(table) => [primaryKey({ columns: [table.colaborador_id, table.chave] })]
 );
+
+/**
+ * O "já mandei" do relatório diário dos colaboradores (E61-b, migração 0097):
+ * uma linha por unidade e dia, gravada antes do envio — o cron pode repetir
+ * sem duplicar e-mail.
+ */
+export const relatoriosColaboradores = sqliteTable(
+	'relatorios_colaboradores',
+	{
+		unidade_id: integer('unidade_id').notNull(),
+		dia: text('dia').notNull(),
+		enviado_em: text('enviado_em')
+			.notNull()
+			.default(sql`(datetime('now', '-3 hours'))`),
+		destinatarios: text('destinatarios').notNull().default(''),
+		acoes: integer('acoes').notNull().default(0)
+	},
+	(table) => [primaryKey({ columns: [table.unidade_id, table.dia] })]
+);
 export type TempoMunicipios = typeof temposMunicipios.$inferSelect;
 export type GiseEscala = typeof giseEscalas.$inferSelect;
 export type GiseSeccional = typeof giseSeccionais.$inferSelect;
