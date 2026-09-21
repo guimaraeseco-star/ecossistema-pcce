@@ -150,7 +150,7 @@
 							: 'Nomes'}
 					</summary>
 					<ul class="mt-1 space-y-1 text-xs">
-						{#each lista as f (f.policial_id + f.data_inicio)}
+						{#each lista as f (f.historico_id)}
 							<li class="flex flex-wrap items-baseline justify-between gap-x-2">
 								<a href="/servidores/{f.policial_id}" class="font-medium no-underline">{f.nome}</a>
 								<span class="tabular-nums text-surface-500">

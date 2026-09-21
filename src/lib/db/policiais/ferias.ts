@@ -841,6 +841,8 @@ export async function abonosVigentesDe(
 
 /** Um servidor de férias num mês — o que a visão anual da unidade lista. */
 export interface FeriasNoMes {
+	/** O evento do histórico — a chave da linha (um servidor pode ter dois eventos na mesma data: carga antiga + fração). */
+	historico_id: number;
 	policial_id: number;
 	nome: string;
 	cargo: string;
@@ -871,6 +873,7 @@ export async function feriasDoAno(
 		if (fatia.length === 0) continue;
 		const r = await db
 			.select({
+				historico_id: policialHistorico.id,
 				policial_id: policialHistorico.policial_id,
 				nome: policiais.nome,
 				cargo: policiais.cargo,
@@ -897,6 +900,7 @@ export async function feriasDoAno(
 		for (const l of r) {
 			if (!l.data_inicio) continue;
 			linhas.push({
+				historico_id: l.historico_id,
 				policial_id: l.policial_id,
 				nome: l.nome,
 				cargo: l.cargo,
