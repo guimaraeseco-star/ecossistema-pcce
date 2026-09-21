@@ -396,8 +396,7 @@ export async function abrirReprogramacao(
 	dados: NovaReprogramacao,
 	quem: Registrador
 ): Promise<
-	| { ok: true; id: number }
-	| { ok: false; motivo: 'ja_pendente' | 'fracao_fechada' | 'toda_vendida' }
+	{ ok: true; id: number } | { ok: false; motivo: 'ja_pendente' | 'fracao_fechada' | 'com_abono' }
 > {
 	const alvo = [
 		...new Set([...(dados.fracao_id ? [dados.fracao_id] : []), ...(dados.fracoes_ids ?? [])])
@@ -413,23 +412,15 @@ export async function abrirReprogramacao(
 				f.status === 'programada'
 		);
 	if (!todasValidas) return { ok: false, motivo: 'fracao_fechada' };
-	// Fração inteira vendida não se susta (está resolvida em pecúnia); a venda
-	// parcial não impede — a sustação alcança só o que resta a gozar, e os dias
-	// vendidos ficam vendidos (decisão dele, 20/09).
-	const abonos = await db
-		.select({
-			fracao_id: feriasAbonos.fracao_id,
-			inicio: feriasAbonos.abono_inicio,
-			fim: feriasAbonos.abono_fim
-		})
+	// Fração com abono deferido — toda ou parcialmente vendida — não se susta,
+	// não se suspende nem se redivide (Dec. 37.363, art. 4º § 1º; resposta da
+	// COGEP, E63). A regra já a tira do alvo; aqui é a última linha.
+	const comAbono = await db
+		.select({ fracao_id: feriasAbonos.fracao_id })
 		.from(feriasAbonos)
-		.where(and(inArray(feriasAbonos.fracao_id, alvo), eq(feriasAbonos.status, 'deferido')));
-	for (const a of abonos) {
-		const f = fracoes.find((x) => x.id === a.fracao_id);
-		if (f && diasDaFracao({ data_inicio: a.inicio, data_fim: a.fim }) >= diasDaFracao(f)) {
-			return { ok: false, motivo: 'toda_vendida' };
-		}
-	}
+		.where(and(inArray(feriasAbonos.fracao_id, alvo), eq(feriasAbonos.status, 'deferido')))
+		.get();
+	if (comAbono) return { ok: false, motivo: 'com_abono' };
 
 	const pendente = await db
 		.select({ id: feriasReprogramacoes.id })

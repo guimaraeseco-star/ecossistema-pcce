@@ -37,7 +37,6 @@
 	import { conflitosDasFerias, type PeriodoOcupado } from '$lib/servidores/conflitos';
 	import {
 		criteriosDaSuspensao,
-		diasAGozar,
 		diasDaFracao,
 		diasRestantesNaSuspensao,
 		divisoesPossiveis,
@@ -83,7 +82,7 @@
 		data_inicio: f.data_inicio,
 		data_fim: f.data_fim,
 		status: f.status,
-		// Os dias vendidos (abono deferido) não se sustam: a regra desconta.
+		// Fração com abono deferido fica intocável (art. 4º § 1º): a regra a tira.
 		diasAbonados:
 			f.abono?.status === 'deferido'
 				? diasDaFracao({ data_inicio: f.abono.abono_inicio, data_fim: f.abono.abono_fim })
@@ -104,6 +103,22 @@
 		pedidosDe(exercicio).find((r) => r.status === 'pendente') ?? null;
 	const situacaoDe = (fracoes: FracaoCompleta[]) =>
 		situacaoDaReprogramacao(fracoes.map(comoFracao), hoje);
+	/**
+	 * E62 (COGEP): uma venda por EXERCÍCIO e uma por ANO CIVIL. O botão some
+	 * quando qualquer um dos dois já barra; a action é quem decide de verdade
+	 * (pelo ano do período vendido — aqui basta o ano da fração).
+	 */
+	const abonoBarrado = (f: FracaoCompleta): string | null => {
+		const deferidos = ferias.fracoes.filter((x) => x.abono?.status === 'deferido' && x.id !== f.id);
+		if (deferidos.some((x) => x.exercicio === f.exercicio)) {
+			return `o exercício ${f.exercicio} já teve abono`;
+		}
+		const ano = f.data_inicio.slice(0, 4);
+		if (deferidos.some((x) => x.abono?.abono_inicio.startsWith(ano))) {
+			return `já há abono em ${ano}`;
+		}
+		return null;
+	};
 	/** Programação intacta: tudo `programada`, sem pedido nem abono — dá para excluir. */
 	const intacta = (exercicio: number, fracoes: FracaoCompleta[]) =>
 		fracoes.every((f) => f.status === 'programada' && !f.abono) &&
@@ -458,6 +473,7 @@
 								{#if f.status === 'programada' && status !== 'gozada' && !pendente}
 									<div class="flex gap-1">
 										{#if isAdmin && !f.abono}
+											{@const barrado = abonoBarrado(f)}
 											<button
 												type="button"
 												class="btn btn-sm preset-outlined-surface-500"
@@ -468,14 +484,22 @@
 													cDias = String(diasDaFracao(f));
 												}}>Corrigir</button
 											>
-											<button
-												type="button"
-												class="btn btn-sm preset-outlined-surface-500"
-												onclick={() => {
-													fecharTudo();
-													abonando = f;
-												}}>Registrar abono</button
-											>
+											{#if !barrado}
+												<button
+													type="button"
+													class="btn btn-sm preset-outlined-surface-500"
+													onclick={() => {
+														fecharTudo();
+														abonando = f;
+													}}>Registrar abono</button
+												>
+											{:else}
+												<span
+													class="self-center text-2xs text-surface-500"
+													title="Só uma venda por exercício e por ano civil (art. 11; COGEP)"
+													>sem abono — {barrado}</span
+												>
+											{/if}
 										{/if}
 									</div>
 								{/if}
@@ -491,6 +515,7 @@
 									{#if f.abono.nup}
 										· NUP {formatarNUP(f.abono.nup)}{/if}
 									{#if f.abono.status === 'deferido'}
+										<span class="text-surface-500">· não reprogramável (art. 4º § 1º)</span>
 										{#if f.abono.ciencia_unidade_em}
 											<span class="text-surface-500">
 												· ciência da unidade em {formatarData(f.abono.ciencia_unidade_em)}</span
@@ -649,17 +674,20 @@
 							<li>
 								{s.emGozo.ordem}ª fração (em gozo): {formatarData(s.emGozo.data_inicio)} – {formatarData(
 									s.emGozo.data_fim
-								)} ({diasDaFracao(s.emGozo)} dias{#if s.emGozo.diasAbonados}, {s.emGozo
-										.diasAbonados} vendidos{/if})
+								)} ({diasDaFracao(s.emGozo)} dias)
 							</li>
 						{/if}
 						{#each s.futuras as f (f.ordem + f.data_inicio)}
 							<li>
 								{f.ordem}ª fração: {formatarData(f.data_inicio)} – {formatarData(f.data_fim)} ({diasDaFracao(
 									f
-								)} dias{#if f.diasAbonados}, {f.diasAbonados} vendidos — restam {diasAGozar(
-										f
-									)}{/if})
+								)} dias)
+							</li>
+						{/each}
+						{#each s.comAbono as f (f.ordem + f.data_inicio)}
+							<li class="text-surface-500">
+								{f.ordem}ª fração: {formatarData(f.data_inicio)} – {formatarData(f.data_fim)} — com abono
+								({f.diasAbonados} dias vendidos), fica como está
 							</li>
 						{/each}
 					</ul>

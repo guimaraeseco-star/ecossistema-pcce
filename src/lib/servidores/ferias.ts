@@ -57,9 +57,10 @@ export interface Fracao {
 	data_fim: string;
 	status: StatusFracao;
 	/**
-	 * Dias VENDIDOS (abono deferido) dentro da fração. Não se gozam nem se
-	 * sustam: o que resta à sustação é o que sobra deles (decisão dele,
-	 * 20/09). Ausente = nenhum.
+	 * Dias VENDIDOS (abono deferido) dentro da fração. Não se gozam, e a
+	 * fração que os tem fica INTOCÁVEL: não se susta, não se suspende, não se
+	 * redivide (Dec. 37.363, art. 4º § 1º — resposta da COGEP, E63, 21/09).
+	 * Ausente = nenhum.
 	 */
 	diasAbonados?: number;
 }
@@ -93,8 +94,8 @@ export function diasDaFracao(f: Pick<Fracao, 'data_inicio' | 'data_fim'>): numbe
 	return diffDiasInclusivo(f.data_inicio, f.data_fim);
 }
 
-/** Os dias que ainda se GOZAM (e, portanto, se sustam): a fração menos os vendidos. */
-export function diasAGozar(f: Pick<Fracao, 'data_inicio' | 'data_fim' | 'diasAbonados'>): number {
+/** Os dias que ainda se GOZAM: a fração menos os vendidos (só as sem abono entram na reprogramação). */
+function diasAGozar(f: Pick<Fracao, 'data_inicio' | 'data_fim' | 'diasAbonados'>): number {
 	return Math.max(0, diasDaFracao(f) - (f.diasAbonados ?? 0));
 }
 
@@ -365,8 +366,10 @@ const BASE_LEGAL: Record<TipoReprogramacao, string> = {
  *     com os dias inteiros, sem contagem.
  *
  * Em qualquer caso o pedido é um só, e o total que resta pode voltar
- * redividido. Fração toda vendida (abono) nunca entra; a parcial entra só
- * com o que resta a gozar.
+ * redividido. Fração com abono deferido — toda ou parcialmente vendida —
+ * NUNCA entra (art. 4º § 1º do Dec. 37.363: o deferimento "implicará a
+ * impossibilidade de interrupção, sustação, fracionamento ou ressalva do
+ * período remanescente"; E63). As demais frações do exercício seguem a régua.
  */
 export interface SituacaoDaReprogramacao {
 	/** `null` quando não há o que reprogramar. */
@@ -379,6 +382,8 @@ export interface SituacaoDaReprogramacao {
 	futuras: Fracao[];
 	/** Os dias inteiros das futuras (a em gozo depende do retorno). */
 	diasFuturos: number;
+	/** As frações com abono deferido — ficam de fora do pedido (art. 4º § 1º). */
+	comAbono: Fracao[];
 }
 
 /**
@@ -396,23 +401,36 @@ export function situacaoDaReprogramacao(
 	const comecaram = fracoesDoExercicio.some(
 		(f) => (f.status === 'programada' || f.status === 'suspensa') && f.data_inicio <= hojeISO
 	);
-	const vivas = fracoesDoExercicio.filter((f) => f.status === 'programada' && diasAGozar(f) > 0);
+	// A fração com abono sai ANTES de qualquer conta: nem em gozo (não se
+	// interrompe) nem futura (não se susta) — só as sem abono são "vivas".
+	const comAbono = fracoesDoExercicio.filter(
+		(f) =>
+			f.status === 'programada' &&
+			(f.diasAbonados ?? 0) > 0 &&
+			statusPelaData(f, hojeISO) !== 'gozada'
+	);
+	const vivas = fracoesDoExercicio.filter(
+		(f) => f.status === 'programada' && !(f.diasAbonados ?? 0) && diasAGozar(f) > 0
+	);
 	const emGozo = vivas.find((f) => statusPelaData(f, hojeISO) === 'em_gozo') ?? null;
 	const futuras = vivas.filter((f) => statusPelaData(f, hojeISO) === 'programada');
 	const diasFuturos = futuras.reduce((n, f) => n + diasAGozar(f), 0);
-	const vendidos = [...futuras, ...(emGozo ? [emGozo] : [])].reduce(
-		(n, f) => n + (f.diasAbonados ?? 0),
-		0
-	);
-	const notaVenda = vendidos > 0 ? ` Os ${vendidos} dias vendidos (abono) ficam vendidos.` : '';
+	const notaVenda =
+		comAbono.length > 0
+			? ` A ${comAbono.map((f) => `${f.ordem}ª`).join(' e a ')} fração tem abono deferido e não entra: fica como está (art. 4º § 1º do Dec. 37.363).`
+			: '';
 
 	if (!emGozo && futuras.length === 0) {
 		return {
 			tipo: null,
-			motivo: 'Não há fração por gozar neste exercício.',
+			motivo:
+				comAbono.length > 0
+					? `A ${comAbono.map((f) => `${f.ordem}ª`).join(' e a ')} fração tem abono deferido: não pode ser sustada, suspensa nem redividida (art. 4º § 1º do Dec. 37.363). Não há outra fração por gozar neste exercício.`
+					: 'Não há fração por gozar neste exercício.',
 			emGozo,
 			futuras,
-			diasFuturos
+			diasFuturos,
+			comAbono
 		};
 	}
 	const lista = futuras.map((f) => `${f.ordem}ª (${formatarData(f.data_inicio)})`).join(', ');
@@ -427,7 +445,8 @@ export function situacaoDaReprogramacao(
 				` Não precisa de motivo, e os ${diasFuturos} dias podem voltar divididos de outro jeito.${notaVenda}`,
 			emGozo: null,
 			futuras,
-			diasFuturos
+			diasFuturos,
+			comAbono
 		};
 	}
 
@@ -447,7 +466,8 @@ export function situacaoDaReprogramacao(
 		motivo: `As férias já começaram: o que resta se reprograma por SUSPENSÃO, por imperiosa necessidade do serviço, justificada. ${partes.join(' ')} O total que resta pode voltar dividido de outro jeito.${notaVenda}`,
 		emGozo,
 		futuras,
-		diasFuturos
+		diasFuturos,
+		comAbono
 	};
 }
 
@@ -471,13 +491,11 @@ export function planoDaReprogramacao(
 	situacao: SituacaoDaReprogramacao,
 	dataSuspensaoISO?: string | null
 ): PlanoDaReprogramacao {
+	// A fração em gozo nunca tem abono aqui (E63 a tira antes), então o
+	// quebrado é o restante puro.
 	const quebrado =
 		situacao.emGozo && dataSuspensaoISO
-			? Math.max(
-					0,
-					diasRestantesNaSuspensao(situacao.emGozo, dataSuspensaoISO).restantes -
-						(situacao.emGozo.diasAbonados ?? 0)
-				)
+			? Math.max(0, diasRestantesNaSuspensao(situacao.emGozo, dataSuspensaoISO).restantes)
 			: 0;
 	const fracoes = [
 		...(situacao.emGozo && quebrado > 0 ? [situacao.emGozo] : []),
@@ -692,7 +710,8 @@ export function impedimentosDoAbono(
 
 /**
  * Confere o registro de um abono contra o Dec. 37.363/2026: posição dos 10
- * dias numa fração maior (art. 4º), uma vez por ano (art. 11) e os
+ * dias numa fração maior (art. 4º), uma vez por ANO CIVIL e uma vez por
+ * EXERCÍCIO (art. 11 — os dois limites, resposta da COGEP, E62) e os
  * impedimentos do art. 13, apurados em `hojeISO` (a data do registro). A
  * janela de 60–90 dias do requerimento (art. 3º) NÃO é conferida: o DPI SUL
  * recebe só a decisão, sem a data do pedido — quem apreciou a janela foi a
@@ -702,7 +721,10 @@ export function conferirAbono(entrada: {
 	fracao: Fracao;
 	hojeISO: string;
 	posicao: PosicaoDoAbono | null;
+	/** Abonos deferidos cujo período cai no mesmo ano civil deste (de qualquer exercício). */
 	abonosJaDeferidosNoAno: number;
+	/** Abonos deferidos em frações deste mesmo exercício (qualquer status da fração). */
+	abonosJaDeferidosNoExercicio?: number;
 	historico: readonly AfastamentoParaAbono[];
 }): Checagem[] {
 	const { fracao, posicao } = entrada;
@@ -729,13 +751,22 @@ export function conferirAbono(entrada: {
 		});
 	}
 
+	const noExercicio = entrada.abonosJaDeferidosNoExercicio ?? 0;
+	checagens.push({
+		ok: noExercicio === 0,
+		nivel: 'erro',
+		texto:
+			noExercicio === 0
+				? 'Primeiro abono deste exercício.'
+				: 'Este exercício já teve abono deferido — só uma venda por exercício (art. 11; COGEP).'
+	});
 	checagens.push({
 		ok: entrada.abonosJaDeferidosNoAno === 0,
 		nivel: 'erro',
 		texto:
 			entrada.abonosJaDeferidosNoAno === 0
 				? 'Primeiro abono do ano.'
-				: 'Já há abono deferido neste ano — o decreto limita a uma vez por ano (art. 11).'
+				: 'Já há abono deferido neste ano civil, ainda que de outro exercício — só uma venda por ano (art. 11; COGEP).'
 	});
 
 	for (const imp of impedimentosDoAbono(entrada.historico, entrada.hojeISO)) {
