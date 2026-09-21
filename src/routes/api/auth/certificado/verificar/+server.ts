@@ -21,7 +21,8 @@
  *      validade (token perdido ou roubado, M-1);
  *   7. casamento do CPF com um cadastro ATIVO, pelo índice cego `cpf_index`
  *      (o CPF é cifrado em repouso e o GCM não é determinístico, então não se
- *      pode comparar o valor cifrado).
+ *      pode comparar o valor cifrado). Em `policiais` — ou, no modo "Sou
+ *      colaborador(a)" (`comoColaborador`, E55), em `colaboradores`.
  *
  * Toda falha registra tentativa (`recordAttempt`). Diferente do login por
  * senha, aqui a resposta final PODE dizer que o CPF não está cadastrado: para
@@ -43,6 +44,7 @@ import {
 	validateBody
 } from '$lib/server/api';
 import { certificadoVerificarSchema } from '$lib/schemas';
+import { buscarColaboradorAtivoPorCpf } from '$lib/db/colaboradores';
 import { checkRateLimit, recordAttempt, cookieOptions } from '$lib/server/auth/auth-flow';
 import {
 	modulosDaContaAdmin,
@@ -67,7 +69,7 @@ export const POST: RequestHandler = async (event) => {
 
 	const v = await validateBody(request, certificadoVerificarSchema);
 	if (!v.ok) return v.response;
-	const { desafioId, cmsBase64, comoAdmin } = v.data;
+	const { desafioId, cmsBase64, comoAdmin, comoColaborador } = v.data;
 
 	// Rate limit compartilhado com o fluxo normal de login
 	const rateLimit = await checkRateLimit(db, ip);
@@ -205,6 +207,55 @@ export const POST: RequestHandler = async (event) => {
 		logger.warn('[cert-login] OCSP indisponível — login segue sem confirmação de revogação', {
 			cpf: cpfLimpo.slice(0, 3) + '***',
 			aviso: revogacao.aviso
+		});
+	}
+
+	// COLABORADOR (E55): o mesmo e-CPF, casado com `colaboradores`. Não passa
+	// pelo 2FA — o certificado é o fator forte, como para o policial. O
+	// primeiro acesso segue para `/alterar-senha`, onde ele define a senha
+	// (para entrar sem o token) e, se quiser, o e-mail de recuperação.
+	if (comoColaborador) {
+		const conta = await buscarColaboradorAtivoPorCpf(db, cpfLimpo, platform?.env);
+		if (!conta) {
+			await recordAttempt(db, ip, false);
+			logger.info('[cert-login] CPF sem colaborador ativo', {
+				cpf: cpfLimpo.slice(0, 3) + '***'
+			});
+			return unauthorized('CPF não cadastrado como colaborador(a) ou conta desativada.');
+		}
+		if (!(await consumirDesafio2FA(db, desafio.id))) {
+			await recordAttempt(db, ip, false);
+			return apiError('Desafio inválido ou já utilizado.', 401, ErrorCode.AUTH_REQUIRED);
+		}
+		await recordAttempt(db, ip, true);
+
+		const token = await criarSessao(db, 'colaborador', conta.id);
+		cookies.set('session_token', token, cookieOptions(url));
+
+		const { contexto, env } = contextoDeEvento(event);
+		await auditar(
+			db,
+			{
+				acao: 'login_certificado',
+				usuario: { id: conta.id, nome: conta.nome, tipo: 'colaborador' },
+				entidade: 'colaborador',
+				entidade_id: conta.id,
+				alvo_tipo: 'colaborador',
+				alvo_id: conta.id,
+				alvo_nome: conta.nome,
+				detalhes: 'Login por certificado digital (ICP-Brasil) — colaborador(a)',
+				metadados: { via: 'certificado_a3', comoColaborador: true, ocsp: revogacao.ocsp },
+				...contexto
+			},
+			{ env }
+		);
+
+		const primeiroAcesso = conta.primeiro_acesso === 1;
+		return json({
+			success: true,
+			primeiro_acesso: primeiroAcesso,
+			nome: conta.nome,
+			redirect: primeiroAcesso ? '/alterar-senha' : '/colaborador'
 		});
 	}
 

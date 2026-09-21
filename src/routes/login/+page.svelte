@@ -58,7 +58,7 @@
 	}
 
 	let tipo = $state<'policial' | 'admin'>('policial');
-	/** Modo colaborador (terceira identidade): e-mail no lugar da matrícula. */
+	/** Modo colaborador (terceira identidade): CPF no lugar da matrícula (E55). */
 	let comoColaborador = $state(false);
 	let matricula = $state('');
 	let senha = $state('');
@@ -268,7 +268,7 @@
 		codigo2FA = '';
 	}
 
-	async function fazerLoginComCertificado(comoAdmin = false) {
+	async function fazerLoginComCertificado(comoAdmin = false, comoColaboradorCert = false) {
 		let serproClient: Awaited<ReturnType<typeof conectarSerproParaLogin>> | null = null;
 		try {
 			// 1. Conectar ao SERPRO PRIMEIRO — sem loading overlay sobre o modal.
@@ -306,7 +306,8 @@
 				body: JSON.stringify({
 					desafioId: did,
 					cmsBase64: resultado.rawSignature,
-					comoAdmin
+					comoAdmin,
+					comoColaborador: comoColaboradorCert
 				})
 			});
 
@@ -360,7 +361,10 @@
 				emailMascarado?: string;
 			}>('/api/auth/solicitar-redefinicao', {
 				method: 'POST',
-				body: JSON.stringify({ identificador: identificadorRec.trim(), tipo })
+				body: JSON.stringify({
+					identificador: identificadorRec.trim(),
+					tipo: comoColaborador ? 'colaborador' : tipo
+				})
 			});
 			if (data?.requerCodigo && data?.desafioId) {
 				desafioIdRec = String(data.desafioId);
@@ -468,6 +472,7 @@
 		{:else if recuperacao}
 			<FormRecuperacaoSenha
 				bind:tipo
+				{comoColaborador}
 				bind:identificadorRec
 				bind:codigoRec
 				{recuperacaoEtapa}

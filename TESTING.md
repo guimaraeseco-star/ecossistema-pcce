@@ -52,13 +52,16 @@ Roteiro de regressão manual dos fluxos de negócio. **Papel deste arquivo: exce
 
 ### 1.4b Colaborador (terceira identidade)
 
-> `[Vitest: colaborador-rotas.test.ts, auth-flow.test.ts (colaborador), credencial.test.ts (colaborador), colaboradores.test.ts]` cobrem a lista fechada de rotas, o login sempre com 2FA, a credencial standalone e a recusa de sessão de tipo desconhecido. Manual: o fluxo de ponta a ponta.
+> `[Vitest: colaborador-rotas.test.ts, auth-flow.test.ts (colaborador, por CPF), credencial.test.ts (colaborador), colaboradores.test.ts (CPF cifrado + índice, duplicata, e-mail de recuperação), reset-colaborador.test.ts (desafio `reset_colaborador` e link)]` cobrem a lista fechada de rotas, o login sempre com 2FA, a credencial standalone e a recusa de sessão de tipo desconhecido. Manual: o fluxo de ponta a ponta (E55, 21/09: o colaborador entra IGUAL ao servidor).
 
 - [ ] **Admin Geral** (não só o Super Admin) vê "Colaboradores" na barra lateral, ao lado de "Policiais", e abre `/colaboradores`; admin de seccional e de unidade **não** veem o item, e a URL direta os manda para fora
-- [ ] Admin Geral → `/colaboradores` → "Cadastrar" (nome, e-mail, CPF opcional, vínculo) → a senha provisória aparece UMA vez na caixa amarela; "Copiar" funciona; "Fechar" some com ela
-- [ ] E-mail repetido (mesmo com caixa diferente) → "Já existe um colaborador com este e-mail"; CPF inválido → "CPF inválido"
-- [ ] `/login` → "Sou colaborador(a)" → campo vira E-mail, some o certificado e "Esqueceu a senha?"; "Voltar" restaura o alternador
-- [ ] Login com a senha provisória → **pede o código por e-mail mesmo sendo primeiro acesso** → código certo → `/alterar-senha` sem pedir e-mail pessoal → senha nova → `/aceitar-termo` → `/colaborador` (área com "Nenhuma função designada")
+- [ ] Admin Geral → `/colaboradores` → "Cadastrar" (nome, **CPF obrigatório**, **e-mail pessoal** obrigatório, vínculo) → a senha provisória aparece UMA vez na caixa amarela; "Copiar" funciona; "Fechar" some com ela; a lista mostra a coluna "E-mail pessoal"
+- [ ] CPF repetido (com ou sem máscara) → "Já existe um colaborador com este CPF"; CPF inválido → "CPF inválido"; e-mail vazio → recusa
+- [ ] `/login` → "Sou colaborador(a)" → campo vira **CPF** (só números, aceita máscara); ficam o botão "Certificado Digital (SERPRO)" e "Esqueceu a senha?"; "Voltar" restaura o alternador
+- [ ] Login com CPF + senha provisória → **pede o código no e-mail pessoal mesmo sendo primeiro acesso** → código certo → `/alterar-senha` **sem** a caixa "E-mail pessoal obrigatório" e **com** a caixa "E-mail de recuperação" (mostra o e-mail pessoal mascarado) e o campo opcional "Outro e-mail para recuperação" → senha nova (com ou sem o e-mail) → `/aceitar-termo` → `/colaborador`; e-mail de recuperação inválido → "E-mail de recuperação inválido" e a senha NÃO muda
+- [ ] Senha errada ou CPF inexistente → "CPF ou senha inválidos" (mesma mensagem)
+- [ ] `/login` → "Sou colaborador(a)" → "Esqueceu a senha?" → campo CPF, sem o alternador policial/admin → "Enviar código" → o código chega no e-mail de recuperação (ou no pessoal, se não informou outro) → "Confirmar" → tela "Link enviado!" fala em e-mail **pessoal** → o link chega no e-mail pessoal → `/redefinir-senha` → senha nova → `/login?resetado=1` → entra com a senha nova
+- [ ] (quem tem e-CPF) modo colaborador → "Certificado Digital (SERPRO)" → assina o desafio → entra sem 2FA; CPF sem colaborador ativo → "CPF não cadastrado como colaborador(a) ou conta desativada."; no primeiro acesso cai em `/alterar-senha`
 - [ ] Sidebar do colaborador tem só "Boas-vindas" e "Sair"; digitar `/escalas`, `/perfil`, `/operacoes/presenca` ou `/painel` na URL volta para `/colaborador`; `fetch` de `/api/sync/estado` responde 403
 - [ ] Admin Geral → "Nova senha" → nova provisória; a sessão aberta do colaborador cai no próximo request; o próximo login exige troca de novo
 - [ ] "Desativar" → o login responde "E-mail ou senha inválidos" (mesma mensagem de senha errada); "Reativar" restaura

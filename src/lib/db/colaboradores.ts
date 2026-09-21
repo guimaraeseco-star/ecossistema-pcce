@@ -1,32 +1,35 @@
 /**
  * Colaboradores — a terceira identidade (servidora administrativa e
- * colaboradora terceirizada), criada só pelo Super Admin (decisão 23 do plano
- * do módulo de diárias).
+ * colaboradora terceirizada), criada pelo Admin Geral.
  *
  * O que este módulo NÃO faz, de propósito: não abre sessão, não autentica e
  * não decide o que um colaborador alcança. Isso é `$lib/auth` (tipo de sessão
- * `colaborador`) e a designação do módulo de diárias — que só passam a existir
- * no passo seguinte da fase 2. Aqui é só o cadastro.
+ * `colaborador`) e a designação do módulo de diárias. Aqui é só o cadastro.
  *
- * E-mail é o identificador de login: gravado NORMALIZADO (minúsculas, sem
- * espaços), porque é por ele que o login procura e o índice único compara —
- * "Ana@x.gov.br" e "ana@x.gov.br" são a mesma conta ou são duas, e a resposta
- * tem de ser a mesma no cadastro e no login. CPF passa por
- * `prepararCpfParaDB`, o MESMO caminho de `policiais` (cifra + índice cego).
+ * O CPF é o identificador de login (E55, migração 0094) — numérico como a
+ * matrícula do servidor. Passa por `prepararCpfParaDB`, o MESMO caminho de
+ * `policiais` (cifra + índice cego), e é pelo índice que o login (senha e
+ * e-CPF) acha a conta. Sem chave configurada (dev) o índice é nulo e a busca
+ * cai no `cpf` em texto — é o que `certificado/verificar` já faz.
+ *
+ * O e-mail pessoal é o canal do 2FA e da senha provisória; gravado
+ * NORMALIZADO (minúsculas, sem espaços). O de recuperação é opcional e a
+ * própria pessoa informa no primeiro acesso.
  */
 import { and, asc, eq } from 'drizzle-orm';
 import { colaboradores, sessoes } from '../server/schema';
 import type { Colaborador } from '../server/schema';
-import { prepararCpfParaDB, type CpfCriptoEnv } from '../crypto/cpf-cripto';
+import { cpfKeys, indiceCPF, prepararCpfParaDB, type CpfCriptoEnv } from '../crypto/cpf-cripto';
+import { limparCPF } from '../utils/formato';
 import { linhasAfetadas, type Database } from './core';
 
-/** O que a tela do Super Admin informa ao criar. A senha já vem em hash. */
+/** O que a tela do Admin Geral informa ao criar. A senha já vem em hash. */
 export type NovoColaborador = {
 	nome: string;
-	email: string;
+	cpf: string;
+	emailPessoal: string;
 	/** Hash PBKDF2 (ver `hashSenha`) — nunca a senha em claro. */
 	senhaHash: string;
-	cpf?: string | null;
 	vinculo?: string;
 	criadoPor: { id: number; nome: string };
 };
@@ -34,7 +37,19 @@ export type NovoColaborador = {
 /** O colaborador sem os campos sensíveis — o que listagens e telas recebem. */
 export type ColaboradorResumo = Omit<Colaborador, 'senha' | 'cpf' | 'cpf_index'>;
 
-/** E-mail como o banco o guarda e como o login o procura. */
+/**
+ * CPF já cadastrado. É erro próprio, e não a violação do índice único, porque
+ * sem chave configurada o `cpf_index` é nulo e o banco não acusa a duplicata
+ * — a conferência tem de vir do cadastro nos dois ambientes.
+ */
+export class CpfDeColaboradorJaCadastrado extends Error {
+	constructor() {
+		super('Já existe um colaborador com este CPF');
+		this.name = 'CpfDeColaboradorJaCadastrado';
+	}
+}
+
+/** E-mail como o banco o guarda. */
 export function normalizarEmailColaborador(email: string): string {
 	return email.trim().toLowerCase();
 }
@@ -62,20 +77,30 @@ export async function buscarColaborador(
 	return c ? semSensiveis(c) : null;
 }
 
+/** O filtro do CPF: pelo índice cego com chave; pelo texto, sem. */
+async function filtroDeCpf(cpf: string, env: CpfCriptoEnv | undefined) {
+	const limpo = limparCPF(cpf);
+	const { indexKey } = cpfKeys(env);
+	return indexKey
+		? eq(colaboradores.cpf_index, await indiceCPF(limpo, indexKey))
+		: eq(colaboradores.cpf, limpo);
+}
+
 /**
- * Por e-mail, linha COMPLETA — é o caminho do login, que precisa do hash da
- * senha. Só ativos: desativado não autentica, como em `policiais`.
+ * Por CPF, linha COMPLETA — é o caminho do login, que precisa do hash da
+ * senha. Só ativos: desativado não autentica, como em `policiais`. CPF que
+ * não tem 11 dígitos não consulta o banco.
  */
-export async function buscarColaboradorAtivoPorEmail(
+export async function buscarColaboradorAtivoPorCpf(
 	db: Database,
-	email: string
+	cpf: string,
+	env: CpfCriptoEnv | undefined
 ): Promise<Colaborador | null> {
+	if (limparCPF(cpf).length !== 11) return null;
 	const c = await db
 		.select()
 		.from(colaboradores)
-		.where(
-			and(eq(colaboradores.email, normalizarEmailColaborador(email)), eq(colaboradores.ativo, 1))
-		)
+		.where(and(await filtroDeCpf(cpf, env), eq(colaboradores.ativo, 1)))
 		.get();
 	return c ?? null;
 }
@@ -83,23 +108,30 @@ export async function buscarColaboradorAtivoPorEmail(
 /**
  * Cria a conta. `primeiro_acesso = 1`: a pessoa troca a senha provisória e
  * aceita o termo antes de qualquer outra coisa, pelo mesmo portão dos
- * policiais. E-mail duplicado estoura o índice único — quem chama traduz para
- * 409 (`ehViolacaoUnique`).
+ * policiais. CPF repetido — ativo ou não — recusa com
+ * `CpfDeColaboradorJaCadastrado`.
  */
 export async function criarColaborador(
 	db: Database,
 	dados: NovoColaborador,
 	env: CpfCriptoEnv | undefined
 ): Promise<ColaboradorResumo> {
+	const existente = await db
+		.select({ id: colaboradores.id })
+		.from(colaboradores)
+		.where(await filtroDeCpf(dados.cpf, env))
+		.get();
+	if (existente) throw new CpfDeColaboradorJaCadastrado();
+
 	const { cpf, cpf_index } = await prepararCpfParaDB(dados.cpf, env);
 	const inserido = await db
 		.insert(colaboradores)
 		.values({
 			nome: dados.nome.trim(),
-			email: normalizarEmailColaborador(dados.email),
-			senha: dados.senhaHash,
-			cpf,
+			cpf: cpf ?? '',
 			cpf_index,
+			email_pessoal: normalizarEmailColaborador(dados.emailPessoal),
+			senha: dados.senhaHash,
 			vinculo: (dados.vinculo ?? '').trim(),
 			criado_por_id: dados.criadoPor.id,
 			criado_por_nome: dados.criadoPor.nome
@@ -107,6 +139,21 @@ export async function criarColaborador(
 		.returning()
 		.get();
 	return semSensiveis(inserido);
+}
+
+/**
+ * O e-mail de recuperação — o que a pessoa informa no primeiro acesso.
+ * `null` apaga: o código de recuperação volta a ir para o pessoal.
+ */
+export async function definirEmailRecuperacao(
+	db: Database,
+	id: number,
+	email: string | null
+): Promise<void> {
+	await db
+		.update(colaboradores)
+		.set({ email_recuperacao: email ? normalizarEmailColaborador(email) : null })
+		.where(eq(colaboradores.id, id));
 }
 
 /**

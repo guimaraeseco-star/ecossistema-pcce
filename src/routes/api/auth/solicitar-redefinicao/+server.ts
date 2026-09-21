@@ -1,8 +1,10 @@
 /**
  * POST /api/auth/solicitar-redefinicao
  *
- * Rota pública. Recebe identificador (matrícula ou login) e tipo de usuário,
- * cria um desafio e envia um código ao e-mail pessoal do usuário.
+ * Rota pública. Recebe identificador (matrícula, login ou, para o colaborador,
+ * o CPF — E55) e tipo de usuário, cria um desafio e envia um código ao e-mail
+ * pessoal do usuário (para o colaborador, ao de recuperação, se ele informou
+ * um; senão ao pessoal).
  *
  * **Anti-enumeração:** sempre retorna a mesma estrutura
  * (`{ message, requerCodigo:true, desafioId, emailMascarado }`), com valores
@@ -22,6 +24,7 @@ import { criarDesafio2FA, gerarCodigo2FA, gerarToken } from '$lib/auth';
 import { enviarCodigoRedefinicaoSenha } from '$lib/server/email';
 import { logger } from '$lib/server/logger';
 import { administradores, policiais, doisFatoresTokens } from '$lib/server/schema';
+import { buscarColaboradorAtivoPorCpf } from '$lib/db/colaboradores';
 import { mascararEmail } from '$lib/server/auth/auth-flow';
 import {
 	contarRecoveryAttempts,
@@ -114,6 +117,19 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 				.where(and(eq(policiais.matricula, identificador), eq(policiais.ativo, 1)))
 				.get();
 			if (row) usuario = row;
+		} else if (tipo === 'colaborador') {
+			// O e-mail do colaborador já é o pessoal, provado pelo 2FA do login —
+			// conta como verificado. O código vai para o de recuperação, se houver.
+			const c = await buscarColaboradorAtivoPorCpf(db, identificador, platform?.env);
+			if (c) {
+				usuario = {
+					id: c.id,
+					nome: c.nome,
+					email: c.email_pessoal,
+					email_pessoal: c.email_recuperacao ?? c.email_pessoal,
+					email_pessoal_verificado: 1
+				};
+			}
 		} else {
 			const row = await db
 				.select({
@@ -145,7 +161,12 @@ export const POST: RequestHandler = async ({ request, platform, getClientAddress
 			return respostaDummy(emailDummyMascarado(identificador));
 		}
 
-		const tipoDesafio = tipo === 'policial' ? 'reset_policial' : 'reset_admin';
+		const tipoDesafio =
+			tipo === 'policial'
+				? 'reset_policial'
+				: tipo === 'colaborador'
+					? 'reset_colaborador'
+					: 'reset_admin';
 
 		// Rate limit por usuário (máx 3 códigos nos últimos 10 minutos)
 		// `created_at` guarda horário de BRASÍLIA no formato do SQLite

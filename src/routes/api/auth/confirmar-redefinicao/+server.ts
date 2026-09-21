@@ -2,7 +2,8 @@
  * POST /api/auth/confirmar-redefinicao
  *
  * Confirma o código enviado ao e-mail pessoal, cria o token de redefinição e
- * envia o link por e-mail.
+ * envia o link por e-mail — ao funcional do servidor; ao pessoal do colaborador
+ * (E55), que não tem funcional.
  *
  * **Não marca `email_pessoal_verificado`.** Já marcou: confirmar o OTP aqui
  * promovia um endereço nunca vinculado a "verificado", e o flag passava a
@@ -15,9 +16,9 @@ import { json } from '@sveltejs/kit';
 import { and, count, eq, gt } from 'drizzle-orm';
 import { getDB, registrarAuditComContexto } from '$lib/db';
 import { timestampSqliteBrasilia } from '$lib/db/core';
-import { criarTokenRedefinicao, verificarDesafio2FA } from '$lib/auth';
+import { criarTokenRedefinicao, verificarDesafio2FA, type TipoUsuarioReset } from '$lib/auth';
 import { enviarLinkRedefinicaoSenha } from '$lib/server/email';
-import { administradores, policiais, resetSenhaTokens } from '$lib/server/schema';
+import { administradores, colaboradores, policiais, resetSenhaTokens } from '$lib/server/schema';
 import {
 	contarRecoveryAttempts,
 	registrarRecoveryAttempt
@@ -41,8 +42,6 @@ const MAX_TENTATIVAS_IP = 5;
 const JANELA_IP_MINUTOS = 15;
 const MAX_TOKENS_USUARIO = 3;
 const JANELA_USUARIO_MINUTOS = 60;
-
-type TipoUsuarioReset = 'policial' | 'admin';
 
 type UsuarioReset = {
 	id: number;
@@ -74,7 +73,8 @@ export const POST: RequestHandler = async ({ request, platform, url, getClientAd
 
 	const resultado = await verificarDesafio2FA(db, desafioId, codigo, [
 		'reset_policial',
-		'reset_admin'
+		'reset_admin',
+		'reset_colaborador'
 	]);
 
 	if (resultado === 'expirado') return badRequest('Código expirado. Solicite um novo código.');
@@ -83,10 +83,37 @@ export const POST: RequestHandler = async ({ request, platform, url, getClientAd
 	}
 	if (!resultado) return badRequest('Código inválido');
 
-	const tipo: TipoUsuarioReset = resultado.tipo === 'reset_policial' ? 'policial' : 'admin';
+	const tipo: TipoUsuarioReset =
+		resultado.tipo === 'reset_policial'
+			? 'policial'
+			: resultado.tipo === 'reset_colaborador'
+				? 'colaborador'
+				: 'admin';
 	let usuario: UsuarioReset | null = null;
 
-	if (tipo === 'policial') {
+	if (tipo === 'colaborador') {
+		// O link vai para o e-mail PESSOAL (o único que ele tem); o código foi
+		// para o de recuperação, se houver — dois canais, como no servidor.
+		const c = await db
+			.select({
+				id: colaboradores.id,
+				nome: colaboradores.nome,
+				email_pessoal: colaboradores.email_pessoal,
+				email_recuperacao: colaboradores.email_recuperacao
+			})
+			.from(colaboradores)
+			.where(and(eq(colaboradores.id, resultado.usuarioId), eq(colaboradores.ativo, 1)))
+			.get();
+		if (c) {
+			usuario = {
+				id: c.id,
+				nome: c.nome,
+				email: c.email_pessoal,
+				email_pessoal: c.email_recuperacao ?? c.email_pessoal,
+				email_pessoal_verificado: 1
+			};
+		}
+	} else if (tipo === 'policial') {
 		const row = await db
 			.select({
 				id: policiais.id,
@@ -147,7 +174,12 @@ export const POST: RequestHandler = async ({ request, platform, url, getClientAd
 	await registrarAuditComContexto(db, {
 		usuario: { id: usuario.id, nome: usuario.nome },
 		acao: 'solicitar_redefinicao_senha',
-		entidade: tipo === 'policial' ? 'policiais' : 'administradores',
+		entidade:
+			tipo === 'policial'
+				? 'policiais'
+				: tipo === 'colaborador'
+					? 'colaboradores'
+					: 'administradores',
 		entidade_id: usuario.id,
 		ip
 	});

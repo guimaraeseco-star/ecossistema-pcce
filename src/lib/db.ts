@@ -55,10 +55,12 @@ export { registrarAceite } from './db/termos';
 export {
 	listarColaboradores,
 	buscarColaborador,
-	buscarColaboradorAtivoPorEmail,
+	buscarColaboradorAtivoPorCpf,
 	criarColaborador,
 	definirColaboradorAtivo,
-	normalizarEmailColaborador
+	definirEmailRecuperacao,
+	normalizarEmailColaborador,
+	CpfDeColaboradorJaCadastrado
 } from './db/colaboradores';
 export type { ColaboradorResumo, NovoColaborador } from './db/colaboradores';
 

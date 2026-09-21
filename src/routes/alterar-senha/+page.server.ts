@@ -9,17 +9,20 @@
  * Esta rota também é o destino do primeiro acesso (ver
  * `redefinir-senha/+page.server.ts`): é aqui que senha e e-mail pessoal são
  * definidos na mesma passagem, e é por isso que ela precisa funcionar para quem
- * ainda tem `primeiro_acesso = 1`. A action `sair` existe porque esta rota não
+ * ainda tem `primeiro_acesso = 1`. O COLABORADOR não verifica e-mail aqui: o
+ * dele já é o pessoal, e o 2FA do login acabou de prová-lo (E55). Em vez
+ * disso, a tela PERGUNTA se ele quer outro endereço para recuperar a senha
+ * (`email_recuperacao`, opcional). A action `sair` existe porque esta rota não
  * tem o "Sair" do layout: sem ela, fechar a aba deixava o cookie vivo e o hook
  * devolvia o usuário para cá.
  */
 import { fail, redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
-import { getDB, auditar, contextoDeEvento } from '$lib/db';
+import { getDB, auditar, contextoDeEvento, definirEmailRecuperacao } from '$lib/db';
 import { hashSenha, verificarSenha, criarSessao, temCadastro } from '$lib/auth';
 import { administradores, policiais, colaboradores } from '$lib/server/schema';
-import { alterarSenhaSchema } from '$lib/schemas';
-import { cookieOptions } from '$lib/server/auth/auth-flow';
+import { alterarSenhaSchema, emailRecuperacaoSchema } from '$lib/schemas';
+import { cookieOptions, mascararEmail } from '$lib/server/auth/auth-flow';
 import {
 	credencialDoUsuario,
 	resolverCredencial,
@@ -64,8 +67,8 @@ async function lerLinhaDaSenha(
 			.where(eq(administradores.id, alvo.id))
 			.get();
 	}
-	// Colaborador não tem e-mail pessoal: o e-mail da conta é o do login, e o
-	// 2FA que ele acabou de passar já provou que o controla.
+	// O e-mail pessoal do colaborador é o do 2FA que ele acabou de passar —
+	// já está provado, sem etapa de verificação (E55).
 	const c = await db
 		.select({ senha: colaboradores.senha })
 		.from(colaboradores)
@@ -92,8 +95,14 @@ const SENHA_ATUAL_MAX_TENTATIVAS = 5;
 const SENHA_ATUAL_JANELA_MIN = 15;
 
 export const load: PageServerLoad = async ({ locals }) => {
+	const u = locals.usuario;
+	const colaborador = u?.tipo === 'colaborador';
 	return {
-		primeiro_acesso: locals.usuario?.primeiro_acesso ?? false
+		primeiro_acesso: u?.primeiro_acesso ?? false,
+		colaborador,
+		// O endereço que já recebe o 2FA — a tela mostra para a pessoa decidir
+		// se quer outro para a recuperação.
+		emailPessoalMascarado: colaborador && u?.email ? mascararEmail(u.email) : ''
 	};
 };
 
@@ -167,8 +176,26 @@ export const actions = {
 			}
 		}
 
+		// O e-mail de recuperação do colaborador: só no primeiro acesso, opcional,
+		// e validado ANTES de gravar a senha — recusar depois deixaria a senha
+		// trocada e o primeiro acesso fechado com a resposta de erro na tela.
+		let emailRecuperacao: string | null | undefined;
+		if (alvo.tipo === 'colaborador' && usuario.primeiro_acesso) {
+			const bruto = formData.get('email_recuperacao')?.toString().trim() ?? '';
+			if (bruto) {
+				const rec = emailRecuperacaoSchema.safeParse(bruto);
+				if (!rec.success) return fail(400, { error: rec.error.issues[0].message });
+				emailRecuperacao = rec.data;
+			} else {
+				emailRecuperacao = null;
+			}
+		}
+
 		const novaSenhaHash = await hashSenha(parsed.data.nova_senha, pepper);
 		await gravarSenha(db, alvo, novaSenhaHash);
+		if (emailRecuperacao !== undefined) {
+			await definirEmailRecuperacao(db, alvoId, emailRecuperacao);
+		}
 
 		// Rotação completa: invalida TODAS as sessões (inclusive a atual) e cria
 		// uma nova. Se um atacante tinha o cookie roubado, o `Set-Cookie` novo

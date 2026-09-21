@@ -15,10 +15,11 @@
  *
  * A senha nasce PROVISÓRIA, gerada pelo servidor e mostrada uma única vez na
  * resposta desta action — nunca gravada em claro nem registrada na auditoria.
- * No primeiro login a pessoa passa pelo 2FA por e-mail (obrigatório para
- * colaborador) e é forçada a trocá-la. Esqueceu a senha? Não há fluxo de
- * recuperação por e-mail para esta identidade: o administrador gera outra
- * provisória aqui (`redefinirSenha`), o que derruba as sessões da conta.
+ * No primeiro login (por CPF, E55) a pessoa passa pelo 2FA no e-mail pessoal
+ * (obrigatório para colaborador) e é forçada a trocá-la. Esqueceu a senha?
+ * Ela mesma recupera pela tela de login, como o servidor; o administrador
+ * também pode gerar outra provisória aqui (`redefinirSenha`), o que derruba
+ * as sessões da conta.
  *
  * **Colaborador não se exclui, só se desativa** — pela mesma razão das
  * unidades e dos policiais: o que ele fizer no módulo de diárias (autuações,
@@ -43,6 +44,7 @@ import { hashSenha } from '$lib/auth';
 import { gerarSenhaProvisoria } from '$lib/server/auth/senha-provisoria';
 import { resolverCredencial, revogarSessoesDaCredencial } from '$lib/server/auth/credencial';
 import { ehViolacaoUnique, mensagemComCausas } from '$lib/server/db-errors';
+import { CpfDeColaboradorJaCadastrado } from '$lib/db/colaboradores';
 import { logger } from '$lib/server/logger';
 
 export const load: PageServerLoad = async ({ locals, platform, depends }) => {
@@ -71,8 +73,8 @@ export const actions: Actions = {
 		const data = await request.formData();
 		const parsed = colaboradorSchema.safeParse({
 			nome: data.get('nome')?.toString() ?? '',
-			email: data.get('email')?.toString() ?? '',
 			cpf: data.get('cpf')?.toString() ?? '',
+			email_pessoal: data.get('email_pessoal')?.toString() ?? '',
 			vinculo: data.get('vinculo')?.toString() ?? ''
 		});
 		if (!parsed.success) {
@@ -86,8 +88,8 @@ export const actions: Actions = {
 				db,
 				{
 					nome: parsed.data.nome,
-					email: parsed.data.email,
-					cpf: parsed.data.cpf || null,
+					cpf: parsed.data.cpf,
+					emailPessoal: parsed.data.email_pessoal,
 					vinculo: parsed.data.vinculo,
 					senhaHash: await hashSenha(senhaProvisoria, pepperDe(platform)),
 					criadoPor: { id: u.id, nome: u.nome }
@@ -105,9 +107,13 @@ export const actions: Actions = {
 					alvo_tipo: 'colaborador',
 					alvo_id: criado.id,
 					alvo_nome: criado.nome,
-					detalhes: `Colaborador criado: ${criado.nome} (${criado.email})`,
+					detalhes: `Colaborador criado: ${criado.nome} (${criado.email_pessoal})`,
 					// Sem CPF e sem senha: a auditoria guarda o que identifica, não o que expõe.
-					dados_depois: { nome: criado.nome, email: criado.email, vinculo: criado.vinculo },
+					dados_depois: {
+						nome: criado.nome,
+						email_pessoal: criado.email_pessoal,
+						vinculo: criado.vinculo
+					},
 					...contexto
 				},
 				{ env }
@@ -115,8 +121,10 @@ export const actions: Actions = {
 			// A senha provisória sai UMA vez, nesta resposta, para o admin repassar.
 			return { success: true, criado: { id: criado.id, nome: criado.nome }, senhaProvisoria };
 		} catch (e: unknown) {
-			if (ehViolacaoUnique(e)) {
-				return fail(409, { error: 'Já existe um colaborador com este e-mail' });
+			// O cadastro confere antes (sem chave o índice é nulo); o índice único
+			// pega a corrida entre dois cadastros simultâneos.
+			if (e instanceof CpfDeColaboradorJaCadastrado || ehViolacaoUnique(e)) {
+				return fail(409, { error: 'Já existe um colaborador com este CPF' });
 			}
 			logger.error('[colaboradores/criar]', { error: mensagemComCausas(e) });
 			return fail(500, { error: 'Erro ao cadastrar o colaborador. Tente novamente.' });

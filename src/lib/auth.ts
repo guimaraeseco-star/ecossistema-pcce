@@ -100,6 +100,7 @@ export type TipoDesafio2FA =
 	| 'assinatura'
 	| 'reset_policial'
 	| 'reset_admin'
+	| 'reset_colaborador'
 	// Verificação de e-mail pessoal (I-2 da auditoria): canal próprio, separado
 	// de `assinatura`. Antes os dois compartilhavam o mesmo tipo, abrindo
 	// confused-deputy se um caminho futuro aceitasse um sem o outro.
@@ -330,7 +331,7 @@ function mapearColaborador(c: typeof colaboradores.$inferSelect): UsuarioLogado 
 		tipo: 'colaborador' as const,
 		nome: c.nome,
 		primeiro_acesso: c.primeiro_acesso === 1,
-		email: c.email,
+		email: c.email_pessoal,
 		vinculo: c.vinculo
 	};
 }
@@ -611,9 +612,12 @@ export async function criarDesafio2FA(
  * Cria um token de redefinição de senha (256 bits, expira em 1 hora) e o persiste.
  * Retorna o token gerado para ser incluído no link de redefinição.
  */
+/** Quem pode ter um link de redefinição: as três identidades (E55). */
+export type TipoUsuarioReset = 'policial' | 'admin' | 'colaborador';
+
 export async function criarTokenRedefinicao(
 	db: Database,
-	tipoUsuario: 'policial' | 'admin',
+	tipoUsuario: TipoUsuarioReset,
 	usuarioId: number
 ): Promise<string> {
 	const token = gerarToken();
@@ -635,7 +639,7 @@ export async function criarTokenRedefinicao(
 export async function verificarTokenRedefinicao(
 	db: Database,
 	tokenInput: string
-): Promise<{ tipo: 'policial' | 'admin'; usuarioId: number } | 'expirado' | 'invalido'> {
+): Promise<{ tipo: TipoUsuarioReset; usuarioId: number } | 'expirado' | 'invalido'> {
 	const tokenHash = await hashTokenArmazenado(tokenInput);
 	const row = await db
 		.select()
@@ -657,7 +661,7 @@ export async function verificarTokenRedefinicao(
 		return 'expirado';
 	}
 
-	return { tipo: row.tipo_usuario as 'policial' | 'admin', usuarioId: row.usuario_id };
+	return { tipo: row.tipo_usuario, usuarioId: row.usuario_id };
 }
 
 /**
@@ -684,7 +688,7 @@ export async function verificarTokenRedefinicao(
 export async function consumirTokenRedefinicao(
 	db: Database,
 	tokenInput: string
-): Promise<{ tipo: 'policial' | 'admin'; usuarioId: number } | 'expirado' | 'invalido'> {
+): Promise<{ tipo: TipoUsuarioReset; usuarioId: number } | 'expirado' | 'invalido'> {
 	const tokenHash = await hashTokenArmazenado(tokenInput);
 	const linhas = await db
 		.update(resetSenhaTokens)
@@ -704,7 +708,7 @@ export async function consumirTokenRedefinicao(
 
 	const linha = linhas[0];
 	if (linha) {
-		return { tipo: linha.tipo as 'policial' | 'admin', usuarioId: linha.usuarioId };
+		return { tipo: linha.tipo, usuarioId: linha.usuarioId };
 	}
 
 	// Perdeu a corrida, já estava usado, expirou ou nunca existiu — só a

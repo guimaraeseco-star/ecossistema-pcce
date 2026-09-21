@@ -214,22 +214,31 @@ export const colaboradores = sqliteTable(
 	{
 		id: integer('id').primaryKey({ autoIncrement: true }),
 		nome: text('nome').notNull(),
-		email: text('email').notNull().unique(),
-		senha: text('senha').notNull(),
-		cpf: text('cpf'),
+		/**
+		 * O identificador de login (E55, migração 0094): cifrado em repouso como
+		 * em `policiais`. A unicidade é do `cpf_index` (índice único parcial no
+		 * banco); sem chave configurada o índice é nulo e o cadastro confere a
+		 * duplicata pelo próprio `cpf` em texto.
+		 */
+		cpf: text('cpf').notNull(),
 		cpf_index: text('cpf_index'),
+		/** O canal do 2FA e da senha provisória — o mesmo nome que `policiais` usa. */
+		email_pessoal: text('email_pessoal').notNull(),
+		/** Opcional, perguntado no primeiro acesso: outro endereço para o código de recuperação. */
+		email_recuperacao: text('email_recuperacao'),
+		senha: text('senha').notNull(),
 		/** Empresa ou contrato — a quem a conta pertence, para saber quando revogar. */
 		vinculo: text('vinculo').notNull().default(''),
 		primeiro_acesso: integer('primeiro_acesso').notNull().default(1),
 		ativo: integer('ativo').notNull().default(1),
-		/** Quem criou (Super Admin, decisão 23), em snapshot. */
+		/** Quem criou (Admin Geral), em snapshot. */
 		criado_por_id: integer('criado_por_id'),
 		criado_por_nome: text('criado_por_nome').notNull().default(''),
 		created_at: text('created_at')
 			.notNull()
 			.default(sql`(datetime('now', '-3 hours'))`)
 	},
-	(table) => [index('idx_colaboradores_cpf_index').on(table.cpf_index)]
+	(table) => [uniqueIndex('colaboradores_cpf_index_unique').on(table.cpf_index)]
 );
 
 // ---- Sessoes ----
@@ -1039,7 +1048,7 @@ export const doisFatoresTokens = sqliteTable(
 	{
 		id: integer('id').primaryKey({ autoIncrement: true }),
 		desafio_id: text('desafio_id').notNull().unique(),
-		/** O CHECK do banco acompanha (migração 0083 acrescentou `colaborador`). */
+		/** O CHECK do banco acompanha (0083 acrescentou `colaborador`; 0095, `reset_colaborador`). */
 		tipo: text('tipo', {
 			enum: [
 				'policial',
@@ -1048,6 +1057,7 @@ export const doisFatoresTokens = sqliteTable(
 				'assinatura',
 				'reset_policial',
 				'reset_admin',
+				'reset_colaborador',
 				'verificacao_email',
 				'login_certificado'
 			]
@@ -1071,7 +1081,7 @@ export const resetSenhaTokens = sqliteTable(
 	{
 		id: integer('id').primaryKey({ autoIncrement: true }),
 		token: text('token').notNull().unique(),
-		tipo_usuario: text('tipo_usuario', { enum: ['policial', 'admin'] }).notNull(),
+		tipo_usuario: text('tipo_usuario', { enum: ['policial', 'admin', 'colaborador'] }).notNull(),
 		usuario_id: integer('usuario_id').notNull(),
 		expires_at: text('expires_at').notNull(),
 		usado: integer('usado').notNull().default(0),

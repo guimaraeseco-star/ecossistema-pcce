@@ -1,8 +1,7 @@
 /**
- * Cadastro de colaboradores (migração 0082) e o que a terceira identidade NÃO
- * pode fazer antes de existir login para ela: uma sessão de tipo
- * `colaborador` tem de ser recusada pela validação — nunca virar "policial de
- * mesmo id".
+ * Cadastro de colaboradores (migração 0082, reconstruída pela 0094 — E55: o
+ * CPF é o login) e a validação de sessão da terceira identidade: uma sessão
+ * de tipo `colaborador` nunca vira "policial de mesmo id".
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { Database } from '$lib/db';
@@ -11,17 +10,26 @@ import {
 	criarColaborador,
 	listarColaboradores,
 	buscarColaborador,
-	buscarColaboradorAtivoPorEmail,
+	buscarColaboradorAtivoPorCpf,
 	definirColaboradorAtivo,
-	normalizarEmailColaborador
+	definirEmailRecuperacao,
+	normalizarEmailColaborador,
+	CpfDeColaboradorJaCadastrado
 } from '../colaboradores';
 import { validarSessao, validarSessaoComAceite } from '$lib/auth';
-import { ehViolacaoUnique, mensagemComCausas } from '$lib/server/db-errors';
 
 let db: Database;
 let sqlite: ReturnType<typeof bancoMigrado>;
 
 const SUPER = { id: 1, nome: 'Super Admin' };
+const CPF = '529.982.247-25';
+const OUTRO_CPF = '111.444.777-35';
+
+/** Chaves de teste (32 bytes em hex) — o caminho COM cifra e índice cego. */
+const ENV = {
+	CPF_ENCRYPTION_KEY: '11'.repeat(32),
+	CPF_INDEX_KEY: '22'.repeat(32)
+};
 
 beforeEach(() => {
 	sqlite = bancoMigrado();
@@ -34,9 +42,9 @@ describe('criarColaborador', () => {
 			db,
 			{
 				nome: '  Ana Servidora ',
-				email: ' Ana.Servidora@PC.CE.GOV.BR ',
+				cpf: CPF,
+				emailPessoal: ' Ana.Servidora@Gmail.com ',
 				senhaHash: 'pbkdf2v3:hash',
-				cpf: '529.982.247-25',
 				vinculo: 'Empresa X',
 				criadoPor: SUPER
 			},
@@ -44,7 +52,8 @@ describe('criarColaborador', () => {
 		);
 		expect(c).toMatchObject({
 			nome: 'Ana Servidora',
-			email: 'ana.servidora@pc.ce.gov.br',
+			email_pessoal: 'ana.servidora@gmail.com',
+			email_recuperacao: null,
 			vinculo: 'Empresa X',
 			primeiro_acesso: 1,
 			ativo: 1,
@@ -58,49 +67,73 @@ describe('criarColaborador', () => {
 		// Sem chave configurada o CPF vai normalizado em texto (fail-open
 		// documentado em `prepararCpfParaDB`); com chave, cifrado — o caminho é o
 		// mesmo de `policiais`.
-		const linha = sqlite.prepare('SELECT senha, cpf FROM colaboradores WHERE id = ?').get(c.id) as {
-			senha: string;
-			cpf: string;
-		};
+		const linha = sqlite
+			.prepare('SELECT senha, cpf, cpf_index FROM colaboradores WHERE id = ?')
+			.get(c.id) as { senha: string; cpf: string; cpf_index: string | null };
 		expect(linha.senha).toBe('pbkdf2v3:hash');
 		expect(linha.cpf).toBe('52998224725');
+		expect(linha.cpf_index).toBeNull();
 	});
 
-	it('e-mail duplicado estoura o índice único nomeando a coluna', async () => {
-		const dados = { nome: 'A', email: 'a@x.br', senhaHash: 'h', criadoPor: SUPER };
-		await criarColaborador(db, dados, undefined);
-		// O drizzle embrulha o erro do driver; é `mensagemComCausas` que a rota lê
-		// para decidir o 409 — o teste mede o mesmo caminho.
-		const erro = await criarColaborador(
+	it('com chave: cifra o CPF, grava o índice cego e o login acha pelo índice', async () => {
+		const c = await criarColaborador(
 			db,
-			{ ...dados, nome: 'B', email: 'A@X.BR' },
-			undefined
-		).then(
-			() => null,
-			(e: unknown) => e
+			{ nome: 'A', cpf: CPF, emailPessoal: 'a@x.br', senhaHash: 'h', criadoPor: SUPER },
+			ENV
 		);
-		expect(ehViolacaoUnique(erro)).toBe(true);
-		expect(mensagemComCausas(erro)).toMatch(/colaboradores\.email/);
+		const linha = sqlite
+			.prepare('SELECT cpf, cpf_index FROM colaboradores WHERE id = ?')
+			.get(c.id) as { cpf: string; cpf_index: string | null };
+		expect(linha.cpf.startsWith('enc:v1:')).toBe(true);
+		expect(linha.cpf_index).toMatch(/^[0-9a-f]{64}$/);
+		expect((await buscarColaboradorAtivoPorCpf(db, '52998224725', ENV))?.id).toBe(c.id);
+		// Sem a chave a busca cai no texto — e o cifrado não casa.
+		expect(await buscarColaboradorAtivoPorCpf(db, CPF, undefined)).toBeNull();
+	});
+
+	it('CPF duplicado recusa com erro próprio — com e sem chave, ativo ou não', async () => {
+		const dados = { nome: 'A', cpf: CPF, emailPessoal: 'a@x.br', senhaHash: 'h', criadoPor: SUPER };
+		const a = await criarColaborador(db, dados, undefined);
+		await expect(
+			criarColaborador(db, { ...dados, nome: 'B', cpf: '52998224725' }, undefined)
+		).rejects.toBeInstanceOf(CpfDeColaboradorJaCadastrado);
+		await definirColaboradorAtivo(db, a.id, false);
+		await expect(criarColaborador(db, { ...dados, nome: 'C' }, undefined)).rejects.toThrow(/CPF/);
+
+		await criarColaborador(db, { ...dados, cpf: OUTRO_CPF }, ENV);
+		await expect(criarColaborador(db, { ...dados, cpf: OUTRO_CPF }, ENV)).rejects.toBeInstanceOf(
+			CpfDeColaboradorJaCadastrado
+		);
 	});
 });
 
 describe('busca e listagem', () => {
-	it('por e-mail ignora caixa e espaços, e só devolve ativo', async () => {
+	it('por CPF ignora a máscara, exige 11 dígitos e só devolve ativo', async () => {
 		const c = await criarColaborador(
 			db,
-			{ nome: 'A', email: 'a@x.br', senhaHash: 'h', criadoPor: SUPER },
+			{ nome: 'A', cpf: CPF, emailPessoal: 'a@x.br', senhaHash: 'h', criadoPor: SUPER },
 			undefined
 		);
-		expect((await buscarColaboradorAtivoPorEmail(db, '  A@X.br '))?.id).toBe(c.id);
+		expect((await buscarColaboradorAtivoPorCpf(db, ' 529.982.247-25 ', undefined))?.id).toBe(c.id);
+		expect(await buscarColaboradorAtivoPorCpf(db, '5299822472', undefined)).toBeNull();
 		await definirColaboradorAtivo(db, c.id, false);
-		expect(await buscarColaboradorAtivoPorEmail(db, 'a@x.br')).toBeNull();
+		expect(await buscarColaboradorAtivoPorCpf(db, CPF, undefined)).toBeNull();
 		// A gestão continua vendo a conta desativada.
 		expect((await buscarColaborador(db, c.id))?.ativo).toBe(0);
 		expect(await listarColaboradores(db)).toHaveLength(1);
 	});
 
-	it('normalizarEmailColaborador é a mesma regra do cadastro e do login', () => {
+	it('normalizarEmailColaborador é a regra do cadastro e do e-mail de recuperação', async () => {
 		expect(normalizarEmailColaborador(' Ana@X.Br ')).toBe('ana@x.br');
+		const c = await criarColaborador(
+			db,
+			{ nome: 'A', cpf: CPF, emailPessoal: 'a@x.br', senhaHash: 'h', criadoPor: SUPER },
+			undefined
+		);
+		await definirEmailRecuperacao(db, c.id, ' Outro@Y.Br ');
+		expect((await buscarColaborador(db, c.id))?.email_recuperacao).toBe('outro@y.br');
+		await definirEmailRecuperacao(db, c.id, null);
+		expect((await buscarColaborador(db, c.id))?.email_recuperacao).toBeNull();
 	});
 });
 
@@ -108,7 +141,7 @@ describe('desativar', () => {
 	it('apaga as sessões DA CONTA, e só as de tipo colaborador', async () => {
 		const c = await criarColaborador(
 			db,
-			{ nome: 'A', email: 'a@x.br', senhaHash: 'h', criadoPor: SUPER },
+			{ nome: 'A', cpf: CPF, emailPessoal: 'a@x.br', senhaHash: 'h', criadoPor: SUPER },
 			undefined
 		);
 		sqlite.exec(`
@@ -126,8 +159,8 @@ describe('desativar', () => {
 	});
 });
 
-describe('sessão de colaborador antes de existir login', () => {
-	it('é recusada pela validação, mesmo havendo policial com o mesmo id', async () => {
+describe('sessão de colaborador', () => {
+	it('sem linha em `colaboradores` é recusada, mesmo havendo policial com o mesmo id', async () => {
 		sqlite.exec(`
 			INSERT INTO policiais (id, matricula, nome, cargo, lotacao, senha, ativo)
 			VALUES (42, 'M42', 'Policial 42', 'OIP', 'X', 'h', 1);

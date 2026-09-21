@@ -20,7 +20,8 @@ import { captureMessage } from '@sentry/cloudflare';
 import { enviarCodigo2FA } from '$lib/server/email';
 import { logger } from '$lib/server/logger';
 import { administradores, policiais, loginAttempts } from '$lib/server/schema';
-import { buscarColaboradorAtivoPorEmail, normalizarEmailColaborador } from '$lib/db/colaboradores';
+import { buscarColaboradorAtivoPorCpf } from '$lib/db/colaboradores';
+import { limparCPF } from '$lib/utils/formato';
 import { colaboradores } from '$lib/server/schema';
 import type { Database } from '$lib/db';
 import { chaveRateLimitIp } from '$lib/server/auth/recovery-rate-limit';
@@ -302,9 +303,10 @@ export async function tentarLogin({
 	// Mesma mensagem 429 do limite por IP (não revela se o bloqueio é de IP ou de
 	// conta) e aplica-se uniformemente, inclusive a matrículas inexistentes (toda
 	// falha grava o identifier), então não vira oráculo de enumeração.
-	// O e-mail do colaborador entra normalizado ANTES do throttle por conta:
-	// "Ana@x" e "ana@x" são a mesma conta e têm de contar no mesmo balde.
-	if (tipo === 'colaborador') matricula = normalizarEmailColaborador(matricula);
+	// O CPF do colaborador entra só com os dígitos ANTES do throttle por conta:
+	// "529.982.247-25" e "52998224725" são a mesma conta e têm de contar no
+	// mesmo balde.
+	if (tipo === 'colaborador') matricula = limparCPF(matricula);
 	const identHash = await hashIdentificadorLogin(tipo, matricula);
 	const accountLimit = await checkAccountRateLimit(db, identHash);
 	if (accountLimit.blocked) {
@@ -717,7 +719,7 @@ export async function tentarLogin({
 	}
 
 	if (tipo === 'colaborador') {
-		return tentarLoginColaborador({ db, ip, email: matricula, senha, platform, pepper, identHash });
+		return tentarLoginColaborador({ db, ip, cpf: matricula, senha, platform, pepper, identHash });
 	}
 
 	const policial = await db
@@ -815,12 +817,13 @@ export async function tentarLogin({
 }
 
 /**
- * Login do colaborador — a terceira identidade. Por E-MAIL, e SEMPRE com 2FA,
- * inclusive no primeiro acesso: o e-mail é obrigatório na conta por construção,
- * então não existe o caso "sem e-mail" que faz policial e admin entrarem sem
- * segundo fator no onboarding. É também o que prova, no primeiro login, que a
- * pessoa controla o e-mail que o Super Admin cadastrou — o colaborador não
- * tem "e-mail pessoal" a verificar depois.
+ * Login do colaborador — a terceira identidade. Por CPF (E55), e SEMPRE com
+ * 2FA no e-mail pessoal, inclusive no primeiro acesso: o e-mail é obrigatório
+ * na conta por construção, então não existe o caso "sem e-mail" que faz
+ * policial e admin entrarem sem segundo fator no onboarding. É também o que
+ * prova, no primeiro login, que a pessoa controla o e-mail que o Admin Geral
+ * cadastrou — por isso o primeiro acesso do colaborador não pede verificação
+ * do e-mail pessoal (`/alterar-senha`).
  *
  * Mesma derivação incondicional de hash dos outros ramos (`HASH_SENTINELA`):
  * conta inexistente e senha errada custam o mesmo tempo e devolvem a mesma
@@ -829,7 +832,7 @@ export async function tentarLogin({
 async function tentarLoginColaborador({
 	db,
 	ip,
-	email,
+	cpf,
 	senha,
 	platform,
 	pepper,
@@ -837,13 +840,13 @@ async function tentarLoginColaborador({
 }: {
 	db: Database;
 	ip: string;
-	email: string;
+	cpf: string;
 	senha: string;
 	platform: App.Platform | undefined;
 	pepper: string | undefined;
 	identHash: string;
 }): Promise<TentarLoginResult> {
-	const conta = await buscarColaboradorAtivoPorEmail(db, email);
+	const conta = await buscarColaboradorAtivoPorCpf(db, cpf, platform?.env);
 	const senhaConfere = await verificarSenha(senha, conta?.senha ?? HASH_SENTINELA, pepper);
 
 	if (!conta || !senhaConfere) {
@@ -851,8 +854,8 @@ async function tentarLoginColaborador({
 		return {
 			sucesso: false,
 			statusCode: 401,
-			erro: 'E-mail ou senha inválidos',
-			fields: { matricula: email, tipo: 'colaborador' }
+			erro: 'CPF ou senha inválidos',
+			fields: { matricula: cpf, tipo: 'colaborador' }
 		};
 	}
 
@@ -865,9 +868,11 @@ async function tentarLoginColaborador({
 
 	const codigo = gerarCodigo2FA();
 	const desafioId = await criarDesafio2FA(db, 'colaborador', conta.id, codigo);
-	const emailJob = enviarCodigo2FA(conta.email, codigo, conta.nome, platform).catch((err) => {
-		logger.error('[2FA] Falha ao enviar e-mail (colaborador)', { error: mensagemDeErro(err) });
-	});
+	const emailJob = enviarCodigo2FA(conta.email_pessoal, codigo, conta.nome, platform).catch(
+		(err) => {
+			logger.error('[2FA] Falha ao enviar e-mail (colaborador)', { error: mensagemDeErro(err) });
+		}
+	);
 	platform?.ctx?.waitUntil(emailJob);
 	return {
 		sucesso: false,
@@ -876,7 +881,7 @@ async function tentarLoginColaborador({
 			desafioId,
 			nome: conta.nome,
 			primeiroAcesso: conta.primeiro_acesso === 1,
-			emailMascarado: mascararEmail(conta.email),
+			emailMascarado: mascararEmail(conta.email_pessoal),
 			tipoUsuario2FA: 'colaborador'
 		},
 		setAdminModuloPendingCookie: false
