@@ -4,7 +4,8 @@
 	 * Identificação e Código cabem no cartão; "Concluído" não entra no stepper —
 	 * a senha só muda depois do link no e-mail (`/redefinir-senha`). A tela de
 	 * aviso pós-código é instrução, não fase. Respostas genéricas — não revela se
-	 * a matrícula/login existe.
+	 * a matrícula/login/CPF existe. No modo colaborador (E55) o identificador é
+	 * o CPF e o link vai ao e-mail pessoal — ele não tem funcional.
 	 */
 	import Mail from '@lucide/svelte/icons/mail';
 	import { loading as loadingService } from '$lib/loading.svelte';
@@ -16,6 +17,7 @@
 
 	let {
 		tipo = $bindable(),
+		comoColaborador = false,
 		identificadorRec = $bindable(),
 		codigoRec = $bindable(),
 		recuperacaoEtapa,
@@ -27,6 +29,8 @@
 		onSair
 	}: {
 		tipo: 'policial' | 'admin';
+		/** Modo colaborador: CPF no lugar da matrícula/login; sem alternador. */
+		comoColaborador?: boolean;
 		identificadorRec: string;
 		codigoRec: string;
 		recuperacaoEtapa: 'identificador' | 'codigo' | 'concluida';
@@ -66,22 +70,31 @@
 	<div class="text-center mb-6">
 		<h1 class="h1 text-2xl font-bold mb-2">Recuperar senha</h1>
 		<p class="text-sm text-surface-600 dark:text-surface-400">
-			Informe {tipo === 'policial' ? 'sua matrícula' : 'seu login'} para receber um código de validação
-			por e-mail.
+			Informe {comoColaborador ? 'seu CPF' : tipo === 'policial' ? 'sua matrícula' : 'seu login'} para
+			receber um código de validação por e-mail.
 		</p>
 	</div>
 
 	<div class="flex flex-col gap-5">
-		<SeletorPolicialAdmin bind:tipo aoTrocar={() => (identificadorRec = '')} class="mb-4" />
+		{#if !comoColaborador}
+			<SeletorPolicialAdmin bind:tipo aoTrocar={() => (identificadorRec = '')} class="mb-4" />
+		{/if}
 
 		<label class="label">
-			<span class="label-text">{tipo === 'policial' ? 'Matrícula' : 'Login'}</span>
+			<span class="label-text"
+				>{comoColaborador ? 'CPF' : tipo === 'policial' ? 'Matrícula' : 'Login'}</span
+			>
 			<input
 				class="input"
 				type="text"
 				bind:value={identificadorRec}
-				placeholder={tipo === 'policial' ? 'Digite sua matrícula' : 'Digite seu login'}
-				maxlength={tipo === 'policial' ? 8 : undefined}
+				placeholder={comoColaborador
+					? 'Digite seu CPF (só números)'
+					: tipo === 'policial'
+						? 'Digite sua matrícula'
+						: 'Digite seu login'}
+				maxlength={comoColaborador ? 14 : tipo === 'policial' ? 8 : undefined}
+				inputmode={comoColaborador ? 'numeric' : 'text'}
 			/>
 		</label>
 
@@ -144,8 +157,9 @@
 		</h1>
 		<p class="text-sm text-surface-600 dark:text-surface-400 mb-6">
 			{#if recuperacaoResultado === 'link'}
-				Dentro de instantes você receberá em seu e-mail funcional um link de redefinição de senha. O
-				código pode demorar até 5 minutos para chegar. Verifique também sua caixa de spam.
+				Dentro de instantes você receberá em seu e-mail {comoColaborador ? 'pessoal' : 'funcional'} um
+				link de redefinição de senha. O código pode demorar até 5 minutos para chegar. Verifique também
+				sua caixa de spam.
 			{:else}
 				Você receberá um código de validação em instantes.
 			{/if}

@@ -9,6 +9,9 @@
 	 * (`useVerificacaoEmailPessoal`) antes de liberar. O e-mail é o canal de
 	 * recuperação e de 2FA — sem ele confirmado, uma senha perdida deixa a conta
 	 * inacessível, e é essa a razão de o passo ser bloqueante e não um lembrete.
+	 * O COLABORADOR pula a verificação: o e-mail dele já é o pessoal e o 2FA do
+	 * login acabou de prová-lo (E55); no lugar, a tela pergunta se ele quer
+	 * outro endereço para recuperar a senha (opcional).
 	 *
 	 * A validação daqui é de USABILIDADE, não de segurança: `podeAlterarSenha`
 	 * desabilita o botão e `handleAlterarSenha` cancela o submit com mensagem,
@@ -45,6 +48,8 @@
 	let error = $state('');
 
 	const primeiroAcesso = $derived(page.data.primeiro_acesso);
+	const colaborador = $derived(page.data.colaborador === true);
+	let emailRecuperacao = $state('');
 
 	// --- E-mail pessoal (apenas no primeiro acesso) ---
 	const verificacaoEmail = useVerificacaoEmailPessoal();
@@ -69,13 +74,15 @@
 
 	const forca = $derived(validarForcaSenha(novaSenha, confirmarSenha));
 	const senhaOk = $derived(forca.senhaOk);
-	const emailPessoalOk = $derived(!primeiroAcesso || verificacaoEmail.etapa === 'verificado');
+	const emailPessoalOk = $derived(
+		!primeiroAcesso || colaborador || verificacaoEmail.etapa === 'verificado'
+	);
 	const podeAlterarSenha = $derived(senhaOk && forca.confirmaOk && emailPessoalOk);
 
 	function handleAlterarSenha({ cancel }: { cancel: () => void }) {
 		error = '';
 
-		if (primeiroAcesso && verificacaoEmail.etapa !== 'verificado') {
+		if (primeiroAcesso && !colaborador && verificacaoEmail.etapa !== 'verificado') {
 			error = 'Confirme seu e-mail pessoal para continuar o primeiro acesso.';
 			cancel();
 			return;
@@ -157,7 +164,25 @@
 			{/if}
 
 			<!-- Seção de e-mail pessoal (apenas no primeiro acesso) -->
-			{#if primeiroAcesso}
+			{#if primeiroAcesso && colaborador}
+				<!-- Colaborador (E55): o e-mail já está provado pelo 2FA; só a
+				     pergunta do endereço alternativo, que vai no MESMO formulário
+				     da senha (campo `email_recuperacao`, lido pela action). -->
+				<div
+					class="mb-5 p-4 rounded-2xl bg-surface-100/80 dark:bg-surface-800/50 border border-surface-200 dark:border-white/5 space-y-2"
+				>
+					<p
+						class="text-xs font-semibold text-surface-600 dark:text-surface-300 uppercase tracking-wider mb-0.5"
+					>
+						E-mail de recuperação
+					</p>
+					<p class="text-xs text-surface-600 dark:text-surface-400 leading-relaxed">
+						Seu e-mail pessoal <strong>{page.data.emailPessoalMascarado}</strong> já está confirmado pelo
+						código que você digitou. Se quiser receber o código de recuperação de senha em outro endereço,
+						informe abaixo — é opcional.
+					</p>
+				</div>
+			{:else if primeiroAcesso}
 				<div
 					class="mb-5 p-4 rounded-2xl bg-surface-100/80 dark:bg-surface-800/50 border border-surface-200 dark:border-white/5 space-y-3"
 				>
@@ -270,6 +295,21 @@
 				use:enhance={handleAlterarSenha}
 				class="flex flex-col gap-4"
 			>
+				{#if primeiroAcesso && colaborador}
+					<label class="label">
+						<span class="label-text font-medium">Outro e-mail para recuperação (opcional)</span>
+						<input
+							class="input"
+							type="email"
+							name="email_recuperacao"
+							bind:value={emailRecuperacao}
+							placeholder="Deixe em branco para usar o e-mail pessoal"
+							maxlength="254"
+							autocomplete="email"
+						/>
+					</label>
+				{/if}
+
 				{#if !primeiroAcesso}
 					<label class="label">
 						<span class="label-text font-medium">Senha atual</span>

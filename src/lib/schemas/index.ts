@@ -20,6 +20,7 @@ export {
 	reenviarCodigoSchema,
 	solicitarRedefinicaoSchema,
 	confirmarRedefinicaoSchema,
+	emailRecuperacaoSchema,
 	solicitarVerificacaoEmailSchema,
 	confirmarVerificacaoEmailSchema,
 	certificadoVerificarSchema,

@@ -1,12 +1,12 @@
 <script lang="ts">
 	/**
-	 * Gestão de colaboradores (`/colaboradores`, Super Admin) — a terceira
-	 * identidade: servidora administrativa e colaboradora terceirizada.
+	 * Gestão de colaboradores (`/colaboradores`, Admin Geral) — a terceira
+	 * identidade: servidora administrativa e colaboradora terceirizada. Entra
+	 * por CPF (E55), com 2FA no e-mail pessoal.
 	 *
 	 * A senha provisória aparece UMA vez, na caixa destacada depois de criar
-	 * ou redefinir; fechar a caixa é perdê-la — o caminho de volta é "Nova
-	 * senha". Não há e-mail automático nem recuperação por link para esta
-	 * identidade (ver o cabeçalho de `+page.server.ts`).
+	 * ou redefinir; fechar a caixa é perdê-la — os caminhos de volta são "Nova
+	 * senha" aqui e "Esqueceu a senha?" na tela de login.
 	 */
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
@@ -20,8 +20,8 @@
 	let cadastroOpen = $state(false);
 	let pending = $state(false);
 	let nome = $state('');
-	let email = $state('');
 	let cpf = $state('');
+	let emailPessoal = $state('');
 	let vinculo = $state('');
 	const formId = $props.id();
 
@@ -30,8 +30,8 @@
 
 	function limpar() {
 		nome = '';
-		email = '';
 		cpf = '';
+		emailPessoal = '';
 		vinculo = '';
 	}
 
@@ -74,8 +74,8 @@
 	<div>
 		<h1 class="h1 text-2xl font-bold">Colaboradores</h1>
 		<p class="text-sm text-surface-600 dark:text-surface-400 mt-1">
-			Servidores administrativos e terceirizados. Entram com e-mail e senha; o que alcançam vem das
-			funções designadas no módulo de diárias.
+			Servidores administrativos e terceirizados. Entram com CPF e senha (ou e-CPF); o que alcançam
+			vem das funções designadas no módulo de diárias.
 		</p>
 	</div>
 	<button
@@ -113,8 +113,8 @@
 			>
 		</div>
 		<p class="text-xs text-surface-600 dark:text-surface-400 mt-2">
-			Repasse à pessoa. No primeiro acesso ela recebe um código no e-mail e é obrigada a trocar a
-			senha.
+			Repasse à pessoa. Ela entra com o CPF; no primeiro acesso recebe um código no e-mail pessoal e
+			é obrigada a trocar a senha.
 		</p>
 	</div>
 {/if}
@@ -124,7 +124,7 @@
 		<thead>
 			<tr>
 				<th>Nome</th>
-				<th>E-mail</th>
+				<th>E-mail pessoal</th>
 				<th>Vínculo</th>
 				<th>Situação</th>
 				<th class="text-right">Ações</th>
@@ -141,7 +141,7 @@
 			{#each data.colaboradores as c (c.id)}
 				<tr>
 					<td class="font-medium {c.ativo ? '' : 'opacity-60 line-through'}">{c.nome}</td>
-					<td class="text-sm">{c.email}</td>
+					<td class="text-sm">{c.email_pessoal}</td>
 					<td class="text-sm italic">{c.vinculo || '—'}</td>
 					<td class="text-xs">
 						{#if !c.ativo}
@@ -223,19 +223,7 @@
 			<input class="input" type="text" name="nome" bind:value={nome} maxlength="200" required />
 		</label>
 		<label class="label">
-			<span class="label-text">E-mail (será o login e o canal do código de acesso)</span>
-			<input
-				class="input"
-				type="email"
-				name="email"
-				bind:value={email}
-				maxlength="254"
-				autocomplete="off"
-				required
-			/>
-		</label>
-		<label class="label">
-			<span class="label-text">CPF (opcional — vai no Requerimento de diárias)</span>
+			<span class="label-text">CPF (será o login)</span>
 			<input
 				class="input"
 				type="text"
@@ -243,6 +231,20 @@
 				bind:value={cpf}
 				maxlength="14"
 				inputmode="numeric"
+				autocomplete="off"
+				required
+			/>
+		</label>
+		<label class="label">
+			<span class="label-text">E-mail pessoal (recebe o código de acesso)</span>
+			<input
+				class="input"
+				type="email"
+				name="email_pessoal"
+				bind:value={emailPessoal}
+				maxlength="254"
+				autocomplete="off"
+				required
 			/>
 		</label>
 		<label class="label">
@@ -259,7 +261,7 @@
 			type="submit"
 			form={formId}
 			class="btn preset-filled-primary-500"
-			disabled={pending || !nome.trim() || !email.trim()}
+			disabled={pending || !nome.trim() || !cpf.trim() || !emailPessoal.trim()}
 		>
 			{pending ? 'Cadastrando...' : 'Cadastrar'}
 		</button>

@@ -17,9 +17,10 @@ import {
 	verificarTokenRedefinicao,
 	consumirTokenRedefinicao,
 	hashSenha,
-	criarSessao
+	criarSessao,
+	type TipoUsuarioReset
 } from '$lib/auth';
-import { administradores, policiais } from '$lib/server/schema';
+import { administradores, colaboradores, policiais } from '$lib/server/schema';
 import { alterarSenhaSchema } from '$lib/schemas';
 import { cookieOptions } from '$lib/server/auth/auth-flow';
 import { resolverCredencial, revogarSessoesDaCredencial } from '$lib/server/auth/credencial';
@@ -34,9 +35,17 @@ import type { PageServerLoad, Actions } from './$types';
  */
 async function ehPrimeiroAcesso(
 	db: ReturnType<typeof getDB>,
-	tipo: 'admin' | 'policial',
+	tipo: TipoUsuarioReset,
 	usuarioId: number
 ): Promise<boolean> {
+	if (tipo === 'colaborador') {
+		const c = await db
+			.select({ pa: colaboradores.primeiro_acesso })
+			.from(colaboradores)
+			.where(eq(colaboradores.id, usuarioId))
+			.get();
+		return c?.pa === 1;
+	}
 	if (tipo === 'admin') {
 		const a = await db
 			.select({ pa: administradores.primeiro_acesso })
@@ -51,6 +60,15 @@ async function ehPrimeiroAcesso(
 		.where(eq(policiais.id, usuarioId))
 		.get();
 	return p?.pa === 1;
+}
+
+/** A tabela da auditoria de cada identidade. */
+function entidadeDe(tipo: TipoUsuarioReset): string {
+	return tipo === 'policial'
+		? 'policiais'
+		: tipo === 'colaborador'
+			? 'colaboradores'
+			: 'administradores';
 }
 
 export const load: PageServerLoad = async ({ url, platform, setHeaders }) => {
@@ -131,7 +149,7 @@ export const actions: Actions = {
 			await registrarAuditComContexto(db, {
 				usuario: { id: usuarioId, nome: 'Usuário' },
 				acao: 'primeiro_acesso_link',
-				entidade: tipo === 'policial' ? 'policiais' : 'administradores',
+				entidade: entidadeDe(tipo),
 				entidade_id: usuarioId,
 				ip: getClientAddress(),
 				user_agent: request.headers.get('user-agent'),
@@ -176,7 +194,19 @@ export const actions: Actions = {
 		// Buscar nome para auditoria
 		let nome = 'Usuário';
 
-		if (cred.dono.tipo === 'admin') {
+		if (cred.dono.tipo === 'colaborador') {
+			const c = await db
+				.select({ nome: colaboradores.nome })
+				.from(colaboradores)
+				.where(eq(colaboradores.id, cred.dono.id))
+				.get();
+			nome = c?.nome ?? nome;
+
+			await db
+				.update(colaboradores)
+				.set({ senha: novaSenhaHash, primeiro_acesso: 0 })
+				.where(eq(colaboradores.id, cred.dono.id));
+		} else if (cred.dono.tipo === 'admin') {
 			const admin = await db
 				.select({ nome: administradores.nome })
 				.from(administradores)
@@ -211,7 +241,7 @@ export const actions: Actions = {
 		await registrarAuditComContexto(db, {
 			usuario: { id: usuarioId, nome },
 			acao: 'redefinir_senha',
-			entidade: tipo === 'policial' ? 'policiais' : 'administradores',
+			entidade: entidadeDe(tipo),
 			entidade_id: usuarioId,
 			alvo_tipo: tipo,
 			alvo_id: usuarioId,

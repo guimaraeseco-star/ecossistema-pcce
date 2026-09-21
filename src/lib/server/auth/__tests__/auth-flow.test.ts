@@ -297,7 +297,7 @@ describe('tentarLogin — alerta de credencial de bootstrap', () => {
 	});
 });
 
-describe('tentarLogin — colaborador (terceira identidade, decisão 71)', () => {
+describe('tentarLogin — colaborador (terceira identidade, por CPF — E55)', () => {
 	function fakeDbColaborador(conta: Row | undefined): Database {
 		const select = (fields?: Record<string, unknown>) => ({
 			from: (table: unknown) => ({
@@ -319,7 +319,8 @@ describe('tentarLogin — colaborador (terceira identidade, decisão 71)', () =>
 	const conta = (over: Row = {}): Row => ({
 		id: 7,
 		nome: 'Ana Servidora',
-		email: 'ana@pc.ce.gov.br',
+		cpf: '52998224725',
+		email_pessoal: 'ana@gmail.com',
 		senha: senhaHash,
 		ativo: 1,
 		primeiro_acesso: 0,
@@ -327,11 +328,11 @@ describe('tentarLogin — colaborador (terceira identidade, decisão 71)', () =>
 		...over
 	});
 
-	it('entra por e-mail e para SEMPRE no 2º fator — o e-mail é obrigatório na conta', async () => {
+	it('entra por CPF (com ou sem máscara) e para SEMPRE no 2º fator no e-mail pessoal', async () => {
 		const r = await tentarLogin({
 			db: fakeDbColaborador(conta()),
 			ip: '1.2.3.4',
-			matricula: 'Ana@PC.CE.GOV.BR',
+			matricula: '529.982.247-25',
 			senha: SENHA,
 			tipo: 'colaborador',
 			platform: undefined
@@ -341,6 +342,7 @@ describe('tentarLogin — colaborador (terceira identidade, decisão 71)', () =>
 		if (!r.sucesso && 'pendente2FA' in r) {
 			expect(r.pendente2FA.tipoUsuario2FA).toBe('colaborador');
 			expect(r.pendente2FA.nome).toBe('Ana Servidora');
+			expect(r.pendente2FA.emailMascarado).toBe('a*a@***.com');
 		}
 	});
 
@@ -348,7 +350,7 @@ describe('tentarLogin — colaborador (terceira identidade, decisão 71)', () =>
 		const r = await tentarLogin({
 			db: fakeDbColaborador(conta({ primeiro_acesso: 1 })),
 			ip: '1.2.3.4',
-			matricula: 'ana@pc.ce.gov.br',
+			matricula: '52998224725',
 			senha: SENHA,
 			tipo: 'colaborador',
 			platform: undefined
@@ -361,7 +363,7 @@ describe('tentarLogin — colaborador (terceira identidade, decisão 71)', () =>
 		const errada = await tentarLogin({
 			db: fakeDbColaborador(conta()),
 			ip: '1.2.3.4',
-			matricula: 'ana@pc.ce.gov.br',
+			matricula: '52998224725',
 			senha: 'outra',
 			tipo: 'colaborador',
 			platform: undefined
@@ -369,7 +371,7 @@ describe('tentarLogin — colaborador (terceira identidade, decisão 71)', () =>
 		const inexistente = await tentarLogin({
 			db: fakeDbColaborador(undefined),
 			ip: '1.2.3.4',
-			matricula: 'ninguem@pc.ce.gov.br',
+			matricula: '11144477735',
 			senha: SENHA,
 			tipo: 'colaborador',
 			platform: undefined

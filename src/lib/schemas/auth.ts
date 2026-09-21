@@ -16,15 +16,14 @@ import { z } from 'zod';
 
 export const loginSchema = z
 	.object({
-		/** Matrícula (policial), login (admin) ou E-MAIL (colaborador, decisão 71). */
-		matricula: z.string().min(1, 'Matrícula é obrigatória').max(254, 'Identificador muito longo'),
+		/** Matrícula (policial), login (admin) ou CPF (colaborador, E55). */
+		matricula: z.string().min(1, 'Matrícula é obrigatória').max(32, 'Identificador muito longo'),
 		senha: z.string().min(1, 'Senha é obrigatória').max(128, 'Senha muito longa'),
 		tipo: z.enum(['policial', 'admin', 'colaborador']).default('policial')
 	})
-	// O cap de 32 continua valendo para matrícula e login; só o e-mail do
-	// colaborador precisa de mais.
-	.refine((v) => v.tipo === 'colaborador' || v.matricula.length <= 32, {
-		message: 'Matrícula muito longa',
+	// O CPF do colaborador chega com ou sem máscara; só os dígitos contam.
+	.refine((v) => v.tipo !== 'colaborador' || v.matricula.replace(/\D/g, '').length === 11, {
+		message: 'CPF deve ter 11 dígitos',
 		path: ['matricula']
 	});
 
@@ -41,9 +40,21 @@ export const verificar2faSchema = z.object({ desafioId: desafioIdField, codigo: 
 
 export const reenviarCodigoSchema = z.object({ desafioId: desafioIdField });
 
+/**
+ * O e-mail de recuperação do colaborador (E55): opcional, informado no
+ * primeiro acesso. Quem chama já tratou o vazio — aqui só chega texto.
+ */
+export const emailRecuperacaoSchema = z
+	.string()
+	.trim()
+	.toLowerCase()
+	.max(254, 'E-mail de recuperação muito longo')
+	.email('E-mail de recuperação inválido');
+
 export const solicitarRedefinicaoSchema = z.object({
+	/** Matrícula, login ou, para o colaborador, o CPF (E55). */
 	identificador: z.string().trim().min(1).max(64),
-	tipo: z.enum(['policial', 'admin'])
+	tipo: z.enum(['policial', 'admin', 'colaborador'])
 });
 
 export const confirmarRedefinicaoSchema = z.object({
@@ -72,7 +83,10 @@ export const certificadoVerificarSchema = z.object({
 	// Intenção de entrar no console de Admin Geral (aba "Administrador" da tela de
 	// login). Só concede sessão admin se o CPF do certificado tiver uma conta
 	// vinculada em `administradores.policial_id`; caso contrário, erro claro.
-	comoAdmin: z.boolean().optional()
+	comoAdmin: z.boolean().optional(),
+	// Modo "Sou colaborador(a)" da tela de login (E55): o CPF do e-CPF é casado
+	// com `colaboradores`, não com `policiais`.
+	comoColaborador: z.boolean().optional()
 });
 
 /**
