@@ -110,7 +110,9 @@ function pendenciaDeRespondencia(ausentes: TitularAusente[]): Pendencia | null {
 			? `${uma.unidade_nome}: o titular se ausenta em ${uma.data_inicio} e ninguém responde pela unidade`
 			: `${ausentes.length} unidades com o titular se ausentando e ninguém respondendo`,
 		quantidade: ausentes.length,
-		link: uma ? `/unidade/${uma.unidade_id}` : '/unidade'
+		// Com mais de uma, a lista JÁ FILTRADA — mandar para a árvore inteira
+		// obrigava a abrir unidade por unidade para descobrir quais eram.
+		link: uma ? `/unidade/${uma.unidade_id}` : '/unidade?pendencia=respondencia'
 	};
 }
 
