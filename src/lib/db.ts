@@ -29,6 +29,7 @@ export {
 	batchNonEmpty,
 	linhasAfetadas,
 	likeContains,
+	buscaPorPartes,
 	likePrefix
 } from './db/core';
 export type { Database } from './db/core';

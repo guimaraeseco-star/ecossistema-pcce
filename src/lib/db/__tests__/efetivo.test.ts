@@ -4,9 +4,10 @@
  * `afastamentoVigente`.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
+import { inArray } from 'drizzle-orm';
 import type { Database } from '$lib/db';
 import { bancoMigrado, drizzleSobre } from './sqlite-migrado';
-import { policiais, policialHistorico } from '$lib/server/schema';
+import { policiais, policialHistorico, unidades } from '$lib/server/schema';
 import {
 	afastamentosVigentesDe,
 	efetivoPorLotacao,
@@ -164,5 +165,35 @@ describe('situação de hoje por servidor (fase 2-C)', () => {
 		});
 		expect(ativosOip.map((s) => s.nome)).toEqual(['D']);
 		expect(await servidoresPorSituacao(db, [], hoje)).toEqual([]);
+	});
+});
+
+describe('"trabalha em" (E66): o efetivo conta quem está na unidade, não quem é lotado nela', () => {
+	it('o posto mostra quem trabalha nele; a delegacia deixa de contá-lo', async () => {
+		await db.insert(unidades).values([
+			{ id: 96010, nome: 'DP de Aracati (teste)', tipo: 'delegacia' },
+			{ id: 96011, nome: 'Posto de Fortim (teste)', tipo: 'unidade', seccional_id: 96010 }
+		]);
+		await policial('NA SEDE', 'OIP', 'DP de Aracati (teste)');
+		const noPostoId = await policial('NO POSTO', 'OIP', 'DP de Aracati (teste)');
+		const delegadoId = await policial('DELEGADO NO POSTO', 'DPC', 'DP de Aracati (teste)');
+		await db
+			.update(policiais)
+			.set({ local_id: 96011 })
+			.where(inArray(policiais.id, [noPostoId, delegadoId]));
+
+		const mapa = await efetivoPorLotacao(db, '2026-09-22');
+		expect(mapa.get('DP de Aracati (teste)')?.total).toBe(1);
+		expect(mapa.get('Posto de Fortim (teste)')?.total).toBe(2);
+		expect(mapa.get('Posto de Fortim (teste)')?.dpc.total).toBe(1);
+
+		// A lista da ficha do posto traz os dois, dizendo de onde vêm.
+		const noPosto = await servidoresPorSituacao(db, ['Posto de Fortim (teste)'], '2026-09-22');
+		expect(noPosto.map((s) => [s.nome, s.lotacao, s.unidade])).toEqual([
+			['DELEGADO NO POSTO', 'DP de Aracati (teste)', 'Posto de Fortim (teste)'],
+			['NO POSTO', 'DP de Aracati (teste)', 'Posto de Fortim (teste)']
+		]);
+		const naSede = await servidoresPorSituacao(db, ['DP de Aracati (teste)'], '2026-09-22');
+		expect(naSede.map((s) => s.nome)).toEqual(['NA SEDE']);
 	});
 });

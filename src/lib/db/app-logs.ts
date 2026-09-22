@@ -12,7 +12,7 @@
 import { desc, eq, and, gte, lte, sql } from 'drizzle-orm';
 import { appLog } from '../server/schema';
 import type { AppLog } from '../server/schema';
-import { timestampSqliteUtc, paginarComContagem, likeContains, type Database } from './core';
+import { timestampSqliteUtc, paginarComContagem, buscaPorPartes, type Database } from './core';
 
 type AppLogLevel = 'warn' | 'error';
 
@@ -70,9 +70,7 @@ export async function listarAppLogs(
 	if (opts?.ate) conditions.push(lte(appLog.created_at, opts.ate));
 	if (opts?.busca) {
 		const termo = opts.busca;
-		conditions.push(
-			sql`(${likeContains(appLog.message, termo)} OR ${likeContains(appLog.contexto, termo)} OR ${likeContains(appLog.rota, termo)})`
-		);
+		conditions.push(buscaPorPartes([appLog.message, appLog.contexto, appLog.rota], termo)!);
 	}
 
 	const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

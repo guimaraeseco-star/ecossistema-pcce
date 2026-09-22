@@ -7,7 +7,14 @@
  * A ligação servidor → unidade é pelo NOME (`policiais.lotacao` =
  * `unidades.nome`), herança da planilha que originou o sistema — ver o
  * cabeçalho de `$lib/db/unidades`. Por isso o mapa devolvido é indexado por
- * nome de lotação, e quem consome casa com `unidade.nome`.
+ * nome de unidade, e quem consome casa com `unidade.nome`.
+ *
+ * **Conta quem TRABALHA na unidade, não quem está lotado nela** (E66, pedido
+ * dele em 22/09): desde o "trabalha em" (`policiais.local_id`), o servidor
+ * lotado em Aracati que fica no posto de Fortim aparece no efetivo de FORTIM —
+ * é o que a ficha de uma unidade quer responder ("quem está aqui?"). As REGRAS
+ * continuam pela lotação e não passam por aqui: o teto de 15 % é
+ * `contagemParaTeto`, a escala é `listarPoliciais` por lotação.
  *
  * "Fora de serviço hoje" segue a MESMA regra de `afastamentoVigente`
  * (histórico): evento `afastamento` com `data_inicio <= hoje` e `data_fim`
@@ -61,21 +68,25 @@ export async function efetivoPorLotacao(
 	db: Database,
 	hojeISO: string
 ): Promise<Map<string, EfetivoLotacao>> {
+	// `unidadeDeTrabalho`: o nome da subunidade quando há "trabalha em", senão a
+	// lotação. Subconsulta e não join — no D1, o join com colunas nomeadas já
+	// devolveu coluna vazia dentro de `batch` (visto em 21/09).
+	const unidadeDeTrabalho = sql<string>`coalesce((SELECT nome FROM unidades WHERE id = ${policiais.local_id}), ${policiais.lotacao})`;
 	const lotados = await db
 		.select({
-			lotacao: policiais.lotacao,
+			lotacao: unidadeDeTrabalho,
 			cargo: policiais.cargo,
 			n: sql<number>`count(*)`
 		})
 		.from(policiais)
 		.where(eq(policiais.ativo, 1))
-		.groupBy(policiais.lotacao, policiais.cargo);
+		.groupBy(unidadeDeTrabalho, policiais.cargo);
 
 	// Um servidor pode ter mais de um afastamento vigente; o `max` faz licença
 	// prevalecer sobre férias, e o `GROUP BY policial_id` conta cada um uma vez.
 	const foraDeServico = await db
 		.select({
-			lotacao: policiais.lotacao,
+			lotacao: unidadeDeTrabalho,
 			cargo: policiais.cargo,
 			ferias: sql<number>`max(case when ${policialHistorico.subtipo} = 'ferias' then 1 else 0 end)`,
 			outro: sql<number>`max(case when ${policialHistorico.subtipo} = 'ferias' then 0 else 1 end)`
@@ -90,7 +101,7 @@ export async function efetivoPorLotacao(
 				sql`(${policialHistorico.data_fim} IS NULL OR ${policialHistorico.data_fim} = '' OR ${policialHistorico.data_fim} >= ${hojeISO})`
 			)
 		)
-		.groupBy(policialHistorico.policial_id, policiais.lotacao, policiais.cargo);
+		.groupBy(policialHistorico.policial_id, unidadeDeTrabalho, policiais.cargo);
 
 	const mapa = new Map<string, EfetivoLotacao>();
 	const de = (lotacao: string) => {
@@ -208,7 +219,10 @@ export interface ServidorSituado {
 	nome: string;
 	matricula: string;
 	cargo: string;
+	/** O vínculo formal — pode ser outra unidade quando ele só TRABALHA aqui. */
 	lotacao: string;
+	/** Onde ele trabalha: a subunidade do "trabalha em", ou a própria lotação. */
+	unidade: string;
 	designacao: string;
 	situacao: SituacaoServidor;
 	afastamento: AfastamentoEmCurso | null;
@@ -236,6 +250,7 @@ export async function servidoresPorSituacao(
 					matricula: policiais.matricula,
 					cargo: policiais.cargo,
 					lotacao: policiais.lotacao,
+					unidade: sql<string>`coalesce((SELECT nome FROM unidades WHERE id = ${policiais.local_id}), ${policiais.lotacao})`,
 					designacao: designacoes.nome
 				})
 				.from(policiais)
@@ -243,7 +258,7 @@ export async function servidoresPorSituacao(
 				.where(
 					and(
 						eq(policiais.ativo, 1),
-						inArray(policiais.lotacao, lotacoes.slice(i, i + FATIA_D1)),
+						sql`coalesce((SELECT nome FROM unidades WHERE id = ${policiais.local_id}), ${policiais.lotacao}) IN ${lotacoes.slice(i, i + FATIA_D1)}`,
 						...(filtro.cargo ? [eq(policiais.cargo, filtro.cargo)] : [])
 					)
 				))
@@ -251,7 +266,7 @@ export async function servidoresPorSituacao(
 	}
 	linhas.sort(
 		(a, b) =>
-			a.lotacao.localeCompare(b.lotacao, 'pt-BR') ||
+			a.unidade.localeCompare(b.unidade, 'pt-BR') ||
 			a.cargo.localeCompare(b.cargo) ||
 			a.nome.localeCompare(b.nome, 'pt-BR')
 	);

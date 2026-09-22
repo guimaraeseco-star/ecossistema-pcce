@@ -23,7 +23,7 @@ import type * as schema from '../../server/schema';
 import { limparMatricula } from '../../utils/formato';
 import { gerarSenhaAleatoriaHash } from '../../auth';
 import { prepararCpfParaDB, type CpfCriptoEnv } from '../../crypto/cpf-cripto';
-import { paginarComContagem, likeContains, type Database } from '../core';
+import { paginarComContagem, buscaPorPartes, type Database } from '../core';
 
 /**
  * Uma linha da listagem: o cadastro sem a senha, MAIS o nome e o símbolo da
@@ -118,9 +118,7 @@ export async function listarPoliciais(
 	// Busca por nome ou matrícula
 	if (opts?.busca) {
 		const termo = opts.busca.trim();
-		baseConditions.push(
-			or(likeContains(policiais.nome, termo), likeContains(policiais.matricula, termo))!
-		);
+		baseConditions.push(buscaPorPartes([policiais.nome, policiais.matricula], termo)!);
 	}
 
 	// Filtro por cargo

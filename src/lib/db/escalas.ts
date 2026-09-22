@@ -20,7 +20,7 @@
  * o `inArray` com lista vazia gera SQL inválido no D1; use `batchNonEmpty` ou
  * devolva cedo, como já fazem os call sites daqui.
  */
-import { eq, and, or, sql, desc, asc, inArray, type SQL } from 'drizzle-orm';
+import { eq, and, sql, desc, asc, inArray, type SQL } from 'drizzle-orm';
 import {
 	escalas,
 	escalaPoliciais,
@@ -33,6 +33,7 @@ import type { EscalaPolicialComDados, EscalaListagem } from '../types';
 import {
 	batchNonEmpty,
 	likeContains,
+	buscaPorPartes,
 	paginarComContagem,
 	timestampSqliteBrasilia,
 	type Database
@@ -132,7 +133,7 @@ export async function listarEscalas(
 	// Busca por título ou cidade
 	if (opts?.busca) {
 		const termo = opts.busca.trim();
-		conditions.push(or(likeContains(escalas.titulo, termo), likeContains(escalas.cidade, termo))!);
+		conditions.push(buscaPorPartes([escalas.titulo, escalas.cidade], termo)!);
 	}
 
 	if (opts?.lotacaoBusca) {

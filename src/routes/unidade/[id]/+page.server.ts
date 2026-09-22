@@ -36,7 +36,12 @@ import { pendenciasDeFeriasPorLotacao } from '$lib/db';
 import { MAX_JUSTIFICATIVA } from '$lib/cadastro-campos';
 import { dataIso, textoLimitado, inteiroNaFaixa } from '$lib/server/form-data';
 import { unidades } from '$lib/server/schema';
-import { efetivoPorLotacao, efetivoVazio, somarEfetivos } from '$lib/db/efetivo';
+import {
+	efetivoPorLotacao,
+	efetivoVazio,
+	servidoresPorSituacao,
+	somarEfetivos
+} from '$lib/db/efetivo';
 import { municipiosDaUnidade } from '$lib/db/cobertura';
 import { escopoDeUnidades, unidadeNoEscopo } from '$lib/server/unidades/escopo';
 import { nivelTipoUnidade, rotuloTipoUnidade } from '$lib/unidades/tipos';
@@ -66,17 +71,28 @@ export const load: PageServerLoad = async ({ locals, platform, params }) => {
 	const unidade = await db.select().from(unidades).where(eq(unidades.id, id)).get();
 	if (!unidade) error(404, 'Unidade não encontrada');
 
-	const [efetivos, municipiosAtendidos, direcao, sucessao, pendenciasPorLotacao, colaboradores] =
-		await Promise.all([
-			efetivoPorLotacao(db, hojeBrasilISO()),
-			municipiosDaUnidade(db, id),
-			responsavelVigente(db, id),
-			historicoDaDirecao(db, id),
-			pendenciasDeFeriasPorLotacao(db),
-			// O bloco "Colaboradores" (E61): só para quem administra a unidade —
-			// o colaborador não vê os colegas nem o que cada um pode.
-			podeGerirColaboradores(u) ? colaboradoresDaUnidade(db, id) : Promise.resolve(null)
-		]);
+	const [
+		efetivos,
+		municipiosAtendidos,
+		direcao,
+		sucessao,
+		pendenciasPorLotacao,
+		servidores,
+		colaboradores
+	] = await Promise.all([
+		efetivoPorLotacao(db, hojeBrasilISO()),
+		municipiosDaUnidade(db, id),
+		responsavelVigente(db, id),
+		historicoDaDirecao(db, id),
+		pendenciasDeFeriasPorLotacao(db),
+		// A lista de quem trabalha AQUI (E66): inclui quem é lotado noutra
+		// unidade e fica num posto desta, e exclui quem é lotado aqui mas
+		// trabalha num posto — a ficha responde "quem está nesta unidade".
+		servidoresPorSituacao(db, [unidade.nome], hojeBrasilISO()),
+		// O bloco "Colaboradores" (E61): só para quem administra a unidade —
+		// o colaborador não vê os colegas nem o que cada um pode.
+		podeGerirColaboradores(u) ? colaboradoresDaUnidade(db, id) : Promise.resolve(null)
+	]);
 	const porNome = (n: NoUnidade) => efetivos.get(n.nome) ?? efetivoVazio();
 	const efetivo = porNome({ ...unidade });
 	const populacaoAtendida = municipiosAtendidos.reduce((n, m) => n + (m.populacao ?? 0), 0);
@@ -146,6 +162,17 @@ export const load: PageServerLoad = async ({ locals, platform, params }) => {
 		 */
 		direcao,
 		sucessao,
+		/** Quem trabalha nesta unidade, com a situação de hoje (E66). */
+		servidores: servidores.map((s) => ({
+			id: s.id,
+			nome: s.nome,
+			matricula: s.matricula,
+			cargo: s.cargo,
+			designacao: s.designacao,
+			situacao: s.situacao,
+			/** Preenchido só quando ele é lotado em OUTRA unidade e trabalha aqui. */
+			lotacaoDeOrigem: s.lotacao === unidade.nome ? null : s.lotacao
+		})),
 		modoDirecao: modoDaDirecao(u),
 		/**
 		 * Os colaboradores lotados aqui e o que a unidade liberou a cada um (E61).
