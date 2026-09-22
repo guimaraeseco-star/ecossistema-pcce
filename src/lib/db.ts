@@ -29,6 +29,7 @@ export {
 	batchNonEmpty,
 	linhasAfetadas,
 	likeContains,
+	buscaPorPartes,
 	likePrefix
 } from './db/core';
 export type { Database } from './db/core';
@@ -132,6 +133,7 @@ export {
 	afastamentoVigente,
 	listarDesignacoes,
 	designacaoAtiva,
+	motivoParaRecusarDesignacao,
 	listarFeriasDoPolicial,
 	buscarFracao,
 	registrarProgramacao,

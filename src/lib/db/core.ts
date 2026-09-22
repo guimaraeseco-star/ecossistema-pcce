@@ -240,3 +240,89 @@ export function hasR2(platform: PlatformLike | undefined): boolean {
 	const env = platform?.env || platform;
 	return !!env?.escalas_docs;
 }
+
+/**
+ * Tira os acentos de uma expressão SQL. O SQLite do D1 não tem `unaccent` nem
+ * ICU: `lower()` e o `LIKE` são insensíveis a caixa só em ASCII, então "JOSÉ"
+ * não casa com "jose". A tradução por `replace()` aninhado resolve sem
+ * migração nem coluna nova — são as vogais acentuadas do português mais o `ç`,
+ * que é o alfabeto que os nomes usam.
+ *
+ * A troca é feita nas DUAS caixas antes do `lower()`, e não depois: como o
+ * `lower()` do SQLite é ASCII, o "É" de "JOSÉ" sairia dele ainda maiúsculo e
+ * nenhuma regra de minúscula o alcançaria — a busca por "jose" voltava vazia.
+ */
+function semAcentos(expr: SQL | SQLWrapper): SQL {
+	const PARES: [string, string][] = [
+		['á', 'a'],
+		['à', 'a'],
+		['â', 'a'],
+		['ã', 'a'],
+		['ä', 'a'],
+		['é', 'e'],
+		['è', 'e'],
+		['ê', 'e'],
+		['ë', 'e'],
+		['í', 'i'],
+		['ì', 'i'],
+		['î', 'i'],
+		['ï', 'i'],
+		['ó', 'o'],
+		['ò', 'o'],
+		['ô', 'o'],
+		['õ', 'o'],
+		['ö', 'o'],
+		['ú', 'u'],
+		['ù', 'u'],
+		['û', 'u'],
+		['ü', 'u'],
+		['ç', 'c'],
+		['ñ', 'n']
+	];
+	// Os caracteres entram como LITERAIS (`sql.raw`), não como parâmetros: o D1
+	// aceita no máximo 100 binds por consulta, e 24 pares × 2 caixas × 2 valores
+	// gastariam 96 só nesta expressão — a busca respondia 500. Eles vêm daqui,
+	// não do usuário, então não há o que injetar; ainda assim o apóstrofo é
+	// duplicado, que é o escape do SQLite.
+	const literal = (c: string) => sql.raw(`'${c.replace(/'/g, "''")}'`);
+	const trocado = PARES.reduce<SQL>(
+		(acc, [de, para]) =>
+			sql`replace(replace(${acc}, ${literal(de)}, ${literal(para)}), ${literal(de.toUpperCase())}, ${literal(para)})`,
+		sql`${expr}`
+	);
+	return sql`lower(${trocado})`;
+}
+
+/** Quantos pedaços de busca valem: o suficiente para um nome completo, sem virar consulta gigante. */
+const MAX_PARTES_DA_BUSCA = 6;
+
+/**
+ * **Busca por partes** (pedido dele em 22/09): quem digita "jose silva" acha
+ * "JOSÉ DA SILVA SANTOS", e "silva jose" também — cada pedaço tem de aparecer
+ * em ALGUMA das colunas, em qualquer ordem, ignorando acento e caixa.
+ *
+ * É a régua de TODA busca por nome do sistema: servidores, escalas, unidades,
+ * auditoria. Antes era um `LIKE %termo%` único, que exigia digitar o nome na
+ * ordem exata e com acento — "jose silva" não achava ninguém.
+ *
+ * `undefined` quando não há nada a filtrar (termo vazio), para o chamador
+ * simplesmente não acrescentar condição.
+ */
+export function buscaPorPartes(colunas: SQLWrapper[], termo: string): SQL | undefined {
+	const partes = termo.trim().split(/\s+/).filter(Boolean).slice(0, MAX_PARTES_DA_BUSCA);
+	if (partes.length === 0 || colunas.length === 0) return undefined;
+	const condicoes = partes.map((parte) => {
+		const alvo = semAcentosDeTexto(parte);
+		const ors = colunas.map((c) => sql`instr(${semAcentos(c)}, ${alvo}) > 0`);
+		return sql`(${sql.join(ors, sql` OR `)})`;
+	});
+	return sql`(${sql.join(condicoes, sql` AND `)})`;
+}
+
+/** A mesma normalização do SQL, do lado do JS — o termo digitado. */
+function semAcentosDeTexto(texto: string): string {
+	return texto
+		.normalize('NFD')
+		.replace(/\p{Diacritic}/gu, '')
+		.toLowerCase();
+}

@@ -46,7 +46,7 @@ export {
 } from './historico';
 export type { NovoEventoHistorico, CamposDoEventoFuncional } from './historico';
 
-export { listarDesignacoes, designacaoAtiva } from './designacoes';
+export { listarDesignacoes, designacaoAtiva, motivoParaRecusarDesignacao } from './designacoes';
 
 export {
 	listarFeriasDoPolicial,

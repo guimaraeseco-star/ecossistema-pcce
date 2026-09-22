@@ -102,10 +102,14 @@ export async function executarAcaoRH(
 	const evento = eventoDaAcao(policialId, acao, ator);
 
 	if (acao.tipo === 'movimentacao') {
+		// O "trabalha em" (E66) é um LOCAL da lotação antiga: mudar de unidade o
+		// invalida, e deixá-lo apontando para o posto da unidade de origem faria o
+		// servidor aparecer trabalhando onde não está mais lotado. Volta para a
+		// sede do destino (nulo); quem quiser pôr num posto de lá faz na ficha.
 		await atualizarPolicialComHistorico(
 			db,
 			policialId,
-			{ lotacao: acao.unidade_destino ?? '' },
+			{ lotacao: acao.unidade_destino ?? '', local_id: null },
 			evento
 		);
 		return;

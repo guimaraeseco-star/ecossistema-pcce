@@ -11,7 +11,7 @@
 	import type { PageProps } from './$types';
 	import BotaoVoltar from '$lib/components/BotaoVoltar.svelte';
 	import { rotuloTipoPlantao } from '$lib/unidades/plantao';
-	import { COR_SITUACAO } from '$lib/servidores/afastamentos';
+	import { COR_SITUACAO, ROTULO_SITUACAO } from '$lib/servidores/afastamentos';
 	import ModalEfetivo, { type PedidoEfetivo } from '../_components/ModalEfetivo.svelte';
 	import CartaoDirecao from './_components/CartaoDirecao.svelte';
 	import CartaoColaboradores from './_components/CartaoColaboradores.svelte';
@@ -205,7 +205,9 @@
 			</div>
 		</div>
 		<!-- Uma linha por cargo: ativos hoje, de férias, afastados por outro motivo
-		     e o total lotado. O número de ativos é link para a lista filtrada. -->
+		     e o total lotado. O número de ativos é link para a lista filtrada.
+		     Desde a E66 o efetivo conta quem TRABALHA aqui: o lotado nesta
+		     delegacia que fica no posto conta no posto, não aqui. -->
 		<div class="table-wrap">
 			<table class="table">
 				<thead>
@@ -300,6 +302,57 @@
 		</ul>
 	</section>
 </div>
+
+<!-- Quem trabalha aqui (E66, pedido dele em 22/09): a lista na própria ficha,
+     com nome, matrícula, cargo, designação e a situação de hoje. -->
+<section class="card-elevated mt-4 rounded-2xl p-5" aria-labelledby="servidores-da-unidade">
+	<div class="mb-3 flex items-baseline justify-between gap-3">
+		<h2
+			id="servidores-da-unidade"
+			class="text-base font-semibold text-surface-900 dark:text-surface-50"
+		>
+			Servidores
+		</h2>
+		<span class="text-xs text-surface-500">{data.servidores.length}</span>
+	</div>
+	{#if data.servidores.length === 0}
+		<p class="text-sm text-surface-500">Nenhum servidor trabalha nesta unidade.</p>
+	{:else}
+		<div class="table-wrap">
+			<table class="table">
+				<thead>
+					<tr class="text-2xs">
+						<th>Nome</th>
+						<th>Matrícula</th>
+						<th>Cargo</th>
+						<th>Designação</th>
+						<th>Situação</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each data.servidores as s (s.id)}
+						<tr>
+							<td class="font-medium">
+								<a href="/servidores/{s.id}" class="no-underline hover:underline">{s.nome}</a>
+								{#if s.lotacaoDeOrigem}
+									<span class="block text-2xs text-surface-500"
+										>lotado(a) em {s.lotacaoDeOrigem}</span
+									>
+								{/if}
+							</td>
+							<td class="font-mono text-xs tabular-nums">{s.matricula}</td>
+							<td class="text-sm">{s.cargo}</td>
+							<td class="text-sm">{s.designacao || '—'}</td>
+							<td class="text-xs font-semibold {COR_SITUACAO[s.situacao]}"
+								>{ROTULO_SITUACAO[s.situacao]}</td
+							>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+	{/if}
+</section>
 
 {#if data.municipios.length > 0}
 	<section

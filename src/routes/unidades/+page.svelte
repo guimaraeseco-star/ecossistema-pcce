@@ -231,7 +231,7 @@
 </div>
 
 <ModalDesativarUnidade bind:open={dialogDesativarOpen} unidade={unidadeParaDesativar} />
-<ModalCadastrarUnidade bind:open={cadastroOpen} {seccionais} />
+<ModalCadastrarUnidade bind:open={cadastroOpen} {seccionais} {unidades} />
 
 <div class="p-4 sm:p-6 rounded-2xl card-elevated shadow-sm overflow-hidden">
 	{#if data.unidades.length === 0}

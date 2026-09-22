@@ -67,13 +67,17 @@
 	interface Props {
 		policial: { id: number; nome: string; matricula: string; lotacao: string };
 		lotacoes: string[];
+		/** Unidades sem direção vigente, pelo NOME — o atalho da E66. */
+		semTitular?: string[];
+		/** Cargo do servidor: só delegado dirige unidade. */
+		cargo?: string;
 		/** `direto` executa; `solicitacao` envia para aprovação do Admin Geral. */
 		modo: 'direto' | 'solicitacao';
 		/** Os períodos ocupados da linha do tempo — o afastamento não abrange férias. */
 		ocupados: PeriodoOcupado[];
 	}
 
-	const { policial, lotacoes, modo, ocupados }: Props = $props();
+	const { policial, lotacoes, modo, ocupados, semTitular = [], cargo }: Props = $props();
 
 	const solicitando = $derived(modo === 'solicitacao');
 
@@ -83,6 +87,11 @@
 
 	// ---- Campos controlados (resetados ao fechar) ----
 	let unidadeDestino = $state('');
+	/** O atalho da E66 só cabe em DELEGADO indo para unidade sem titular. */
+	const podeDesignarTitular = $derived(
+		!solicitando && cargo === 'DPC' && semTitular.includes(unidadeDestino)
+	);
+	let designarTitular = $state(false);
 	/** Os tipos que ESTE perfil pode lançar, por categoria (disciplinares só no modo direto). */
 	const grupos = $derived(subtiposPorCategoria(!solicitando));
 	/** Sem tipo até o usuário escolher — "Selecione o tipo" é a primeira coisa que ele vê. */
@@ -351,6 +360,26 @@
 						</select>
 					</label>
 				</div>
+				{#if podeDesignarTitular}
+					<label
+						class="flex items-start gap-2 rounded-xl border border-warning-500/30 bg-warning-500/5 p-3 text-sm"
+					>
+						<input
+							type="checkbox"
+							class="checkbox mt-0.5"
+							name="designar_titular"
+							value="1"
+							bind:checked={designarTitular}
+						/>
+						<span>
+							<span class="font-medium">Designar como titular de {unidadeDestino}</span>
+							<span class="block text-xs text-surface-600 dark:text-surface-400">
+								A unidade está sem direção vigente. A designação usa a mesma data e o mesmo NUP
+								desta movimentação.
+							</span>
+						</span>
+					</label>
+				{/if}
 				<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
 					<label class="label">
 						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"

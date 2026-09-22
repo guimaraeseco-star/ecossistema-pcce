@@ -53,6 +53,8 @@
 	// Derivado gravável: espelha o load, mas admite o que a action devolve.
 	let feriasDaFicha = $derived(data.ferias);
 	const solicitando = $derived(data.modo === 'solicitacao');
+	/** "Trabalha em" (E66): vazio = a sede da lotação. Só o Admin Geral edita. */
+	let localId = $state('');
 	/** O que a unidade liberou para o colaborador (E61); tudo `true` para os demais. */
 	const acessos = $derived(data.acessos);
 	const seccionaisParaPapel = $derived(
@@ -93,6 +95,7 @@
 			lotacao = data.policial.lotacao;
 			email = data.policial.email || '';
 			designacaoId = data.policial.designacao_id ? String(data.policial.designacao_id) : '';
+			localId = data.policial.local_id ? String(data.policial.local_id) : '';
 			seguirPlanilha = false;
 			papel = data.policial.papel;
 			papelUnidadeId = data.policial.papel_unidade_id;
@@ -419,6 +422,35 @@
 					/>
 				{/if}
 			</label>
+
+			<!-- Trabalha em (E66): a lotação é o vínculo; o local é onde a pessoa
+			     fica. Só aparece quando a lotação TEM subunidade — sem posto nem
+			     núcleo, a pergunta não existe. Só o Admin Geral edita. -->
+			{#if data.locais.length > 1}
+				<label class="label sm:col-span-12">
+					<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1">
+						Trabalha em
+						<span class="normal-case font-normal opacity-70"
+							>— a lotação continua sendo {lotacao}</span
+						>
+					</span>
+					{#if isAdmin}
+						<select class="select py-1 px-3 text-sm" name="local_id" bind:value={localId}>
+							{#each data.locais as l (l.id)}
+								<option value={l.sede ? '' : String(l.id)}>{l.nome}{l.sede ? ' (sede)' : ''}</option
+								>
+							{/each}
+						</select>
+					{:else}
+						<input
+							class="input py-1 px-3 text-sm bg-surface-200 dark:bg-surface-800 cursor-not-allowed opacity-75"
+							type="text"
+							value={data.locais.find((l) => String(l.id) === localId)?.nome ?? lotacao}
+							readonly
+						/>
+					{/if}
+				</label>
+			{/if}
 		</div>
 
 		{#if solicitando}
@@ -585,6 +617,8 @@
 		lotacoes={data.lotacoes}
 		modo={data.modo}
 		ocupados={data.ocupados}
+		semTitular={data.semTitular}
+		cargo={data.policial.cargo}
 	/>
 {/if}
 

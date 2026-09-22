@@ -10,7 +10,7 @@
  */
 import { desc, asc, eq, and, gte, lte, isNotNull, sql } from 'drizzle-orm';
 import { auditCheckpoints, auditLog } from '../../server/schema';
-import { paginarComContagem, timestampSqliteUtc, likeContains, type Database } from '../core';
+import { paginarComContagem, timestampSqliteUtc, buscaPorPartes, type Database } from '../core';
 import type { AuditLog } from '../../server/schema';
 import { type AuditResultado, type AuditSeveridade, type AuditActorTipo } from './catalogo';
 import {
@@ -68,7 +68,7 @@ export async function listarAuditLog(
 	if (opts?.busca) {
 		const termo = opts.busca;
 		conditions.push(
-			sql`${likeContains(auditLog.usuario_nome, termo)} OR ${likeContains(auditLog.detalhes, termo)} OR ${likeContains(auditLog.alvo_nome, termo)}`
+			buscaPorPartes([auditLog.usuario_nome, auditLog.detalhes, auditLog.alvo_nome], termo)!
 		);
 	}
 

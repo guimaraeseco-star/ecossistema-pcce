@@ -17,18 +17,41 @@
 	import type { Unidade } from '$lib/types';
 	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
 	import type { ActionResult } from '@sveltejs/kit';
+	import { TIPOS_UNIDADE, podeSerPaiDe, type TipoUnidade } from '$lib/unidades/tipos';
 
 	let {
 		open = $bindable(false),
-		seccionais
+		seccionais,
+		unidades = []
 	}: {
 		open: boolean;
 		seccionais: Unidade[];
+		/** Todas as unidades — os pais possíveis de uma subunidade (E66). */
+		unidades?: Unidade[];
 	} = $props();
 
 	const cadastroFormId = $props.id();
 
-	let tipoUnidade = $state<'delegacia' | 'seccional'>('delegacia');
+	let tipoUnidade = $state<'delegacia' | 'seccional' | 'subunidade'>('delegacia');
+	/**
+	 * Subunidade (E66): posto de atendimento, núcleo, seção — o que existe
+	 * fisicamente dentro de uma delegacia ou do departamento e não é órgão da
+	 * estrutura. O tipo concreto e o pai são escolhidos aqui; a régua de quem
+	 * pode ser pai de quem é a do catálogo (`podeSerPaiDe`), conferida no
+	 * servidor.
+	 */
+	let subTipo = $state<TipoUnidade>('unidade');
+	let subPaiId = $state<number | null>(null);
+
+	const TIPOS_DE_SUBUNIDADE = TIPOS_UNIDADE.filter((t) =>
+		['unidade', 'nucleo', 'secao', 'celula'].includes(t.valor)
+	);
+	/** Pais possíveis de uma subunidade: tudo o que está ACIMA dela na precedência. */
+	const paisPossiveis = $derived(
+		unidades
+			.filter((u) => podeSerPaiDe(u.tipo, subTipo))
+			.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+	);
 	let delegaciaPrefixo = $state('');
 	let delegaciaSufixo = $state('');
 	let seccionalPrefixo = $state('');
@@ -101,8 +124,12 @@
 				     nome derivado não têm input nativo com `name`, então o POST leva estas
 				     cópias. `cidade` é exceção — o SearchableSelect já emite a sua. -->
 		<input type="hidden" name="nome" value={novoNome} />
-		<input type="hidden" name="tipo" value={tipoUnidade} />
-		<input type="hidden" name="seccional_id" value={novoSeccionalId ?? ''} />
+		<input type="hidden" name="tipo" value={tipoUnidade === 'subunidade' ? subTipo : tipoUnidade} />
+		<input
+			type="hidden"
+			name="seccional_id"
+			value={(tipoUnidade === 'subunidade' ? subPaiId : novoSeccionalId) ?? ''}
+		/>
 		<input type="hidden" name="tem_plantao" value={novoTemPlantao ? 'on' : ''} />
 		<input type="hidden" name="tem_expediente" value={novoTemExpediente ? 'on' : ''} />
 		<input type="hidden" name="tem_fds" value={novoTemFds ? 'on' : ''} />
@@ -130,6 +157,10 @@
 						<SegmentedControl.ItemText>Delegacia</SegmentedControl.ItemText>
 						<SegmentedControl.ItemHiddenInput />
 					</SegmentedControl.Item>
+					<SegmentedControl.Item value="subunidade" class="flex-1">
+						<SegmentedControl.ItemText>Subunidade</SegmentedControl.ItemText>
+						<SegmentedControl.ItemHiddenInput />
+					</SegmentedControl.Item>
 				</SegmentedControl.Control>
 			</SegmentedControl>
 		</div>
@@ -144,6 +175,34 @@
 				placeholder="Buscar e selecionar cidade..."
 			/>
 		</div>
+
+		{#if tipoUnidade === 'subunidade'}
+			<!-- Subunidade (E66): posto, núcleo, seção — pendurada na unidade a que
+			     pertence, que pode ser uma delegacia ou o próprio departamento. -->
+			<div class="flex flex-col gap-3 animate-in fade-in duration-300">
+				<label class="label">
+					<span class="label-text">O que é</span>
+					<select class="select" bind:value={subTipo}>
+						{#each TIPOS_DE_SUBUNIDADE as t (t.valor)}
+							<option value={t.valor}>{t.rotulo}</option>
+						{/each}
+					</select>
+				</label>
+				<label class="label">
+					<span class="label-text">Pertence a</span>
+					<select class="select" bind:value={subPaiId}>
+						<option value={null}>Selecione a unidade...</option>
+						{#each paisPossiveis as u (u.id)}
+							<option value={u.id}>{u.nome}</option>
+						{/each}
+					</select>
+					<span class="text-xs text-surface-600 dark:text-surface-400">
+						Ninguém é lotado numa subunidade: a lotação continua sendo a unidade, e quem trabalha
+						aqui é indicado na ficha do servidor ("Trabalha em").
+					</span>
+				</label>
+			</div>
+		{/if}
 
 		{#if tipoUnidade === 'delegacia'}
 			<div class="flex flex-col gap-3 animate-in fade-in duration-300">
@@ -245,7 +304,8 @@
 			disabled={pending ||
 				!novoNome.trim() ||
 				!buscaCidade?.trim() ||
-				(tipoUnidade === 'delegacia' && !novoSeccionalId)}
+				(tipoUnidade === 'delegacia' && !novoSeccionalId) ||
+				(tipoUnidade === 'subunidade' && !subPaiId)}
 		>
 			{pending ? 'Cadastrando...' : 'Cadastrar'}
 		</button>

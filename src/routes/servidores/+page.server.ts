@@ -45,6 +45,10 @@ import { policialSchema } from '$lib/schemas/policial';
 import { isAdminGeral } from '$lib/auth';
 import { lotacoesAdministradas, lotacaoNoEscopo } from '$lib/server/policial-permissao';
 import { escopoDaFicha, podeAbrirFichaDePolicial } from '$lib/server/policiais/ficha-permissao';
+import { responsaveisVigentesDe } from '$lib/db/unidades-responsaveis';
+import { arvoreUnidades } from '$lib/db/unidades';
+import { localValido } from '$lib/unidades/locais';
+import { designarTitularNoAto, mensagemDoAtalho } from '$lib/server/unidades/designar-titular';
 import { decifrarCpfDoDB } from '$lib/crypto/cpf-cripto';
 import { impedimentoParaExcluirPolicial } from '$lib/db/policiais';
 import { afastamentosVigentesDe, situacaoDe } from '$lib/db/efetivo';
@@ -78,7 +82,10 @@ export const load: PageServerLoad = async ({ locals, platform, url, depends }) =
 	// `null` = irrestrito (Admin Geral); Set = as lotações do papel.
 	const escopo = await escopoDaFicha(db, u);
 
-	const [resultado, unidades, designacoes] = await Promise.all([
+	// A árvore vem primeiro porque as direções se consultam pelos ids dela — o
+	// atalho "designar como titular" (E66) só aparece para unidade SEM titular.
+	const unidades = await listarUnidades(db);
+	const [resultado, designacoes, direcoes] = await Promise.all([
 		listarPoliciais(db, lotacaoParam, false, {
 			busca,
 			cargo,
@@ -90,8 +97,11 @@ export const load: PageServerLoad = async ({ locals, platform, url, depends }) =
 			page,
 			limit: 20
 		}),
-		listarUnidades(db),
-		listarDesignacoes(db)
+		listarDesignacoes(db),
+		responsaveisVigentesDe(
+			db,
+			unidades.map((x) => x.id)
+		)
 	]);
 
 	// CPF é cifrado em repouso (LGPD) e só é decifrado para quem edita o cadastro
@@ -131,6 +141,8 @@ export const load: PageServerLoad = async ({ locals, platform, url, depends }) =
 		},
 		unidades,
 		designacoes,
+		/** Unidades ativas SEM direção vigente — o atalho da E66 e o aviso da tela. */
+		semTitular: unidades.filter((x) => !direcoes.has(x.id)).map((x) => x.id),
 		filtros: {
 			lotacao: lotacaoParam ?? '',
 			cargo: cargo ?? '',
@@ -193,6 +205,21 @@ export const actions: Actions = {
 			});
 		}
 
+		// "Trabalha em" (E66) e o atalho "designar como titular": os dois só valem
+		// para o Admin Geral, que é quem cadastra com lotação livre.
+		const localBruto = data.get('local_id')?.toString() ?? '';
+		const localId = localBruto === '' ? null : Number(localBruto);
+		if (localId !== null && (!Number.isInteger(localId) || localId <= 0)) {
+			return fail(400, { error: 'Local de trabalho inválido.' });
+		}
+		const arvore = await arvoreUnidades(db);
+		const unidadeDaLotacao = [...arvore.values()].find((x) => x.nome === lotacao)?.id ?? null;
+		if (!localValido(arvore, unidadeDaLotacao, localId)) {
+			return fail(400, {
+				error: 'O local de trabalho tem de ser a própria unidade de lotação ou uma subunidade dela.'
+			});
+		}
+
 		const parsed = policialSchema.safeParse({
 			nome,
 			matricula,
@@ -204,6 +231,7 @@ export const actions: Actions = {
 			classe,
 			papel: papel || null,
 			papel_unidade_id: papelUnidadeId || null,
+			local_id: localId,
 			email: email || null,
 			email_pessoal: emailPessoal || null
 		});
@@ -251,6 +279,31 @@ export const actions: Actions = {
 				},
 				platform?.env
 			);
+
+			// Atalho da E66: o delegado recém-cadastrado assume a unidade que estava
+			// sem titular, no mesmo ato. Recusa aqui é erro de formulário, não
+			// silêncio: quem pediu precisa saber que a direção NÃO foi registrada.
+			const designarTitular = ['1', 'true', 'on'].includes(
+				String(data.get('designar_titular') ?? '').toLowerCase()
+			);
+			if (designarTitular) {
+				const novo = await buscarPolicialPorMatricula(db, matricula);
+				const r = novo
+					? await designarTitularNoAto(db, {
+							unidadeNome: lotacao,
+							policialId: novo.id,
+							cargo: cargoVal,
+							dataInicio: data.get('titular_desde')?.toString() || hojeBrasilISO(),
+							nup: data.get('titular_nup')?.toString() || '',
+							quem: { id: u.id, nome: u.nome }
+						})
+					: ({ ok: false, motivo: 'falhou' } as const);
+				if (!r.ok) {
+					return fail(400, {
+						error: `Servidor cadastrado, mas a direção não foi registrada: ${mensagemDoAtalho(r.motivo)}`
+					});
+				}
+			}
 			// Conceder Admin Geral já no cadastro (cria a conta vinculada). Como o
 			// id só existe após o insert, busca pela matrícula.
 			if (concederAdminGeral) {
