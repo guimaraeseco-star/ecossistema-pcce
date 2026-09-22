@@ -14,6 +14,10 @@
 import { eq, sql } from 'drizzle-orm';
 import { cadastroSolicitacoes, policialAcaoSolicitacoes } from '$lib/server/schema';
 import { pendenciasDeFeriasPorLotacao } from '$lib/db/policiais/ferias';
+import {
+	titularesAusentesSemRespondencia,
+	type TitularAusente
+} from '$lib/db/unidades-responsaveis';
 import type { Database } from '$lib/db/core';
 import { isAdminGeral, type UsuarioLogado } from '$lib/auth';
 import { lotacoesAdministradas } from '$lib/server/policial-permissao';
@@ -38,7 +42,7 @@ export async function pendenciasDoUsuario(db: Database, u: UsuarioLogado): Promi
 }
 
 async function pendenciasDoAdminGeral(db: Database): Promise<Pendencia[]> {
-	const [cadastro, acoes] = await Promise.all([
+	const [cadastro, acoes, ausentes] = await Promise.all([
 		db
 			.select({ n: sql<number>`count(*)` })
 			.from(cadastroSolicitacoes)
@@ -48,7 +52,8 @@ async function pendenciasDoAdminGeral(db: Database): Promise<Pendencia[]> {
 			.select({ tipo: policialAcaoSolicitacoes.tipo, n: sql<number>`count(*)` })
 			.from(policialAcaoSolicitacoes)
 			.where(eq(policialAcaoSolicitacoes.status, 'pendente'))
-			.groupBy(policialAcaoSolicitacoes.tipo)
+			.groupBy(policialAcaoSolicitacoes.tipo),
+		titularesAusentesSemRespondencia(db)
 	]);
 	const itens: Pendencia[] = [];
 	const nCadastro = Number(cadastro?.n ?? 0);
@@ -81,11 +86,39 @@ async function pendenciasDoAdminGeral(db: Database): Promise<Pendencia[]> {
 			link: '/solicitacoes'
 		});
 	}
+	const semRespondencia = pendenciaDeRespondencia(ausentes);
+	if (semRespondencia) itens.push(semRespondencia);
 	return itens;
 }
 
+/**
+ * "Titular ausente sem respondente" (E68) — a pendência que nasce sozinha das
+ * férias e dos afastamentos, e some sozinha quando a cobertura é registrada.
+ *
+ * Uma linha só, com a contagem: a caixa é para saber QUE há o que resolver,
+ * não para listar; a lista está na ficha de cada unidade, que é onde se
+ * resolve. O texto diz a unidade quando é uma só, porque nesse caso o nome
+ * poupa um clique.
+ */
+function pendenciaDeRespondencia(ausentes: TitularAusente[]): Pendencia | null {
+	if (ausentes.length === 0) return null;
+	const uma = ausentes.length === 1 ? ausentes[0] : null;
+	return {
+		cartao: 'unidade',
+		tipo: 'respondencia_pendente',
+		titulo: uma
+			? `${uma.unidade_nome}: o titular se ausenta em ${uma.data_inicio} e ninguém responde pela unidade`
+			: `${ausentes.length} unidades com o titular se ausentando e ninguém respondendo`,
+		quantidade: ausentes.length,
+		link: uma ? `/unidade/${uma.unidade_id}` : '/unidade'
+	};
+}
+
 async function pendenciasDaUnidade(db: Database, escopo: Set<string>): Promise<Pendencia[]> {
-	const porLotacao = await pendenciasDeFeriasPorLotacao(db);
+	const [porLotacao, ausentes] = await Promise.all([
+		pendenciasDeFeriasPorLotacao(db),
+		titularesAusentesSemRespondencia(db)
+	]);
 	let reprog = 0;
 	let abonos = 0;
 	for (const [lotacao, p] of porLotacao) {
@@ -112,5 +145,11 @@ async function pendenciasDaUnidade(db: Database, escopo: Set<string>): Promise<P
 			link: '/servidores'
 		});
 	}
+	// A unidade e a seccional veem a ausência das unidades que administram: é
+	// delas a indicação de quem responde (E68).
+	const semRespondencia = pendenciaDeRespondencia(
+		ausentes.filter((a) => escopo.has(a.unidade_nome))
+	);
+	if (semRespondencia) itens.push(semRespondencia);
 	return itens;
 }

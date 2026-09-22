@@ -13,8 +13,8 @@
  * planilha com a linha do catálogo durante a carga, mora em `carga-planilha.ts`
  * junto do resto da importação.
  */
-import { and, asc, eq } from 'drizzle-orm';
-import { designacoes } from '../../server/schema';
+import { and, asc, eq, ne } from 'drizzle-orm';
+import { designacoes, policiais } from '../../server/schema';
 import type { Database } from '../core';
 
 /** Uma designação como a tela a consome. */
@@ -87,3 +87,54 @@ export async function motivoParaRecusarDesignacao(
 	if (!DESIGNACOES_DE_DIRECAO.includes(linha.nome.trim().toLowerCase())) return null;
 	return `"${linha.nome}" é função de direção da unidade e só cabe em delegado (DPC). Chefia de seção, sim, pode ser OIP.`;
 }
+
+/**
+ * Quem a unidade indicaria para responder pelo titular ausente (E68).
+ *
+ * "Em geral é o adjunto que responde, mas precisa de confirmação": por isso
+ * isto SUGERE e não decide — quem confirma é a unidade, e quem homologa é o
+ * DPI SUL. A ordem é a da hierarquia: Delegado Adjunto primeiro, Auxiliar na
+ * falta dele. Vazio quer dizer que a indicação cabe à seccional, que é a outra
+ * hipótese da decisão.
+ *
+ * Procura entre os DPC lotados na unidade (a lotação, não o local de trabalho:
+ * quem responde pela unidade pertence a ela) e ignora quem está com o cargo
+ * errado, porque direção é só de delegado.
+ */
+export interface SugestaoDeRespondencia {
+	policial_id: number;
+	nome: string;
+	matricula: string;
+	designacao: string;
+}
+
+export async function sugestaoDeRespondencia(
+	db: Database,
+	unidadeNome: string,
+	excluirPolicialId: number
+): Promise<SugestaoDeRespondencia | null> {
+	const linhas = await db
+		.select({
+			policial_id: policiais.id,
+			nome: policiais.nome,
+			matricula: policiais.matricula,
+			designacao: designacoes.nome
+		})
+		.from(policiais)
+		.innerJoin(designacoes, eq(designacoes.id, policiais.designacao_id))
+		.where(
+			and(
+				eq(policiais.lotacao, unidadeNome),
+				eq(policiais.ativo, 1),
+				eq(policiais.cargo, 'DPC'),
+				ne(policiais.id, excluirPolicialId)
+			)
+		);
+	const pos = (nome: string) => DESIGNACOES_DE_SUBSTITUICAO.indexOf(nome.trim().toLowerCase());
+	const candidatos = linhas.filter((l) => pos(l.designacao) >= 0);
+	candidatos.sort((a, b) => pos(a.designacao) - pos(b.designacao));
+	return candidatos[0] ?? null;
+}
+
+/** Quem substitui o titular, na ordem em que a casa os chama. */
+const DESIGNACOES_DE_SUBSTITUICAO = ['delegado adjunto', 'delegado auxiliar'];

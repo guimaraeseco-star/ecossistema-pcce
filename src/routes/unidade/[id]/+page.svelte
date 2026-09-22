@@ -172,6 +172,7 @@
 		direcao={data.direcao}
 		sucessao={data.sucessao}
 		modo={data.modoDirecao}
+		respondencia={data.respondencia}
 	/>
 </div>
 

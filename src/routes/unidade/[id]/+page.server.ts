@@ -25,13 +25,22 @@ import {
 	type NoUnidade
 } from '$lib/db';
 import {
+	registrarRespondenciaTemporaria,
 	responsavelVigente,
+	titularAberto,
+	titularesAusentesSemRespondencia,
 	historicoDaDirecao,
 	registrarResponsavel,
 	encerrarResponsavel,
 	type RecusaDaDirecao
 } from '$lib/db/unidades-responsaveis';
-import { modoDaDirecao, RECUSA_DIRECAO } from '$lib/server/unidades/direcao-permissao';
+import {
+	modoDaDirecao,
+	modoDaRespondencia,
+	RECUSA_DIRECAO,
+	RECUSA_RESPONDENCIA
+} from '$lib/server/unidades/direcao-permissao';
+import { sugestaoDeRespondencia } from '$lib/db/policiais/designacoes';
 import { pendenciasDeFeriasPorLotacao } from '$lib/db';
 import { MAX_JUSTIFICATIVA } from '$lib/cadastro-campos';
 import { dataIso, textoLimitado, inteiroNaFaixa } from '$lib/server/form-data';
@@ -77,6 +86,7 @@ export const load: PageServerLoad = async ({ locals, platform, params }) => {
 		direcao,
 		sucessao,
 		pendenciasPorLotacao,
+		ausencias,
 		servidores,
 		colaboradores
 	] = await Promise.all([
@@ -85,6 +95,10 @@ export const load: PageServerLoad = async ({ locals, platform, params }) => {
 		responsavelVigente(db, id),
 		historicoDaDirecao(db, id),
 		pendenciasDeFeriasPorLotacao(db),
+		// E68: o titular está fora, ou sai em até cinco dias, sem ninguém
+		// respondendo? É a mesma consulta da pendência ao vivo (E59) — a ficha
+		// mostra o que a caixa de avisos cobra.
+		titularesAusentesSemRespondencia(db, hojeBrasilISO()),
 		// A lista de quem trabalha AQUI (E66): inclui quem é lotado noutra
 		// unidade e fica num posto desta, e exclui quem é lotado aqui mas
 		// trabalha num posto — a ficha responde "quem está nesta unidade".
@@ -93,6 +107,14 @@ export const load: PageServerLoad = async ({ locals, platform, params }) => {
 		// o colaborador não vê os colegas nem o que cada um pode.
 		podeGerirColaboradores(u) ? colaboradoresDaUnidade(db, id) : Promise.resolve(null)
 	]);
+	// A ausência DESTA unidade, e quem a casa indicaria para cobrir: o Delegado
+	// Adjunto e, na falta dele, o Auxiliar. Sem nenhum dos dois a indicação é da
+	// seccional (E68) — e é o `null` que a tela usa para dizer isso.
+	const ausencia = ausencias.find((a) => a.unidade_id === id) ?? null;
+	const sugestao = ausencia
+		? await sugestaoDeRespondencia(db, unidade.nome, ausencia.titular_id)
+		: null;
+
 	const porNome = (n: NoUnidade) => efetivos.get(n.nome) ?? efetivoVazio();
 	const efetivo = porNome({ ...unidade });
 	const populacaoAtendida = municipiosAtendidos.reduce((n, m) => n + (m.populacao ?? 0), 0);
@@ -174,6 +196,16 @@ export const load: PageServerLoad = async ({ locals, platform, params }) => {
 			lotacaoDeOrigem: s.lotacao === unidade.nome ? null : s.lotacao
 		})),
 		modoDirecao: modoDaDirecao(u),
+		/**
+		 * A respondência temporária (E68): a ausência do titular que ninguém
+		 * cobriu ainda, a indicação sugerida e o que esta sessão pode fazer —
+		 * o DPI SUL registra direto; a unidade e a seccional indicam.
+		 */
+		respondencia: {
+			modo: modoDaRespondencia(u),
+			ausencia,
+			sugestao
+		},
 		/**
 		 * Os colaboradores lotados aqui e o que a unidade liberou a cada um (E61).
 		 * `null` = esta sessão não gere colaboradores (o bloco não aparece).
@@ -279,6 +311,35 @@ function lerDadosDaDirecao(fd: FormData) {
 	return { policialId, papel, dataInicio, nup, observacao };
 }
 
+/** Os campos da respondência temporária, lidos igual nos dois caminhos. */
+function lerDadosDaRespondencia(fd: FormData) {
+	const policialId = inteiroNaFaixa(fd, 'policial_id', 1, 99_999_999);
+	const eventoId = inteiroNaFaixa(fd, 'evento_id', 1, 99_999_999);
+	return {
+		policialId,
+		eventoId: eventoId || null,
+		dataInicio: dataIso(fd, 'data_inicio'),
+		dataFim: dataIso(fd, 'data_fim') || null,
+		/** O 1º dia do afastamento, para a fila reencontrar o evento. */
+		inicioDoAfastamento: dataIso(fd, 'inicio_afastamento') || null,
+		nup: textoLimitado(fd, 'nup', 40),
+		observacao: textoLimitado(fd, 'observacao', MAX_JUSTIFICATIVA)
+	};
+}
+
+/** O que a camada de dados recusou, em português de tela. */
+const MOTIVO_RESPONDENCIA: Record<string, string> = {
+	unidade_inexistente: 'Unidade não encontrada.',
+	policial_inexistente: 'Servidor não encontrado.',
+	policial_inativo: 'Servidor inativo não responde por unidade.',
+	nao_e_delegado: 'Só delegado (DPC) responde por unidade.',
+	sem_nup: 'Informe o NUP do processo.',
+	periodo_invertido: 'O último dia é anterior ao primeiro.',
+	responde_a_si_mesmo: 'O titular não responde por si mesmo.',
+	nao_substitui_o_titular: 'A cobertura não corresponde ao titular atual da unidade.',
+	ja_ha_temporaria: 'Já há respondência registrada nesse período.'
+};
+
 export const actions: Actions = {
 	/** Admin Geral: registra e vale na hora. */
 	registrarDirecao: async (event) => {
@@ -291,6 +352,12 @@ export const actions: Actions = {
 		const { policialId, papel, dataInicio, nup, observacao } = lerDadosDaDirecao(fd);
 		if (!policialId) return fail(400, { error: 'Escolha o delegado.' });
 		if (!dataInicio) return fail(400, { error: 'Informe a data de início (AAAA-MM-DD).' });
+		// NUP obrigatório desde a E68: a portaria saiu do formulário (é o ato, vem
+		// depois), então o processo que PEDE a designação é o único documento que
+		// amarra o registro. Os 51 registros antigos, vindos da planilha, ficam
+		// como estão — a exigência vale para quem registra pela tela daqui em diante.
+		if (!nup.trim())
+			return fail(400, { error: 'Informe o NUP do processo que pede a designação.' });
 
 		const r = await registrarResponsavel(db, {
 			unidade_id: id,
@@ -333,29 +400,104 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
-	/** Admin de seccional: propõe, e o Admin Geral decide em `/solicitacoes`. */
-	proporDirecao: async (event) => {
+	/**
+	 * Admin Geral: registra a respondência temporária e vale na hora (E68).
+	 *
+	 * O titular NÃO é encerrado — ele continua titular e volta sozinho no fim
+	 * do período. Quem ela cobre não vem do formulário: é o titular aberto da
+	 * unidade, lido aqui, para que a tela não possa indicar a cobertura de um
+	 * titular que já saiu.
+	 */
+	registrarRespondencia: async (event) => {
 		const auth = await portaoDaDirecao(event);
 		if ('erro' in auth) return auth.erro;
-		const { u, db, id, unidade, modo } = auth;
-		if (modo !== 'proposta') return fail(403, { error: RECUSA_DIRECAO });
+		const { u, db, id, unidade } = auth;
+		if (modoDaRespondencia(u) !== 'direto') return fail(403, { error: RECUSA_RESPONDENCIA });
 
 		const fd = await event.request.formData();
-		const { policialId, papel, dataInicio, nup, observacao } = lerDadosDaDirecao(fd);
-		if (!policialId) return fail(400, { error: 'Escolha o delegado.' });
-		if (!dataInicio) return fail(400, { error: 'Informe a data de início (AAAA-MM-DD).' });
-		if (!observacao.trim()) return fail(400, { error: 'A justificativa é obrigatória.' });
+		const dados = lerDadosDaRespondencia(fd);
+		if (!dados.policialId) return fail(400, { error: 'Escolha quem responde.' });
+		if (!dados.dataInicio) return fail(400, { error: 'Informe o primeiro dia (AAAA-MM-DD).' });
 
-		// A unidade vai pelo NOME porque é assim que `policial_acao_solicitacoes`
-		// guarda destino hoje — a dívida que a decisão E51 vai pagar.
+		const titular = await titularAberto(db, id);
+		if (!titular) {
+			return fail(400, {
+				error: 'Esta unidade não tem titular. Sem titular, a respondência é permanente.'
+			});
+		}
+
+		const r = await registrarRespondenciaTemporaria(db, {
+			unidade_id: id,
+			policial_id: dados.policialId,
+			substitui_policial_id: titular.policial_id,
+			evento_id: dados.eventoId,
+			data_inicio: dados.dataInicio,
+			data_fim: dados.dataFim,
+			nup: dados.nup,
+			observacao: dados.observacao,
+			registrado_por_id: u.id,
+			registrado_por_nome: u.nome
+		});
+		if (!r.ok) return fail(400, { error: MOTIVO_RESPONDENCIA[r.motivo] });
+
+		const { contexto, env } = contextoDeEvento(event);
+		await auditar(
+			db,
+			{
+				acao: 'registrar_respondencia_temporaria',
+				usuario: u,
+				entidade: 'unidade',
+				entidade_id: id,
+				alvo_tipo: 'policial',
+				alvo_id: dados.policialId,
+				alvo_nome: unidade.nome,
+				detalhes: `Respondência temporária em ${unidade.nome} de ${dados.dataInicio}${dados.dataFim ? ` a ${dados.dataFim}` : ''} (NUP ${dados.nup})`,
+				metadados: { substitui: titular.policial_id, evento_id: dados.eventoId },
+				...contexto
+			},
+			{ env }
+		);
+		await avisarOutroLado(db, u, {
+			cartao: 'unidade',
+			tipo: 'respondencia_registrada',
+			titulo: `Respondência temporária em ${unidade.nome} registrada pelo DPI SUL`,
+			texto: `De ${dados.dataInicio}${dados.dataFim ? ` a ${dados.dataFim}` : ''} · NUP ${dados.nup}`,
+			link: `/unidade/${id}`,
+			lotacoes: [unidade.nome]
+		});
+		return { success: true };
+	},
+
+	/**
+	 * A unidade (quando tem adjunto ou auxiliar) ou a seccional INDICA quem
+	 * responde; o DPI SUL homologa em `/solicitacoes` (E68).
+	 *
+	 * `data_evento` leva o primeiro dia do AFASTAMENTO — é por ele que a
+	 * homologação reencontra o evento, a mesma convenção do retorno antecipado.
+	 */
+	indicarRespondencia: async (event) => {
+		const auth = await portaoDaDirecao(event);
+		if ('erro' in auth) return auth.erro;
+		const { u, db, id, unidade } = auth;
+		if (modoDaRespondencia(u) !== 'indicacao') return fail(403, { error: RECUSA_RESPONDENCIA });
+
+		const fd = await event.request.formData();
+		const dados = lerDadosDaRespondencia(fd);
+		if (!dados.policialId) return fail(400, { error: 'Escolha quem responde.' });
+		if (!dados.dataInicio) return fail(400, { error: 'Informe o primeiro dia (AAAA-MM-DD).' });
+		if (!dados.nup.trim()) return fail(400, { error: 'Informe o NUP do processo.' });
+		if (!dados.observacao.trim()) return fail(400, { error: 'A justificativa é obrigatória.' });
+
 		await criarSolicitacaoAcao(db, {
-			policial_id: policialId,
+			policial_id: dados.policialId,
 			tipo: 'direcao',
-			subtipo: papel,
+			subtipo: 'respondencia_temporaria',
 			unidade_destino: unidade.nome,
-			data_inicio: dataInicio,
-			nup,
-			justificativa: observacao,
+			data_inicio: dados.dataInicio,
+			data_fim: dados.dataFim ?? undefined,
+			data_evento: dados.inicioDoAfastamento ?? undefined,
+			nup: dados.nup,
+			justificativa: dados.observacao,
 			solicitante_id: u.id,
 			solicitante_nome: u.nome
 		});
@@ -364,20 +506,31 @@ export const actions: Actions = {
 		await auditar(
 			db,
 			{
-				acao: 'propor_direcao_unidade',
+				acao: 'indicar_respondencia_temporaria',
 				usuario: u,
 				entidade: 'unidade',
 				entidade_id: id,
 				alvo_tipo: 'policial',
-				alvo_id: policialId,
+				alvo_id: dados.policialId,
 				alvo_nome: unidade.nome,
-				detalhes: `Proposta de ${papel} para ${unidade.nome} a partir de ${dataInicio}`,
-				metadados: { papel, nup },
+				detalhes: `Indicação de respondência em ${unidade.nome} a partir de ${dados.dataInicio}`,
+				metadados: { nup: dados.nup },
 				...contexto
 			},
 			{ env }
 		);
-		return { success: true, proposta: true };
+		return { success: true, indicacao: true };
+	},
+
+	/**
+	 * A proposta de direção pela seccional ACABOU (E67): a indicação é do DPI
+	 * SUL. A action fica, e só recusa, porque aba aberta antes do deploy ainda
+	 * posta aqui — melhor a recusa explicando do que o 404 de action inexistente.
+	 */
+	proporDirecao: async (event) => {
+		const auth = await portaoDaDirecao(event);
+		if ('erro' in auth) return auth.erro;
+		return fail(403, { error: RECUSA_DIRECAO });
 	},
 
 	/**

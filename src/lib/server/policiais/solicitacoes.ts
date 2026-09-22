@@ -20,7 +20,11 @@
 
 import { eq } from 'drizzle-orm';
 import { fecharSolicitacaoAcao, type Database } from '$lib/db';
-import { registrarResponsavel } from '$lib/db/unidades-responsaveis';
+import {
+	registrarResponsavel,
+	registrarRespondenciaTemporaria,
+	titularAberto
+} from '$lib/db/unidades-responsaveis';
 import { unidades, type PolicialAcaoSolicitacao } from '$lib/server/schema';
 import { executarAcaoRH, type AtorDaAcao } from './acoes-rh';
 import { encurtarAfastamento, listarHistoricoPolicial } from '$lib/db/policiais/historico';
@@ -94,6 +98,44 @@ export async function decidirSolicitacaoAcao(
 }
 
 /**
+ * Aplica a respondência temporária indicada pela unidade ou pela seccional.
+ *
+ * O pedido guarda o que a fila sabe guardar hoje (a dívida da E51): a unidade
+ * pelo NOME, o período da cobertura em `data_inicio`/`data_fim` e o primeiro
+ * dia do AFASTAMENTO em `data_evento` — é por ele que se reencontra o evento,
+ * a mesma convenção do retorno antecipado. Quem o pedido cobre não vai
+ * escrito: é o titular aberto da unidade NO MOMENTO DA HOMOLOGAÇÃO, porque
+ * entre a indicação e a decisão a titularidade pode ter mudado, e cobrir um
+ * titular que já saiu seria registrar uma ausência que não existe.
+ */
+async function registrarRespondenciaDoPedido(
+	db: Database,
+	pedido: PolicialAcaoSolicitacao,
+	unidadeId: number,
+	adminId: number
+): Promise<void> {
+	const titular = await titularAberto(db, unidadeId);
+	if (!titular || !pedido.data_inicio) return;
+	const evento = pedido.data_evento
+		? (await listarHistoricoPolicial(db, titular.policial_id)).find(
+				(h) => h.tipo === 'afastamento' && h.data_inicio === pedido.data_evento
+			)
+		: undefined;
+	await registrarRespondenciaTemporaria(db, {
+		unidade_id: unidadeId,
+		policial_id: pedido.policial_id,
+		substitui_policial_id: titular.policial_id,
+		evento_id: evento?.id ?? null,
+		data_inicio: pedido.data_inicio,
+		data_fim: pedido.data_fim ?? null,
+		nup: pedido.nup ?? '',
+		observacao: pedido.justificativa,
+		registrado_por_id: adminId,
+		registrado_por_nome: pedido.solicitante_nome ?? 'Solicitante'
+	});
+}
+
+/**
  * Aplica um pedido de direção aprovado.
  *
  * A unidade vem pelo NOME (`unidade_destino`), como todo o resto do sistema
@@ -115,6 +157,13 @@ async function registrarDirecaoDoPedido(
 		.where(eq(unidades.nome, nome))
 		.get();
 	if (!unidade) return;
+	// Respondência temporária (E68) é outro ato: não encerra o titular, amarra-se
+	// ao afastamento dele e tem período. Vem pela mesma fila porque quem homologa
+	// é o mesmo DPI SUL.
+	if (pedido.subtipo === 'respondencia_temporaria') {
+		await registrarRespondenciaDoPedido(db, pedido, unidade.id, adminId);
+		return;
+	}
 	await registrarResponsavel(db, {
 		unidade_id: unidade.id,
 		policial_id: pedido.policial_id,
