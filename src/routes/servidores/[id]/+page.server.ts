@@ -87,6 +87,7 @@ import {
 	listarUnidades,
 	listarDesignacoes,
 	designacaoAtiva,
+	motivoParaRecusarDesignacao,
 	vincularAdminGeral,
 	desvincularAdminGeral,
 	buscarModulosAdminVinculado,
@@ -128,6 +129,10 @@ import {
 	ocupadosDoHistorico
 } from '$lib/servidores/conflitos';
 import { colaboradorTemAcesso, isAdminGeral, nomeParaRastro } from '$lib/auth';
+import { arvoreUnidades } from '$lib/db/unidades';
+import { responsaveisVigentesDe } from '$lib/db/unidades-responsaveis';
+import { locaisDaUnidade, localValido } from '$lib/unidades/locais';
+import { designarTitularNoAto, mensagemDoAtalho } from '$lib/server/unidades/designar-titular';
 import { dataIso, inteiroNaFaixa, textoLimitado } from '$lib/server/form-data';
 import {
 	lotacoesAdministradas,
@@ -286,6 +291,7 @@ export const load: PageServerLoad = async ({ locals, params, platform, depends }
 		lotacoes,
 		todasUnidades,
 		designacoes,
+		arvoreDeUnidades,
 		modulosAdmin,
 		historico,
 		credenciaisPasskey,
@@ -302,6 +308,7 @@ export const load: PageServerLoad = async ({ locals, params, platform, depends }
 		listarLotacoes(db),
 		listarUnidades(db),
 		listarDesignacoes(db),
+		arvoreUnidades(db),
 		buscarModulosAdminVinculado(db, id),
 		listarHistoricoPolicial(db, id),
 		// A credencial pertence à PESSOA: quem tem conta admin vinculada tem duas
@@ -315,6 +322,14 @@ export const load: PageServerLoad = async ({ locals, params, platform, depends }
 		feriadosNoIntervalo(db, hojeBrasilISO(), adicionarDias(hojeBrasilISO(), 540))
 	]);
 	const ehAdminGeral = modulosAdmin != null;
+
+	// Unidades sem direção vigente, pelo NOME: é o que o atalho "designar como
+	// titular" (E66) do painel de movimentação precisa saber.
+	const direcoes = await responsaveisVigentesDe(
+		db,
+		todasUnidades.map((x) => x.id)
+	);
+	const semTitular = todasUnidades.filter((x) => !direcoes.has(x.id)).map((x) => x.nome);
 
 	const credencialPasskey = credenciaisPasskey.find((c) => c.revogadoEm == null) ?? null;
 
@@ -337,6 +352,16 @@ export const load: PageServerLoad = async ({ locals, params, platform, depends }
 		lotacoes,
 		unidades: todasUnidades,
 		designacoes,
+		/**
+		 * Onde ele pode trabalhar (E66): a lotação (sede) e as subunidades dela.
+		 * Vazio quando a lotação em texto não casa com unidade nenhuma — só o
+		 * Admin Geral edita este campo.
+		 */
+		semTitular,
+		locais: locaisDaUnidade(
+			arvoreDeUnidades,
+			todasUnidades.find((x) => x.nome === policial.lotacao)?.id ?? null
+		),
 		modo,
 		acessos,
 		isAdmin: isAdm,
@@ -474,6 +499,16 @@ export const actions: Actions = {
 			email: formData.get('email')?.toString() || null
 		};
 
+		// "Trabalha em" (E66): vazio = a sede da lotação. Só o Admin Geral chega
+		// aqui (o modo já é `direto`), e a régua é sempre a mesma — o local tem
+		// de ser a própria lotação ou um descendente dela, senão vira uma segunda
+		// lotação com o efetivo contado duas vezes.
+		const localBruto = formData.get('local_id')?.toString() ?? '';
+		const localId = localBruto === '' ? null : Number(localBruto);
+		if (localId !== null && (!Number.isInteger(localId) || localId <= 0)) {
+			return fail(400, { error: 'Local de trabalho inválido.', fields: data });
+		}
+
 		const parsed = policialUpdateSchema.safeParse(data);
 		if (!parsed.success) {
 			return fail(400, { error: parsed.error.issues[0].message, fields: data });
@@ -495,6 +530,20 @@ export const actions: Actions = {
 		}
 		if (designacaoId !== null && !(await designacaoAtiva(db, designacaoId))) {
 			return fail(400, { error: 'Designação inexistente ou desativada.', fields: data });
+		}
+		// E69: dirigir a unidade (titular, adjunto, auxiliar) é só de delegado;
+		// administrar no sistema é outro assunto e pode ser OIP.
+		const recusaDesignacao = await motivoParaRecusarDesignacao(db, designacaoId, data.cargo);
+		if (recusaDesignacao) return fail(400, { error: recusaDesignacao, fields: data });
+
+		const arvore = await arvoreUnidades(db);
+		const unidadeDaLotacao = [...arvore.values()].find((x) => x.nome === data.lotacao)?.id ?? null;
+		if (!localValido(arvore, unidadeDaLotacao, localId)) {
+			return fail(400, {
+				error:
+					'O local de trabalho tem de ser a própria unidade de lotação ou uma subunidade dela.',
+				fields: data
+			});
 		}
 
 		// Bloqueia transferência para fora do escopo do administrador. Para o Admin
@@ -537,6 +586,7 @@ export const actions: Actions = {
 				...(mesmoTelefone ? { telefone: telefoneGravado } : {}),
 				email: data.email ?? undefined,
 				designacao_id: designacaoId,
+				local_id: localId,
 				...(origemDaDesignacao ? { designacao_origem: origemDaDesignacao } : {})
 			};
 			const antes = semCamposSensiveis(alvo);
@@ -928,7 +978,15 @@ export const actions: Actions = {
 			return fail(400, { error: 'A unidade de destino é igual à unidade atual.' });
 		}
 
-		return concluirAcaoRH(event, auth, formData, {
+		// Atalho da E66: o delegado que chega assume a unidade que está sem
+		// titular, no mesmo ato — eram dois passos e o segundo era esquecido.
+		// Roda ANTES da movimentação só para recusar cedo o que não pode; o
+		// registro da direção vem depois, com a lotação já trocada.
+		const designarTitular = ['1', 'true', 'on'].includes(
+			String(formData.get('designar_titular') ?? '').toLowerCase()
+		);
+
+		const desfecho = await concluirAcaoRH(event, auth, formData, {
 			acao: {
 				tipo: 'movimentacao',
 				unidade_origem: origem,
@@ -941,6 +999,23 @@ export const actions: Actions = {
 			// Modo direto só: nada a recarregar ao lado do painel.
 			recarregar: () => Promise.resolve(null)
 		});
+
+		if (designarTitular && !('status' in desfecho)) {
+			const r = await designarTitularNoAto(getDB(event.platform), {
+				unidadeNome: parsed.data.unidade_destino,
+				policialId: auth.id,
+				cargo: alvo.cargo,
+				dataInicio: parsed.data.data_evento,
+				nup: parsed.data.nup || '',
+				quem: { id: auth.u.id, nome: auth.u.nome }
+			});
+			if (!r.ok) {
+				return fail(400, {
+					error: `Movimentação registrada, mas a direção não foi: ${mensagemDoAtalho(r.motivo)}`
+				});
+			}
+		}
+		return desfecho;
 	},
 
 	// ---- Afastamento: férias/licenças (apenas registra na linha do tempo) ----

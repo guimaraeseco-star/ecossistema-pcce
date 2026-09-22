@@ -132,6 +132,7 @@ export {
 	afastamentoVigente,
 	listarDesignacoes,
 	designacaoAtiva,
+	motivoParaRecusarDesignacao,
 	listarFeriasDoPolicial,
 	buscarFracao,
 	registrarProgramacao,

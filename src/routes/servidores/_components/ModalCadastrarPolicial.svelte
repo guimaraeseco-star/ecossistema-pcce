@@ -28,7 +28,8 @@
 		isAdmin,
 		isAdminOrSeccional,
 		isAdminUnidade,
-		lotacaoUsuario = null
+		lotacaoUsuario = null,
+		semTitular = []
 	}: {
 		open: boolean;
 		unidades: Unidade[];
@@ -36,6 +37,8 @@
 		isAdminOrSeccional: boolean;
 		isAdminUnidade: boolean;
 		lotacaoUsuario?: string | null;
+		/** Ids das unidades SEM direção vigente — o atalho "designar como titular" (E66). */
+		semTitular?: number[];
 	} = $props();
 
 	const formId = $props.id();
@@ -51,6 +54,13 @@
 	let lotacaoAdmin = $state('');
 	let email = $state('');
 
+	/** "Trabalha em" (E66): vazio = a sede da lotação. */
+	let localId = $state('');
+	/** Atalho da E66: o delegado recém-cadastrado assume a unidade sem titular. */
+	let designarTitular = $state(false);
+	let titularDesde = $state('');
+	let titularNup = $state('');
+
 	let papel = $state<string | null>(null);
 	let papelUnidadeId = $state<number | null>(null);
 	// Chave "Conceder Admin Geral" no cadastro (submetida via input hidden).
@@ -64,6 +74,24 @@
 
 	// Admin Geral escolhe; demais papéis herdam a lotação do escopo (readonly).
 	const lotacaoInput = $derived(isAdmin ? lotacaoAdmin : (lotacaoUsuario ?? ''));
+
+	/** A unidade da lotação escolhida, quando o nome casa com uma cadastrada. */
+	const unidadeDaLotacao = $derived(unidades.find((u) => u.nome === lotacaoInput) ?? null);
+	/**
+	 * Os locais possíveis (E66): a sede e as subunidades dela. Um nível basta na
+	 * tela — posto dentro de posto não existe no organograma.
+	 */
+	const locais = $derived(
+		unidadeDaLotacao
+			? unidades
+					.filter((u) => u.seccional_id === unidadeDaLotacao.id)
+					.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+			: []
+	);
+	/** O atalho só aparece para DELEGADO em unidade que está sem titular. */
+	const podeDesignarTitular = $derived(
+		isAdmin && cargo === 'DPC' && !!unidadeDaLotacao && semTitular.includes(unidadeDaLotacao.id)
+	);
 
 	// Papel administrativo exige a unidade/seccional de responsabilidade.
 	const papelPrecisaUnidade = $derived(!!papel && !(isAdminUnidade && papel === 'admin_unidade'));
@@ -85,6 +113,10 @@
 		classe = '';
 		regime = 'plantao';
 		lotacaoAdmin = '';
+		localId = '';
+		designarTitular = false;
+		titularDesde = '';
+		titularNup = '';
 		email = '';
 		papel = null;
 		papelUnidadeId = null;
@@ -155,6 +187,12 @@
 		<input type="hidden" name="cpf" value={limparCPF(cpf)} />
 		<input type="hidden" name="telefone" value={telefone} />
 		<input type="hidden" name="lotacao" value={lotacaoInput} />
+		<input type="hidden" name="local_id" value={localId} />
+		<input
+			type="hidden"
+			name="designar_titular"
+			value={podeDesignarTitular && designarTitular ? '1' : ''}
+		/>
 		<input type="hidden" name="regime" value={regime} />
 		<input type="hidden" name="papel" value={papel ?? ''} />
 		<input type="hidden" name="papel_unidade_id" value={papelUnidadeId ?? ''} />
@@ -270,7 +308,67 @@
 					/>
 				{/if}
 			</label>
+
+			<!-- Trabalha em (E66): só quando a lotação tem subunidade (posto, núcleo).
+			     A lotação continua sendo a unidade; isto é só onde a pessoa fica. -->
+			{#if locais.length > 0}
+				<label class="label sm:col-span-12">
+					<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1">
+						Trabalha em
+						<span class="normal-case font-normal opacity-70">— a lotação continua a mesma</span>
+					</span>
+					<select class="select py-1 px-3 text-sm" bind:value={localId}>
+						<option value="">{lotacaoInput} (sede)</option>
+						{#each locais as l (l.id)}
+							<option value={String(l.id)}>{l.nome}</option>
+						{/each}
+					</select>
+				</label>
+			{/if}
 		</div>
+
+		<!-- Atalho da E66: lotar um delegado numa unidade SEM titular e designá-lo
+		     no mesmo ato — eram dois atos e o segundo era esquecido. -->
+		{#if podeDesignarTitular}
+			<div class="mt-1 rounded-xl border border-warning-500/30 bg-warning-500/5 p-3">
+				<label class="flex items-start gap-2 text-sm">
+					<input type="checkbox" class="checkbox mt-0.5" bind:checked={designarTitular} />
+					<span>
+						<span class="font-medium">Designar como titular de {lotacaoInput}</span>
+						<span class="block text-xs text-surface-600 dark:text-surface-400">
+							A unidade está sem direção vigente. A designação fica registrada com vigência e NUP,
+							como na ficha da unidade.
+						</span>
+					</span>
+				</label>
+				{#if designarTitular}
+					<div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+						<label class="label">
+							<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1">Desde</span>
+							<input
+								class="input py-1 px-3 text-sm"
+								type="date"
+								name="titular_desde"
+								bind:value={titularDesde}
+							/>
+						</label>
+						<label class="label">
+							<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"
+								>NUP do processo</span
+							>
+							<input
+								class="input py-1 px-3 text-sm"
+								type="text"
+								name="titular_nup"
+								bind:value={titularNup}
+								maxlength="40"
+								placeholder="00000.000000/0000-00"
+							/>
+						</label>
+					</div>
+				{/if}
+			</div>
+		{/if}
 
 		<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1 items-stretch">
 			{#if isAdminOrSeccional || isAdminUnidade}

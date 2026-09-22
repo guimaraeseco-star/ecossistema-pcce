@@ -183,6 +183,7 @@ export async function listarPoliciais(
 			data_nascimento: policiais.data_nascimento,
 			data_posse: policiais.data_posse,
 			designacao_id: policiais.designacao_id,
+			local_id: policiais.local_id,
 			designacao_origem: policiais.designacao_origem,
 			designacao: designacoes.nome,
 			designacao_simbolo: designacoes.simbolo,
@@ -248,6 +249,8 @@ export interface DadosPolicial {
 	classe?: string;
 	papel?: string | null;
 	papel_unidade_id?: number | null;
+	/** Onde trabalha (E66): a lotação (nulo = sede) ou uma subunidade dela. */
+	local_id?: number | null;
 	email?: string | null;
 	email_pessoal?: string | null;
 	ativo?: number;
@@ -289,6 +292,7 @@ async function colunasDoPolicial(data: DadosPolicial, env?: CpfCriptoEnv) {
 		classe: data.classe || '',
 		papel: (data.papel as 'admin_seccional' | 'admin_unidade' | null) || null,
 		papel_unidade_id: data.papel_unidade_id ?? null,
+		local_id: data.local_id ?? null,
 		// Só entram no SET quando a folha os mandou: o Apps Script antigo não
 		// manda, e não pode zerar o que a carga da planilha gravou.
 		...(data.cargo_anterior !== undefined ? { cargo_anterior: data.cargo_anterior } : {}),
@@ -431,6 +435,8 @@ export type CamposDoPolicial = Partial<{
 	email_pessoal_verificado: number;
 	/** A função exercida; `null` limpa. Ver `designacao_origem`. */
 	designacao_id: number | null;
+	/** Onde trabalha (E66): a lotação (nulo = sede) ou uma subunidade dela. */
+	local_id: number | null;
 	/** Quem passou a mandar nela — a tela grava `'sistema'` (0089). */
 	designacao_origem: 'planilha' | 'sistema';
 }>;
@@ -472,6 +478,7 @@ export async function camposDeAtualizacao(
 		updateData.email_pessoal_verificado = data.email_pessoal_verificado;
 	}
 	if (data.designacao_id !== undefined) updateData.designacao_id = data.designacao_id;
+	if (data.local_id !== undefined) updateData.local_id = data.local_id;
 	if (data.designacao_origem !== undefined) {
 		updateData.designacao_origem = data.designacao_origem;
 	}

@@ -52,3 +52,38 @@ export async function designacaoAtiva(db: Database, id: number): Promise<boolean
 		.get();
 	return !!linha;
 }
+
+/**
+ * As designações que são DIREÇÃO da unidade — titular, adjunto e auxiliar — e
+ * que por isso só cabem em delegado (E69, 22/09/2026).
+ *
+ * A distinção que a decisão fixou: administrar a unidade NO SISTEMA (o papel
+ * `admin_unidade`) é acesso e pode ser DPC ou OIP; dirigir a unidade é função
+ * da estrutura e é só de DPC. Chefe de seção fica de fora desta lista de
+ * propósito: ele chefia uma seção DENTRO da unidade, não a unidade, e pode ser
+ * OIP.
+ *
+ * Casa pelo NOME porque o catálogo é parametrizado (a corporação inclui função
+ * nova sem deploy) e os ids seriam uma segunda fonte a manter sincronizada.
+ */
+const DESIGNACOES_DE_DIRECAO = ['delegado titular', 'delegado adjunto', 'delegado auxiliar'];
+
+/**
+ * A designação escolhida cabe neste cargo? Devolve o motivo da recusa, ou
+ * `null` quando pode. `designacaoId` nulo (sem designação) sempre pode.
+ */
+export async function motivoParaRecusarDesignacao(
+	db: Database,
+	designacaoId: number | null,
+	cargo: string
+): Promise<string | null> {
+	if (designacaoId == null || cargo === 'DPC') return null;
+	const linha = await db
+		.select({ nome: designacoes.nome })
+		.from(designacoes)
+		.where(eq(designacoes.id, designacaoId))
+		.get();
+	if (!linha) return null;
+	if (!DESIGNACOES_DE_DIRECAO.includes(linha.nome.trim().toLowerCase())) return null;
+	return `"${linha.nome}" é função de direção da unidade e só cabe em delegado (DPC). Chefia de seção, sim, pode ser OIP.`;
+}

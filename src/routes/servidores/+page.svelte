@@ -340,6 +340,7 @@
 		{isAdminOrSeccional}
 		{isAdminUnidade}
 		lotacaoUsuario={data.lotacaoUsuario}
+		semTitular={data.semTitular}
 	/>
 {/if}
 

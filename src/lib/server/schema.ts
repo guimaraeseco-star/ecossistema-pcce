@@ -73,6 +73,13 @@ export const policiais = sqliteTable(
 		/** A função exercida (catálogo `designacoes`). */
 		designacao_id: integer('designacao_id'),
 		/**
+		 * Onde a pessoa TRABALHA (E66, migração 0098): a própria unidade de
+		 * lotação (nulo = a sede) ou uma subunidade dela — um posto, um núcleo em
+		 * outra cidade. Não é lotação: efetivo, escala e teto de férias continuam
+		 * contando em `lotacao`. A régua está em `lib/unidades/locais.ts`.
+		 */
+		local_id: integer('local_id'),
+		/**
 		 * Quem definiu a designação (0089). `'planilha'` é o que a carga de
 		 * pessoal grava e regrava; `'sistema'` é a escolha feita na ficha do
 		 * servidor, e essa a carga NÃO sobrescreve — só relata a divergência.
