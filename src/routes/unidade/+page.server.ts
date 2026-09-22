@@ -22,7 +22,11 @@ import {
 	type EfetivoLotacao
 } from '$lib/db/efetivo';
 import { municipiosPorUnidade, populacaoPorIbge } from '$lib/db/cobertura';
-import { responsaveisVigentesDe, type ResponsavelDaUnidade } from '$lib/db/unidades-responsaveis';
+import {
+	responsaveisVigentesDe,
+	titularesAusentesSemRespondencia,
+	type ResponsavelDaUnidade
+} from '$lib/db/unidades-responsaveis';
 import { pendenciasDeFeriasPorLotacao } from '$lib/db';
 import { escopoDeUnidades } from '$lib/server/unidades/escopo';
 import { nivelTipoUnidade, rotuloTipoUnidade } from '$lib/unidades/tipos';
@@ -60,6 +64,14 @@ export interface LinhaUnidade {
 	 * resolver (decisão dele, 17/09).
 	 */
 	pendenciasFerias: { reprogramacoesPendentes: number; abonosSemCiencia: number };
+	/**
+	 * O titular sai (ou já saiu) e ninguém responde pela unidade (E68).
+	 *
+	 * Vem para a LISTA, e não só para a ficha, porque a pendência da caixa de
+	 * avisos manda para cá: sem a marca em cada linha, "3 unidades sem quem
+	 * responda" obrigava a abrir as 61 uma a uma para descobrir quais são.
+	 */
+	ausencia: { titular: string; subtipo: string; inicio: string; fim: string | null } | null;
 }
 
 export interface BlocoUnidade {
@@ -85,7 +97,7 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 	// Uma unidade só no escopo: a "lista" seria a própria ficha.
 	if (escopo.nos.length === 1) redirect(302, `/unidade/${escopo.raiz.id}`);
 
-	const [efetivos, ibgesPorUnidade, populacaoDe, direcoes, pendenciasPorLotacao] =
+	const [efetivos, ibgesPorUnidade, populacaoDe, direcoes, pendenciasPorLotacao, ausentes] =
 		await Promise.all([
 			efetivoPorLotacao(db, hojeBrasilISO()),
 			municipiosPorUnidade(db),
@@ -96,8 +108,10 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 				db,
 				escopo.nos.map((n) => n.id)
 			),
-			pendenciasDeFeriasPorLotacao(db)
+			pendenciasDeFeriasPorLotacao(db),
+			titularesAusentesSemRespondencia(db)
 		]);
+	const ausenciaDe = new Map(ausentes.map((a) => [a.unidade_id, a]));
 	const filhosDe = (id: number) =>
 		escopo.nos
 			.filter((n) => n.seccional_id === id)
@@ -146,6 +160,12 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 			 * consulta de respondência procura.
 			 */
 			direcao: resumoDaDirecao(direcoes.get(n.id)),
+			ausencia: (() => {
+				const a = ausenciaDe.get(n.id);
+				return a
+					? { titular: a.titular_nome, subtipo: a.subtipo, inicio: a.data_inicio, fim: a.data_fim }
+					: null;
+			})(),
 			pendenciasFerias: [n, ...desc].reduce(
 				(acc, d) => {
 					const p = pendenciasPorLotacao.get(d.nome);

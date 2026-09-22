@@ -368,8 +368,9 @@
 			<label class="label sm:col-span-7">
 				<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1">
 					Designação
+					<span class="normal-case font-normal opacity-70">— função na estrutura</span>
 					{#if designacaoDaTela}
-						<span class="normal-case font-normal opacity-70">— {designacaoDaTela}</span>
+						<span class="normal-case font-normal opacity-70">· {designacaoDaTela}</span>
 					{/if}
 				</span>
 				<select class="select py-1 px-3 text-sm" name="designacao_id" bind:value={designacaoId}>
@@ -503,9 +504,19 @@
 				<span class="text-2xs font-bold uppercase opacity-60 ml-1">informativo</span>
 			{/if}
 		</h2>
+		<!-- E69: papel administrativo é ACESSO (quem opera o sistema pela unidade),
+	     não função na estrutura. São coisas distintas e a tela tem de dizê-lo:
+	     o papel pode ser de DPC ou de OIP, acumula com a designação e a mesma
+	     unidade pode ter mais de um; já dirigir a unidade é a designação de
+	     Titular, e só de delegado. -->
 		<p class="text-xs text-surface-600 dark:text-surface-400 mb-3">
 			Papel de gestão <b>restrito a uma seccional ou unidade</b>: gerencia escalas e policiais
 			apenas do próprio escopo. Diferente do Admin Geral, não concede acesso global.
+		</p>
+		<p class="text-xs text-surface-600 dark:text-surface-400 mb-3">
+			É <b>acesso ao sistema</b>, não função na estrutura: pode ser de delegado ou de inspetor, a
+			mesma unidade pode ter mais de um, e acumula com a designação. Quem <b>dirige</b> a unidade é o
+			Delegado Titular — isso é a Designação, ali em cima, e a direção formal aparece na ficha da unidade.
 		</p>
 
 		{#if solicitando}

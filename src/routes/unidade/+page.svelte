@@ -23,10 +23,19 @@
 	import { COR_SITUACAO } from '$lib/servidores/afastamentos';
 	import ModalEfetivo, { type PedidoEfetivo } from './_components/ModalEfetivo.svelte';
 	import CartaoUnidade from './_components/CartaoUnidade.svelte';
+	import { page } from '$app/state';
+	import { formatarData } from '$lib/utils/datas';
 
 	const { data }: PageProps = $props();
 
 	let busca = $state('');
+
+	/**
+	 * O filtro "sem respondência" (E68) já nasce ligado quando se chega pela
+	 * pendência da caixa de avisos (`/unidade?pendencia=respondencia`): o botão
+	 * "Resolver" tem de abrir as unidades DO AVISO, não a árvore inteira.
+	 */
+	let soSemRespondencia = $state(page.url.searchParams.get('pendencia') === 'respondencia');
 
 	/**
 	 * Alturas medidas do cabeçalho fixo e da primeira linha do `thead`: os
@@ -63,13 +72,15 @@
 	const casa = (u: LinhaUnidade, termo: string) =>
 		!termo || [u.nome, u.sigla, u.tipoRotulo].some((s) => s.toLowerCase().includes(termo));
 
-	/** Passa na busca E no filtro de titular — os dois se somam, não se anulam. */
+	/** Passa na busca E nos dois filtros — todos se somam, nenhum anula o outro. */
 	const passa = (u: LinhaUnidade, termo: string) =>
-		casa(u, termo) && (!soSemTitular || u.direcao === null);
+		casa(u, termo) &&
+		(!soSemTitular || u.direcao === null) &&
+		(!soSemRespondencia || u.ausencia !== null);
 
 	const blocosFiltrados = $derived.by((): BlocoUnidade[] => {
 		const termo = busca.trim().toLowerCase();
-		if (!termo && !soSemTitular) return data.blocos;
+		if (!termo && !soSemTitular && !soSemRespondencia) return data.blocos;
 		return data.blocos
 			.map((b) => {
 				const filhas = b.filhas.filter((f) => passa(f, termo));
@@ -77,7 +88,10 @@
 				// filtro de titular ligado, não — ali a pergunta é sobre CADA unidade,
 				// e trazer as filhas providas de volta desfaria o recorte.
 				if (passa(b.unidade, termo)) {
-					return { unidade: b.unidade, filhas: soSemTitular ? filhas : b.filhas };
+					return {
+						unidade: b.unidade,
+						filhas: soSemTitular || soSemRespondencia ? filhas : b.filhas
+					};
 				}
 				return filhas.length ? { unidade: b.unidade, filhas } : null;
 			})
@@ -87,6 +101,12 @@
 	const semTitular = $derived(
 		[data.raiz, ...data.blocos.flatMap((b) => [b.unidade, ...b.filhas])].filter(
 			(u) => u.direcao === null && cobraTitular(u)
+		).length
+	);
+
+	const semRespondencia = $derived(
+		[data.raiz, ...data.blocos.flatMap((b) => [b.unidade, ...b.filhas])].filter(
+			(u) => u.ausencia !== null
 		).length
 	);
 
@@ -203,6 +223,20 @@
 			Sem titular{#if semTitular > 0}
 				· {semTitular}{/if}
 		</button>
+		<!-- "O titular sai e ninguém responde" (E68): o botão só aparece quando há
+		     o que mostrar, senão vira mais um controle desligado na barra. -->
+		{#if semRespondencia > 0}
+			<button
+				type="button"
+				class="btn btn-sm self-start sm:self-auto {soSemRespondencia
+					? 'preset-filled-warning-500'
+					: 'preset-outlined-surface-500'}"
+				aria-pressed={soSemRespondencia}
+				onclick={() => (soSemRespondencia = !soSemRespondencia)}
+			>
+				Sem respondência · {semRespondencia}
+			</button>
+		{/if}
 	</div>
 </div>
 
@@ -294,8 +328,22 @@
 			>
 		{/if}
 		{@render linhaDirecao(u)}
+		{@render alertaAusencia(u)}
 		{@render alertaFerias(u)}
 	</td>
+{/snippet}
+
+<!-- Titular ausente sem quem responda (E68): a marca que faz a pendência da
+     caixa de avisos ser encontrável na lista. -->
+{#snippet alertaAusencia(u: LinhaUnidade)}
+	{#if u.ausencia}
+		<span class="block text-2xs font-semibold text-warning-700 dark:text-warning-400">
+			⚠ {u.ausencia.titular}
+			{u.ausencia.subtipo === 'ferias' ? 'entra de férias' : 'se afasta'} em {formatarData(
+				u.ausencia.inicio
+			)} — sem quem responda
+		</span>
+	{/if}
 {/snippet}
 
 <!-- Pendência de férias: o que a unidade ainda tem de resolver (pedido à COGEP

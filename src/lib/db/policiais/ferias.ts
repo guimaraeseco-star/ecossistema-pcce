@@ -40,6 +40,10 @@ import {
 	type TipoReprogramacao
 } from '$lib/servidores/ferias';
 import { adicionarDias } from '$lib/utils/datas';
+import {
+	desvincularTemporariasDoEvento,
+	encerrarTemporariaDoEvento
+} from '../unidades-responsaveis';
 
 /** Quem registra — snapshot de id e nome, como no resto do histórico. */
 export interface Registrador {
@@ -280,6 +284,10 @@ export async function excluirProgramacao(
 			db.delete(feriasFracoes).where(inArray(feriasFracoes.id, ids))
 		];
 		if (eventos.length > 0) {
+			// A respondência temporária que cobria estas férias (E68) aponta para o
+			// evento: solta o vínculo e fecha a cobertura ANTES do delete, senão a
+			// chave estrangeira fica apontando para linha que não existe mais.
+			for (const eventoId of eventos) await desvincularTemporariasDoEvento(db, eventoId);
 			passos.push(db.delete(policialHistorico).where(inArray(policialHistorico.id, eventos)));
 		}
 		await batchNonEmpty(db, passos);
@@ -365,6 +373,12 @@ export async function corrigirFracao(
 		);
 	}
 	await batchNonEmpty(db, passos);
+	// As férias encolheram: quem respondia pela unidade do titular nesses dias
+	// (E68) para no novo último dia. Só encurta — período que cresceu não
+	// estende cobertura sozinho, porque quem responde é indicação, não cálculo.
+	if (f.historico_id && novo.data_fim < f.data_fim) {
+		await encerrarTemporariaDoEvento(db, f.historico_id, novo.data_fim);
+	}
 	return { ok: true, antes: f };
 }
 

@@ -12,6 +12,7 @@
 	 * que passa `aoAbrirPainel`.
 	 */
 	import { COR_SITUACAO } from '$lib/servidores/afastamentos';
+	import { formatarData } from '$lib/utils/datas';
 	import type { LinhaUnidade } from '../+page.server';
 	import type { PedidoEfetivo } from './ModalEfetivo.svelte';
 
@@ -120,6 +121,15 @@
 			<span class="mt-0.5 block text-xs font-semibold text-warning-600 dark:text-warning-400"
 				>Sem titular</span
 			>
+		{/if}
+		<!-- Titular ausente sem quem responda (E68). -->
+		{#if unidade.ausencia}
+			<span class="mt-0.5 block text-xs font-semibold text-warning-700 dark:text-warning-400">
+				⚠ {unidade.ausencia.titular}
+				{unidade.ausencia.subtipo === 'ferias' ? 'entra de férias' : 'se afasta'} em {formatarData(
+					unidade.ausencia.inicio
+				)} — sem quem responda
+			</span>
 		{/if}
 		{#if unidade.pendenciasFerias.reprogramacoesPendentes > 0 || unidade.pendenciasFerias.abonosSemCiencia > 0}
 			<span class="mt-0.5 block text-xs font-semibold text-warning-700 dark:text-warning-400">

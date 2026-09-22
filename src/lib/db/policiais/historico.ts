@@ -12,6 +12,7 @@ import type { Database } from '../core';
 import { camposDeAtualizacao, type CamposDoPolicial } from './cadastro';
 import type { CpfCriptoEnv } from '../../crypto/cpf-cripto';
 import { adicionarDias, diffDiasInclusivo } from '$lib/utils/datas';
+import { encerrarTemporariaDoEvento } from '../unidades-responsaveis';
 
 type TipoHistorico =
 	'movimentacao' | 'afastamento' | 'desvinculacao' | 'edicao' | 'papel' | 'observacao';
@@ -203,6 +204,10 @@ export async function encurtarAfastamento(
 			descricao: ev.descricao ? `${ev.descricao} — ${nota}` : nota
 		})
 		.where(eq(policialHistorico.id, eventoId));
+	// O titular voltou antes: quem respondia pela unidade dele para de responder
+	// no mesmo dia (E68). Sem isto sobraria um substituto vigente com o titular
+	// de volta — dois dirigentes no mesmo dia, que é o que a temporária evita.
+	await encerrarTemporariaDoEvento(db, eventoId, fim);
 	return { ...ev, data_fim: fim, descricao: ev.descricao ? `${ev.descricao} — ${nota}` : nota };
 }
 

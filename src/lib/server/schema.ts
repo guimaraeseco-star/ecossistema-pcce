@@ -2324,6 +2324,18 @@ export const unidadeResponsaveis = sqliteTable(
 			.notNull()
 			.references(() => policiais.id),
 		papel: text('papel', { enum: ['titular', 'respondente'] }).notNull(),
+		/**
+		 * Permanente (titular, respondente de vacância) ou TEMPORÁRIA (E68): a
+		 * que cobre férias/afastamento do titular sem encerrá-lo. A unicidade do
+		 * vigente é por (unidade, caráter) — 0099.
+		 */
+		carater: text('carater', { enum: ['permanente', 'temporaria'] })
+			.notNull()
+			.default('permanente'),
+		/** Quem a temporária cobre — o titular afastado. */
+		substitui_policial_id: integer('substitui_policial_id').references(() => policiais.id),
+		/** O afastamento que a originou, para o retorno antecipado encurtá-la. */
+		evento_id: integer('evento_id').references(() => policialHistorico.id),
 		data_inicio: text('data_inicio').notNull(),
 		data_fim: text('data_fim'),
 		/**
