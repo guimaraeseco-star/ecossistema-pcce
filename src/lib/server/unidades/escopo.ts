@@ -60,12 +60,29 @@ export async function escopoDeUnidades(
 	const raiz = arvore.get(raizId);
 	if (!raiz) return null;
 	const nos = subarvoreDe(arvore, raizId);
-	return { raiz, arvore, nos: noChapeuDeUnidade(u) ? soACasa(nos, raizId) : nos };
+	return { raiz, arvore, nos: alcancaSoACasa(u) ? soACasa(nos, raizId) : nos };
 }
 
-/** Esta sessão está atuando como UNIDADE e não como rede (E71)? */
-function noChapeuDeUnidade(u: UsuarioLogado | null): boolean {
-	return u?.tipo === 'admin' && u.atuandoComo === 'unidade';
+/**
+ * Esta sessão enxerga só a CASA (o nó e as suas subunidades) ou a subárvore
+ * inteira? (E71)
+ *
+ * Três respostas diferentes, porque são três coisas diferentes:
+ *
+ * - **admin de seccional**: a subárvore. Administrar as delegacias abaixo é
+ *   justamente o trabalho dele;
+ * - **sessão admin (Admin Geral)**: depende do CHAPÉU — ele é as duas coisas,
+ *   e o seletor diz qual vale agora;
+ * - **admin de unidade e colaborador**: sempre a casa. Quem administra uma
+ *   UNIDADE administra aquela unidade e os postos dela, nunca outras unidades
+ *   penduradas no mesmo nó. Isto passou despercebido enquanto ninguém era
+ *   administrador de um departamento; no dia em que ele se tornou (22/09), o
+ *   papel de unidade passou a enxergar as 61 unidades do DPI SUL.
+ */
+function alcancaSoACasa(u: UsuarioLogado | null): boolean {
+	if (isAdminSeccional(u)) return false;
+	if (isAdminGeral(u)) return u?.atuandoComo === 'unidade';
+	return true;
 }
 
 /**

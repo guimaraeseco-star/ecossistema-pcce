@@ -83,3 +83,52 @@ describe('escopoDeUnidades para a sessão admin', () => {
 		expect(await escopoDeUnidades(db, admin({ unidade_id: 987654 }))).toBeNull();
 	});
 });
+
+describe('escopoDeUnidades para o PAPEL do servidor', () => {
+	const policial = (over: Record<string, unknown>) =>
+		({
+			id: 2,
+			tipo: 'policial',
+			nome: 'Servidor',
+			primeiro_acesso: false,
+			...over
+		}) as UsuarioLogado;
+
+	it('admin de unidade alcança só a casa, mesmo quando a unidade é um departamento (E71)', async () => {
+		const escopo = await escopoDeUnidades(
+			db,
+			policial({ papel: 'admin_unidade', papel_unidade_id: DEP })
+		);
+		expect((escopo?.nos ?? []).map((n) => n.nome).sort()).toEqual([
+			'DEP DE TESTE',
+			'NUCLEO DO DEP'
+		]);
+		// Era isto que ele via na tela em 23/09: as férias e a árvore inteiras
+		// pelo papel de administrador da unidade 2.
+		expect(unidadeNoEscopo(escopo!, SECCIONAL)).toBe(false);
+		expect(unidadeNoEscopo(escopo!, DELEGACIA)).toBe(false);
+	});
+
+	it('admin de unidade de uma DELEGACIA continua com a delegacia e os postos dela', async () => {
+		const escopo = await escopoDeUnidades(
+			db,
+			policial({ papel: 'admin_unidade', papel_unidade_id: DELEGACIA })
+		);
+		expect((escopo?.nos ?? []).map((n) => n.nome).sort()).toEqual([
+			'DELEGACIA DA SECCIONAL',
+			'POSTO DA DELEGACIA'
+		]);
+	});
+
+	it('admin de SECCIONAL continua alcançando as delegacias abaixo — é o trabalho dele', async () => {
+		const escopo = await escopoDeUnidades(
+			db,
+			policial({ papel: 'admin_seccional', papel_unidade_id: SECCIONAL })
+		);
+		expect((escopo?.nos ?? []).map((n) => n.nome).sort()).toEqual([
+			'DELEGACIA DA SECCIONAL',
+			'POSTO DA DELEGACIA',
+			'SECCIONAL DO DEP'
+		]);
+	});
+});
