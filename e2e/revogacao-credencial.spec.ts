@@ -102,8 +102,8 @@ function semearContaVinculada(senhaHash: string, termoHash: string): boolean {
 		 DELETE FROM policiais WHERE id=${POL};
 		 INSERT INTO policiais (id, matricula, nome, cargo, lotacao, senha, ativo, primeiro_acesso)
 		 VALUES (${POL}, '${MATRICULA}', 'Vinculado Revogacao', 'DPC', '${FIXTURE.unidadeA.nome}', '${senhaHash}', 1, 0);
-		 INSERT INTO administradores (id, login, senha, nome, policial_id, primeiro_acesso)
-		 VALUES (${ADM}, '${MATRICULA}', 'placeholder-nunca-usado', 'Vinculado Revogacao', ${POL}, 0);
+		 INSERT INTO administradores (id, login, senha, nome, policial_id, primeiro_acesso, unidade_id)
+		 VALUES (${ADM}, '${MATRICULA}', 'placeholder-nunca-usado', 'Vinculado Revogacao', ${POL}, 0, ${FIXTURE.departamento.id});
 		 INSERT INTO aceites_termos (usuario_tipo, usuario_id, versao_termo, hash_termo, aceitou_lgpd, aceitou_uso_email, aceitou_uso_localizacao)
 		 VALUES ('policial', ${POL}, '${TERMO_VERSAO}', '${termoHash}', 1, 1, 1),
 		        ('admin', ${ADM}, '${TERMO_VERSAO}', '${termoHash}', 1, 1, 1);`
