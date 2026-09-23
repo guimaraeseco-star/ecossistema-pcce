@@ -6,7 +6,7 @@
  * ver `admin-modulos.ts` e a migração 0065.
  */
 import { eq } from 'drizzle-orm';
-import { administradores, policiais } from '../server/schema';
+import { administradores, policiais, unidades } from '../server/schema';
 import { gerarSenhaAleatoriaHash } from '../auth';
 import type { Database } from './core';
 import type { ModulosAdmin } from '../server/auth/admin-modulos';
@@ -28,7 +28,13 @@ export type { ModulosAdmin };
 export async function vincularAdminGeral(
 	db: Database,
 	policial: typeof policiais.$inferSelect,
-	modulos: ModulosAdmin = { escalas: true, gise: true }
+	modulos: ModulosAdmin = { escalas: true, gise: true },
+	/**
+	 * O NÓ que a conta vai administrar (E65). Obrigatório na prática — conta
+	 * sem nó não opera —, opcional na assinatura só para não quebrar os
+	 * chamadores antigos enquanto a tela nova não é o único caminho.
+	 */
+	unidadeId: number | null = null
 ): Promise<void> {
 	const existente = await db
 		.select({ id: administradores.id })
@@ -48,7 +54,8 @@ export async function vincularAdminGeral(
 		primeiro_acesso: 0,
 		policial_id: policial.id,
 		modulo_escalas: modulos.escalas ? 1 : 0,
-		modulo_gise: modulos.gise ? 1 : 0
+		modulo_gise: modulos.gise ? 1 : 0,
+		unidade_id: unidadeId
 	});
 }
 
@@ -149,4 +156,68 @@ export async function buscarAdminVinculadoPorPolicial(
 		.from(administradores)
 		.where(eq(administradores.policial_id, policialId))
 		.get();
+}
+
+/** Uma conta administrativa como a tela do Super Admin a lista (E65). */
+export interface ContaAdministrativa {
+	id: number;
+	login: string;
+	nome: string;
+	/** O policial vinculado, quando a conta é de alguém do quadro. */
+	policial_id: number | null;
+	/** O nó que ela administra; `null` = conta que NÃO opera. */
+	unidade_id: number | null;
+	unidade_nome: string | null;
+	modulo_escalas: boolean;
+	modulo_gise: boolean;
+	created_at: string | null;
+}
+
+/**
+ * As contas administrativas, para a tela do Super Admin.
+ *
+ * Inclui as que estão sem nó de propósito: é justamente a conta que não opera
+ * que precisa aparecer, para ele dar um nó a ela ou entender por que alguém
+ * não consegue entrar.
+ */
+export async function listarContasAdministrativas(db: Database): Promise<ContaAdministrativa[]> {
+	const linhas = await db
+		.select({
+			id: administradores.id,
+			login: administradores.login,
+			nome: administradores.nome,
+			policial_id: administradores.policial_id,
+			unidade_id: administradores.unidade_id,
+			unidade_nome: unidades.nome,
+			modulo_escalas: administradores.modulo_escalas,
+			modulo_gise: administradores.modulo_gise,
+			created_at: administradores.created_at
+		})
+		.from(administradores)
+		.leftJoin(unidades, eq(unidades.id, administradores.unidade_id))
+		.orderBy(administradores.nome);
+	return linhas.map((l) => ({
+		...l,
+		modulo_escalas: Number(l.modulo_escalas) === 1,
+		modulo_gise: Number(l.modulo_gise) === 1
+	}));
+}
+
+/** Troca o nó que a conta administra. Devolve `false` quando a conta não existe. */
+export async function definirNoDaConta(
+	db: Database,
+	adminId: number,
+	unidadeId: number | null
+): Promise<boolean> {
+	const conta = await db
+		.select({ id: administradores.id })
+		.from(administradores)
+		.where(eq(administradores.id, adminId))
+		.get();
+	if (!conta) return false;
+	await db
+		.update(administradores)
+		.set({ unidade_id: unidadeId })
+		.where(eq(administradores.id, adminId));
+	return true;
 }

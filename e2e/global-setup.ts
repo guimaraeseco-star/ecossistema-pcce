@@ -18,6 +18,13 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
  */
 export const FIXTURE = {
 	password: 'fixture-cross-lotacao-2026!',
+	/**
+	 * O departamento das fixtures (E65): a conta de Admin Geral administra um
+	 * NÓ, e o alcance dela é a subárvore dele. Sem este nó a conta não
+	 * enxergaria as duas delegacias abaixo — e os specs que entram como Admin
+	 * Geral veriam tela vazia.
+	 */
+	departamento: { id: 99000, nome: 'DEPARTAMENTO E2E FIXTURE' },
 	unidadeA: { id: 99001, nome: 'DELEGACIA E2E FIXTURE A' },
 	unidadeB: { id: 99002, nome: 'DELEGACIA E2E FIXTURE B' },
 	/** CPF em claro (sem CPF_ENC_KEY local o app trata como legado) — precisa
@@ -118,10 +125,12 @@ export default async function globalSetup() {
 	// primeiro_acesso=0 pula redirect para /alterar-senha.
 	const senhaHash = await hashSenha(FIXTURE.password);
 	const fixtureSeed = `
-		INSERT INTO unidades (id, nome, tipo) VALUES
-			(${FIXTURE.unidadeA.id}, '${FIXTURE.unidadeA.nome}', 'delegacia'),
-			(${FIXTURE.unidadeB.id}, '${FIXTURE.unidadeB.nome}', 'delegacia')
-		ON CONFLICT(id) DO UPDATE SET nome = excluded.nome, tipo = excluded.tipo;
+		INSERT INTO unidades (id, nome, tipo, seccional_id) VALUES
+			(${FIXTURE.departamento.id}, '${FIXTURE.departamento.nome}', 'departamento', NULL),
+			(${FIXTURE.unidadeA.id}, '${FIXTURE.unidadeA.nome}', 'delegacia', ${FIXTURE.departamento.id}),
+			(${FIXTURE.unidadeB.id}, '${FIXTURE.unidadeB.nome}', 'delegacia', ${FIXTURE.departamento.id})
+		ON CONFLICT(id) DO UPDATE SET nome = excluded.nome, tipo = excluded.tipo,
+			seccional_id = excluded.seccional_id;
 		INSERT INTO policiais
 			(id, matricula, nome, cargo, lotacao, senha, primeiro_acesso, email, ativo, cpf)
 		VALUES
@@ -139,12 +148,13 @@ export default async function globalSetup() {
 			cargo = excluded.cargo, lotacao = excluded.lotacao, senha = excluded.senha,
 			primeiro_acesso = excluded.primeiro_acesso, email = excluded.email,
 			ativo = excluded.ativo, papel = excluded.papel, papel_unidade_id = excluded.papel_unidade_id;
-		INSERT INTO administradores (id, login, senha, nome, email, primeiro_acesso)
+		INSERT INTO administradores (id, login, senha, nome, email, primeiro_acesso, unidade_id)
 		VALUES
-			(${FIXTURE.adminGeral.id}, '${FIXTURE.adminGeral.login}', '${senhaHash}', 'Admin Geral Fixture', NULL, 0),
-			(${FIXTURE.superAdmin.id}, '${FIXTURE.superAdmin.login}', '${senhaHash}', 'Super Admin Fixture', NULL, 0)
+			(${FIXTURE.adminGeral.id}, '${FIXTURE.adminGeral.login}', '${senhaHash}', 'Admin Geral Fixture', NULL, 0, ${FIXTURE.departamento.id}),
+			(${FIXTURE.superAdmin.id}, '${FIXTURE.superAdmin.login}', '${senhaHash}', 'Super Admin Fixture', NULL, 0, NULL)
 		ON CONFLICT(id) DO UPDATE SET login = excluded.login, senha = excluded.senha,
-			nome = excluded.nome, email = excluded.email, primeiro_acesso = excluded.primeiro_acesso;
+			nome = excluded.nome, email = excluded.email, primeiro_acesso = excluded.primeiro_acesso,
+			unidade_id = excluded.unidade_id;
 		INSERT INTO escalas (id, titulo, cidade, tipo, lotacao, data_inicio, data_fim)
 		VALUES
 			(${FIXTURE.escalaA.id}, 'Escala E2E Fixture A', 'Fortaleza', 'plantao', '${FIXTURE.unidadeA.nome}', '2026-01-01', '2026-01-01')

@@ -8,11 +8,17 @@
  * `lotacoesAdministradas` (FLW-RBAC-003): admin de seccional e de unidade
  * administram `papel_unidade_id`, e papel sem unidade é papel sem alcance.
  *
- * Para a sessão de admin (Admin Geral) a raiz é o DEPARTAMENTO: derivado da
- * lotação do policial VINCULADO à conta quando há um (`adminPolicialId` →
- * `departamentoDe`, E24), senão o departamento padrão — o bootstrap por env
- * não tem policial. Quando o sistema servir mais de um departamento com um
- * Admin Geral por departamento, é aqui que a derivação troca de fonte.
+ * Para a sessão de admin a raiz é o NÓ da conta (`administradores.unidade_id`,
+ * E65): não se infere mais da lotação do policial vinculado nem cai no
+ * "departamento padrão". Conta admin sem nó não administra unidade nenhuma —
+ * é o caso do bootstrap por env depois da E65, que passou a ser só a chave do
+ * Super Admin.
+ *
+ * O CHAPÉU (E71) entra aqui: no de **rede** o escopo é a subárvore inteira do
+ * nó; no de **unidade**, só o nó e as suas SUBUNIDADES — posto, núcleo, seção,
+ * célula. Seccional e delegacia nunca entram pelo chapéu de unidade, mesmo
+ * pendendo do nó: é a diferença entre "o departamento que administra as
+ * delegacias" e "o departamento que é uma casa com os seus servidores".
  *
  * Nada aqui é a autorização das outras telas: `/servidores` continua com
  * `lotacoesAdministradas`, escalas com `verificarPermissaoEscala`. Este
@@ -20,18 +26,9 @@
  * unidade" — e, por `trilhaDaUnidade`, "de onde ele olha", para a barra do
  * topo.
  */
-import {
-	ancestraisDe,
-	arvoreUnidades,
-	buscarDepartamentoPadrao,
-	buscarPolicial,
-	departamentoDe,
-	subarvoreDe,
-	type Database,
-	type NoUnidade
-} from '$lib/db';
+import { ancestraisDe, arvoreUnidades, subarvoreDe, type Database, type NoUnidade } from '$lib/db';
 import { buscarUnidadePorNome } from '$lib/db/unidades';
-import { nivelTipoUnidade } from '$lib/unidades/tipos';
+import { nivelTipoUnidade, TIPOS_DE_SUBUNIDADE } from '$lib/unidades/tipos';
 import {
 	colaboradorComAcesso,
 	isAdminGeral,
@@ -58,31 +55,80 @@ export async function escopoDeUnidades(
 	u: UsuarioLogado
 ): Promise<EscopoUnidades | null> {
 	const arvore = await arvoreUnidades(db);
-	const raizId = await idDaRaiz(db, u, arvore);
+	const raizId = await idDaRaiz(db, u);
 	if (raizId == null) return null;
 	const raiz = arvore.get(raizId);
 	if (!raiz) return null;
-	return { raiz, arvore, nos: subarvoreDe(arvore, raizId) };
+	const nos = subarvoreDe(arvore, raizId);
+	return { raiz, arvore, nos: alcancaSoACasa(u) ? soACasa(nos, raizId) : nos };
 }
 
-async function idDaRaiz(
-	db: Database,
-	u: UsuarioLogado,
-	arvore: Map<number, NoUnidade>
-): Promise<number | null> {
+/**
+ * Esta sessão enxerga só a CASA (o nó e as suas subunidades) ou a subárvore
+ * inteira? (E71)
+ *
+ * Três respostas diferentes, porque são três coisas diferentes:
+ *
+ * - **admin de seccional** e **sessão admin (Admin Geral)**: depende do
+ *   CHAPÉU. Os dois são as duas coisas ao mesmo tempo — uma rede que
+ *   administra as unidades abaixo e uma casa com os seus próprios servidores,
+ *   que pede diária, lança férias e monta a escala como qualquer outra —, e o
+ *   seletor diz qual vale agora;
+ * - **admin de unidade e colaborador**: sempre a casa. Quem administra uma
+ *   UNIDADE administra aquela unidade e os postos dela, nunca outras unidades
+ *   penduradas no mesmo nó. Isto passou despercebido enquanto ninguém era
+ *   administrador de um departamento; no dia em que ele se tornou (22/09), o
+ *   papel de unidade passou a enxergar as 61 unidades do DPI SUL.
+ */
+function alcancaSoACasa(u: UsuarioLogado | null): boolean {
+	if (temChapeu(u)) return u?.atuandoComo === 'unidade';
+	return true;
+}
+
+/**
+ * Esta sessão tem os dois chapéus, e portanto seletor? (E71)
+ *
+ * Quem administra uma REDE é também uma casa: o Admin Geral do departamento e
+ * o admin de seccional. O admin de unidade fica de fora porque não há o que
+ * escolher — a casa dele já é todo o alcance que ele tem.
+ */
+export function temChapeu(u: UsuarioLogado | null): boolean {
+	if (isAdminSeccional(u)) return true;
+	return isAdminGeral(u) && u?.unidade_id != null;
+}
+
+/**
+ * O nó e as suas SUBUNIDADES — a casa, no chapéu de unidade.
+ *
+ * Corta pelo TIPO e não pela profundidade: o núcleo de Juazeiro pende do
+ * departamento e entra; a 1ª Seccional também pende dele e não entra. Uma
+ * subunidade de subunidade continua dentro, porque continua sendo a casa.
+ */
+function soACasa(nos: NoUnidade[], raizId: number): NoUnidade[] {
+	const dentro = new Set<number>([raizId]);
+	// `subarvoreDe` devolve em largura: o pai sempre vem antes do filho, então
+	// uma passada basta para decidir cada nó pelo pai já classificado.
+	for (const n of nos) {
+		if (n.id === raizId) continue;
+		if (
+			n.seccional_id != null &&
+			dentro.has(n.seccional_id) &&
+			(TIPOS_DE_SUBUNIDADE as readonly string[]).includes(n.tipo)
+		) {
+			dentro.add(n.id);
+		}
+	}
+	return nos.filter((n) => dentro.has(n.id));
+}
+
+async function idDaRaiz(db: Database, u: UsuarioLogado): Promise<number | null> {
 	if (isAdminSeccional(u) || isAdminUnidade(u)) return u.papel_unidade_id ?? null;
 	// Colaborador lotado com acesso (E61): vê a ficha da própria unidade.
 	if (colaboradorComAcesso(u)) return u.papel_unidade_id ?? null;
 	if (!isAdminGeral(u)) return null;
-
-	if (u.adminPolicialId != null) {
-		const vinculado = await buscarPolicial(db, u.adminPolicialId);
-		const propria = vinculado ? await buscarUnidadePorNome(db, vinculado.lotacao) : null;
-		const dep = propria ? departamentoDe(arvore, propria.id) : null;
-		if (dep) return dep.id;
-	}
-	const padrao = await buscarDepartamentoPadrao(db);
-	return padrao?.id ?? null;
+	// E65: o nó é DADO da conta. Sem nó, a conta admin não administra unidade
+	// nenhuma — antes caía no departamento padrão, que é adivinhar.
+	return u.unidade_id ?? null;
 }
 
 /** A unidade `id` está no escopo? (`nos` é pequena: dezenas de linhas.) */
@@ -104,7 +150,7 @@ export function unidadeNoEscopo(escopo: EscopoUnidades, id: number): boolean {
  */
 export async function trilhaDaUnidade(db: Database, u: UsuarioLogado): Promise<string[]> {
 	const arvore = await arvoreUnidades(db);
-	let id = await idDaRaiz(db, u, arvore);
+	let id = await idDaRaiz(db, u);
 	if (id == null && u.tipo === 'policial' && u.lotacao) {
 		id = (await buscarUnidadePorNome(db, u.lotacao))?.id ?? null;
 	}

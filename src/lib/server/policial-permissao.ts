@@ -2,7 +2,11 @@
  * Helpers de escopo administrativo sobre o cadastro de policiais.
  *
  * Modelo:
- *  - Admin Geral: irrestrito (caller recebe `null`).
+ *  - Super Admin: irrestrito (caller recebe `null`) — ele não é usuário
+ *    operacional, e travá-lo no recorte fecharia a porta de quem conserta.
+ *  - Admin Geral: a subárvore do NÓ da conta (E65) e, no chapéu de unidade,
+ *    só a casa (E71). Deixou de ser irrestrito em 23/09: era `null`, e
+ *    `null` numa base com dois departamentos é o admin de um vendo o outro.
  *  - admin_seccional: administra a própria seccional + todas as unidades
  *    cuja `seccional_id` é a dela.
  *  - admin_unidade: administra apenas a unidade do PAPEL
@@ -16,6 +20,7 @@
 import { eq, or } from 'drizzle-orm';
 import { unidades } from '$lib/server/schema';
 import { colaboradorComAcesso, isAdminGeral, isAdminSeccional, isAdminUnidade } from '$lib/auth';
+import { escopoDeUnidades } from '$lib/server/unidades/escopo';
 import type { Database } from '$lib/db';
 
 /**
@@ -71,7 +76,14 @@ export async function lotacoesAdministradas(
 	db: Database,
 	u: NonNullable<App.Locals['usuario']>
 ): Promise<Set<string> | null> {
-	if (isAdminGeral(u)) return null;
+	if (isAdminGeral(u)) {
+		if (u.isSuperAdmin) return null;
+		// O MESMO escopo da Gestão de unidade, de propósito: duas réguas para "o
+		// que este admin alcança" é como nasce a divergência entre telas. O
+		// chapéu (E71) já está aplicado lá dentro.
+		const escopo = await escopoDeUnidades(db, u);
+		return new Set((escopo?.nos ?? []).map((n) => n.nome));
+	}
 	if (u.papel_unidade_id == null) return new Set();
 
 	// Colaborador lotado (E61): a unidade dele, e só ela — o que ele pode
@@ -82,6 +94,12 @@ export async function lotacoesAdministradas(
 	}
 
 	if (isAdminSeccional(u)) {
+		// No chapéu de unidade a seccional é só uma casa: administra os próprios
+		// servidores, não os das delegacias (E71).
+		if (u.atuandoComo === 'unidade') {
+			const escopo = await escopoDeUnidades(db, u);
+			return new Set((escopo?.nos ?? []).map((n) => n.nome));
+		}
 		return new Set(await lotacoesDaSeccional(db, u.papel_unidade_id));
 	}
 	if (isAdminUnidade(u)) {

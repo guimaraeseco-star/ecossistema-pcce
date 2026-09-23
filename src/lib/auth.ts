@@ -85,6 +85,29 @@ export interface UsuarioLogado {
 	 * Ausente em sessão policial. Super Admin vem com os dois ligados.
 	 */
 	modulosAdmin?: { escalas: boolean; gise: boolean };
+	/**
+	 * O NÓ que esta conta admin administra (E65): a subárvore dele é o alcance,
+	 * e nada fora. `null` numa sessão admin que não é Super Admin significa
+	 * conta que não opera — o bootstrap por env caiu nisso de propósito.
+	 */
+	unidade_id?: number | null;
+	/** O nome do nó, para a tela dizer de onde ele está olhando. */
+	unidade_nome?: string | null;
+	/**
+	 * O CHAPÉU com que ele está atuando (E71). O DPI SUL é ao mesmo tempo a
+	 * REDE que administra as delegacias e uma UNIDADE com os seus próprios
+	 * servidores; o chapéu diz qual dos dois vale nesta navegação:
+	 *
+	 * - `rede`: tudo abaixo do nó — o padrão, e o comportamento de sempre;
+	 * - `unidade`: só o nó e as suas SUBUNIDADES (posto, núcleo, seção,
+	 *   célula), nas pessoas e na estrutura.
+	 *
+	 * É um recorte de ESCOPO, não de poderes: o chapéu não tira nenhuma
+	 * capacidade da conta, só encolhe o que ela enxerga e sobre o que age. A
+	 * caixa de avisos é a exceção declarada — ela não segue o chapéu, mostra os
+	 * dois lados juntos (decisão dele, 22/09).
+	 */
+	atuandoComo?: 'rede' | 'unidade';
 	// RBAC operacional (papel scoped do servidor; cumulativo com Admin Geral)
 	papel?: 'admin_seccional' | 'admin_unidade' | null;
 	papel_unidade_id?: number | null;
@@ -315,6 +338,7 @@ function mapearAdmin(
 		primeiro_acesso: admin.primeiro_acesso === 1,
 		isSuperAdmin,
 		adminPolicialId: admin.policial_id ?? null,
+		unidade_id: admin.unidade_id ?? null,
 		// Super Admin: console próprio, flags sempre ligadas para não barrar
 		// rotas compartilhadas se ele cair nelas. Demais: colunas da linha.
 		modulosAdmin: isSuperAdmin

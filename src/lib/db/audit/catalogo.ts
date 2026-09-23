@@ -104,6 +104,11 @@ export const CATALOGO_ACOES = {
 		categoria: 'policial',
 		severidade: 'critico'
 	},
+	definir_no_do_admin: {
+		label: 'Nó administrado por uma conta admin',
+		categoria: 'policial',
+		severidade: 'critico'
+	},
 	importar_policiais: {
 		label: 'Importação de policiais em massa',
 		categoria: 'policial',

@@ -42,7 +42,9 @@ const LIMPAR =
 test.beforeAll(() => {
 	execD1Local(
 		LIMPAR +
-			`INSERT OR REPLACE INTO administradores (id, login, senha, nome, primeiro_acesso) VALUES (${ADMIN_TMP}, 'e2e-admin-acoes', 'x', 'Admin Fixture Acoes', 0);` +
+			// `unidade_id`: desde a E65 a conta admin administra um NÓ, e o alcance
+			// dela é a subárvore dele. Sem nó, a ficha do servidor não abre.
+			`INSERT OR REPLACE INTO administradores (id, login, senha, nome, primeiro_acesso, unidade_id) VALUES (${ADMIN_TMP}, 'e2e-admin-acoes', 'x', 'Admin Fixture Acoes', 0, ${FIXTURE.departamento.id});` +
 			`INSERT INTO aceites_termos (usuario_tipo, usuario_id, versao_termo, hash_termo, aceitou_lgpd, aceitou_uso_email, aceitou_uso_localizacao) SELECT 'admin', ${ADMIN_TMP}, versao_termo, hash_termo, 1, 1, 1 FROM aceites_termos WHERE usuario_tipo='policial' LIMIT 1;`
 	);
 });

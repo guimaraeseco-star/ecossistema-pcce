@@ -28,7 +28,8 @@ test.beforeAll(() => {
 	execD1Local(
 		`UPDATE policiais SET telefone=NULL WHERE id=${FIXTURE.policialA.id};` +
 			`DELETE FROM cadastro_solicitacoes WHERE policial_id=${FIXTURE.policialA.id};` +
-			`INSERT OR REPLACE INTO administradores (id, login, senha, nome, primeiro_acesso) VALUES (${ADMIN_TMP}, 'e2e-admin-solic', 'x', 'Admin Fixture Solic', 0);` +
+			// `unidade_id`: o nó que a conta administra (E65).
+			`INSERT OR REPLACE INTO administradores (id, login, senha, nome, primeiro_acesso, unidade_id) VALUES (${ADMIN_TMP}, 'e2e-admin-solic', 'x', 'Admin Fixture Solic', 0, ${FIXTURE.departamento.id});` +
 			`DELETE FROM aceites_termos WHERE usuario_tipo='admin' AND usuario_id=${ADMIN_TMP};` +
 			`INSERT INTO aceites_termos (usuario_tipo, usuario_id, versao_termo, hash_termo, aceitou_lgpd, aceitou_uso_email, aceitou_uso_localizacao) SELECT 'admin', ${ADMIN_TMP}, versao_termo, hash_termo, 1, 1, 1 FROM aceites_termos WHERE usuario_tipo='policial' LIMIT 1;`
 	);

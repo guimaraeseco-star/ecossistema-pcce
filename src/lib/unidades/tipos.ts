@@ -45,6 +45,23 @@ export const TIPO_UNIDADE_VALORES = TIPOS_UNIDADE.map((t) => t.valor) as [
 	...TipoUnidade[]
 ];
 
+/**
+ * Os tipos que são a CASA de uma unidade, e não outra unidade abaixo dela
+ * (E71): a sede administrativa e os pontos de atendimento.
+ *
+ * É o corte do chapéu de unidade. O núcleo de Juazeiro pende do departamento e
+ * é casa do DPI SUL; a 1ª Seccional também pende dele e não é — ela é outra
+ * unidade, que o departamento administra pelo chapéu de REDE. Por isso o corte
+ * é por tipo e não por profundidade.
+ */
+export const TIPOS_DE_SUBUNIDADE = [
+	'sub_departamento',
+	'celula',
+	'secao',
+	'nucleo',
+	'unidade'
+] as const satisfies readonly TipoUnidade[];
+
 /** Os quatro tipos que existiam antes da fase 1 — o que a tela de cadastro ainda oferece. */
 export const TIPOS_UNIDADE_LEGADOS = [
 	'departamento',
