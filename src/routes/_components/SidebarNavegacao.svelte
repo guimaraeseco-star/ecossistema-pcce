@@ -274,7 +274,7 @@
 				{@render itemMenu('/colaborador/escalas', 'Escalas', ICONE.calendario)}
 			{/if}
 		{:else if usuario?.isSuperAdmin}
-			<!-- Super Admin: menu exclusivo — apenas estas 8 abas, nesta ordem.
+			<!-- Super Admin: menu exclusivo — apenas estas 9 abas, nesta ordem.
 
 			     "Valores de custo" é do Super Admin, e não do Admin Geral que monta
 			     os planos, porque é a tabela de hora extra e diária da corporação:
@@ -282,6 +282,10 @@
 			     hora. -->
 			{@render itemMenu('/super-admin', 'Boas-vindas', ICONE.casa)}
 			{@render itemMenu('/unidades', 'Unidades', ICONE.predio)}
+			<!-- Quem administra o quê (E65): conceder acesso administrativo e
+			     escolher o nó é ato do Super Admin, não de quem administra um
+			     departamento. Por isso saiu da ficha do servidor e veio para cá. -->
+			{@render itemMenu('/administradores', 'Administradores', ICONE.pessoas)}
 			{@render itemMenu('/servidores', 'Policiais', ICONE.pessoas)}
 			{@render itemMenu('/colaboradores', 'Colaboradores', ICONE.pessoas)}
 			{@render itemMenu('/conf-ass', 'Config. Ass.', ICONE.engrenagem)}

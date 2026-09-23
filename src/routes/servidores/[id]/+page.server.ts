@@ -846,8 +846,16 @@ export const actions: Actions = {
 	toggleAdminGeral: async (event) => {
 		const { request, locals, platform, params } = event;
 		const u = locals.usuario;
-		if (!u || !isAdminGeral(u))
-			return fail(403, { error: 'Apenas o Admin Geral pode conceder Admin Geral' });
+		// E65: conceder acesso administrativo virou ato do SUPER ADMIN, na tela
+		// `/administradores`, onde o nó administrado é escolhido junto. A action
+		// continua aqui só para recusar — aba aberta antes do deploy ainda posta
+		// nela, e promover sem nó criaria a conta que não opera.
+		if (!u?.isSuperAdmin) {
+			return fail(403, {
+				error:
+					'A concessão de Admin Geral é do Super Admin, na tela Administradores — lá o nó administrado é escolhido junto.'
+			});
+		}
 
 		const id = Number(params.id);
 		if (isNaN(id)) return fail(400, { error: 'ID inválido' });

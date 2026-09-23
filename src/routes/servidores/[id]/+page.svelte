@@ -607,13 +607,17 @@
 		/>
 	{/if}
 
+	<!-- E65: a CONCESSÃO mudou de dono — quem promove a Admin Geral e escolhe o
+	     nó administrado é o Super Admin, na tela Administradores. Aqui o cartão
+	     fica só para ele; para os demais a informação continua visível na ficha
+	     em modo leitura, porque saber que o servidor é administrador importa. -->
 	<CartaoAdminGeral
 		policialId={data.policial.id}
 		ehAdminGeral={data.ehAdminGeral}
 		moduloEscalas={data.modulosAdmin?.escalas ?? false}
 		moduloGise={data.modulosAdmin?.gise ?? false}
 		disabled={loading.active}
-		somenteLeitura={solicitando}
+		somenteLeitura={solicitando || !data.usuario?.isSuperAdmin}
 	/>
 </div>
 

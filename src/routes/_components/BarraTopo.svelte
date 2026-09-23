@@ -12,7 +12,7 @@
 	 * não deve receber foco por Tab.
 	 */
 	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { apiFetch } from '$lib/api-fetch';
 	import { apagarReauth } from '$lib/assinatura-reauth';
 	import { loading } from '$lib/loading.svelte';
@@ -35,6 +35,45 @@
 
 	const podeAlternarParaUsuario = $derived(page.data.podeAlternarParaUsuario ?? false);
 	const podeAlternarParaAdmin = $derived(page.data.podeAlternarParaAdmin ?? false);
+
+	/**
+	 * O CHAPÉU (E71): o departamento é a rede que administra as delegacias e,
+	 * ao mesmo tempo, uma casa com os seus próprios servidores. O seletor diz
+	 * em qual dos dois a pessoa está agindo, e por isso fica no topo, visível o
+	 * tempo todo — quem não sabe com que chapéu está não sabe o que está vendo.
+	 *
+	 * Só aparece para a conta que administra um nó (`unidade_id`); o Super
+	 * Admin e as contas sem nó não têm o que alternar.
+	 */
+	const usuario = $derived(
+		page.data.usuario as { atuandoComo?: string; unidade_id?: number | null } | null
+	);
+	const temChapeu = $derived(usuario?.unidade_id != null);
+	const naUnidade = $derived(usuario?.atuandoComo === 'unidade');
+	const nomeDoNo = $derived(trilha[0] ?? 'unidade');
+
+	let trocandoChapeu = $state(false);
+
+	async function trocarChapeu(chapeu: 'rede' | 'unidade') {
+		if (trocandoChapeu || (chapeu === 'unidade') === naUnidade) return;
+		trocandoChapeu = true;
+		loading.show(chapeu === 'unidade' ? 'Atuando como unidade...' : 'Atuando como departamento...');
+		try {
+			await apiFetch('/api/auth/atuando-como', {
+				method: 'POST',
+				body: JSON.stringify({ chapeu })
+			});
+			// `invalidateAll`: o chapéu muda o ESCOPO de quase todo `load` — a
+			// árvore de unidades, a lista de servidores, as férias. Recarregar só a
+			// rota atual deixaria as outras com o recorte antigo em cache.
+			await invalidateAll();
+		} catch (e: unknown) {
+			toaster.create({ title: mensagemDeErro(e, 'Erro ao trocar de perfil'), type: 'error' });
+		} finally {
+			trocandoChapeu = false;
+			loading.hide();
+		}
+	}
 
 	let alternando = $state(false);
 
@@ -104,6 +143,40 @@
 			{ultimoNivel ?? 'Polícia Civil do Ceará'}
 		</span>
 	</div>
+	{#if temChapeu}
+		<!-- Os dois chapéus do departamento (E71). Segmentado e não menu: são duas
+		     opções, e o estado atual tem de se ler sem abrir nada. -->
+		<div
+			class="ml-auto mr-2 hidden shrink-0 items-center rounded-lg border border-surface-300 p-0.5 sm:flex dark:border-white/15"
+			role="group"
+			aria-label="Atuando como"
+		>
+			<button
+				type="button"
+				class="rounded-md px-2.5 py-1 text-2xs font-semibold transition-colors {naUnidade
+					? 'text-surface-600 hover:bg-surface-100 dark:text-surface-300 dark:hover:bg-white/5'
+					: 'bg-primary-500/15 text-primary-700 dark:text-primary-300'}"
+				aria-pressed={!naUnidade}
+				disabled={trocandoChapeu}
+				onclick={() => trocarChapeu('rede')}
+				title="Atuar sobre tudo o que está abaixo do departamento"
+			>
+				Departamento
+			</button>
+			<button
+				type="button"
+				class="rounded-md px-2.5 py-1 text-2xs font-semibold transition-colors {naUnidade
+					? 'bg-primary-500/15 text-primary-700 dark:text-primary-300'
+					: 'text-surface-600 hover:bg-surface-100 dark:text-surface-300 dark:hover:bg-white/5'}"
+				aria-pressed={naUnidade}
+				disabled={trocandoChapeu}
+				onclick={() => trocarChapeu('unidade')}
+				title="Atuar só sobre {nomeDoNo} e as suas subunidades"
+			>
+				Minha unidade
+			</button>
+		</div>
+	{/if}
 	{#if podeAlternarParaUsuario || podeAlternarParaAdmin}
 		<button
 			type="button"

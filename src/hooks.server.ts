@@ -302,6 +302,15 @@ const handleAuth: Handle = async ({ event, resolve }) => {
 		redirect(302, obterRotaBemVindo(usuario, preferencia));
 	}
 
+	// O CHAPÉU (E71): cookie, como o `admin_modulo` — preferência de navegação,
+	// não permissão. Só vale na sessão admin que tem nó; qualquer outro valor
+	// (ou a falta dele) é `rede`, que é o comportamento de sempre. Guardar no
+	// cookie e não na linha da sessão é o que deixa duas abas em chapéus
+	// diferentes sem uma derrubar a outra.
+	if (usuario.tipo === 'admin' && usuario.unidade_id != null) {
+		usuario.atuandoComo = event.cookies.get('atuando_como') === 'unidade' ? 'unidade' : 'rede';
+	}
+
 	event.locals.usuario = usuario;
 	return resolve(event);
 };

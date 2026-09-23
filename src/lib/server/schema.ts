@@ -203,6 +203,15 @@ export const administradores = sqliteTable('administradores', {
 	 */
 	modulo_escalas: integer('modulo_escalas').notNull().default(1),
 	modulo_gise: integer('modulo_gise').notNull().default(1),
+	/**
+	 * O NÓ da árvore que esta conta administra (E65, migração 0100) — hoje
+	 * sempre um departamento. O alcance é a subárvore dele, e nada fora.
+	 *
+	 * Nulo = **não opera**: é o caso do admin de bootstrap por env, que depois
+	 * da E65 é só a chave do Super Admin. Quem define é o Super Admin, na tela
+	 * de Administradores; não se infere mais da lotação do policial vinculado.
+	 */
+	unidade_id: integer('unidade_id').references(() => unidades.id),
 	created_at: text('created_at').default(sql`(datetime('now', '-3 hours'))`)
 });
 

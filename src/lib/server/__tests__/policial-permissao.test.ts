@@ -11,9 +11,14 @@
  * silenciosamente, sem quebrar teste nenhum.
  *
  * A distinção que mais importa aqui é `null` × `Set` vazio: `null` significa
- * "sem restrição" (Admin Geral) e `lotacaoNoEscopo` devolve `true` para qualquer
- * lotação; `Set` vazio significa "não administra nada" e devolve sempre `false`.
+ * "sem restrição" e `lotacaoNoEscopo` devolve `true` para qualquer lotação;
+ * `Set` vazio significa "não administra nada" e devolve sempre `false`.
  * Trocar um pelo outro inverte o gate.
+ *
+ * Desde a E65 (23/09) o `null` é só do **Super Admin**: a sessão de Admin
+ * Geral passou a ter o recorte do NÓ da conta (`administradores.unidade_id`),
+ * e o chapéu de unidade (E71) encolhe esse recorte à casa. Os três casos estão
+ * cobertos abaixo, porque é aqui que um deles vira o outro por engano.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { DatabaseSync } from 'node:sqlite';
@@ -49,7 +54,9 @@ beforeAll(() => {
 	// as unidades 1 e 2.
 	sqlite.exec(`
 		INSERT INTO unidades (id, nome, tipo, seccional_id) VALUES
-			(9100, 'SECCIONAL NORTE', 'seccional', NULL),
+			(9300, 'DEP DE TESTE', 'departamento', NULL),
+			(9301, 'POSTO DO DEP', 'unidade', 9300),
+			(9100, 'SECCIONAL NORTE', 'seccional', 9300),
 			(9101, 'DP PRIMEIRA', 'delegacia', 9100),
 			(9102, 'DP SEGUNDA', 'delegacia', 9100),
 			(9200, 'SECCIONAL SUL', 'seccional', NULL),
@@ -75,11 +82,40 @@ describe('lotacoesDaSeccional', () => {
 });
 
 describe('lotacoesAdministradas', () => {
-	it('Admin Geral recebe null — "sem restrição", não "escopo vazio"', async () => {
-		const escopo = await lotacoesAdministradas(db, usuario({ tipo: 'admin' }));
+	it('Super Admin recebe null — "sem restrição", não "escopo vazio"', async () => {
+		const escopo = await lotacoesAdministradas(db, usuario({ tipo: 'admin', isSuperAdmin: true }));
 		expect(escopo).toBeNull();
 		// É esta a consequência prática do null, e o que o distingue do Set vazio.
 		expect(lotacaoNoEscopo(escopo, 'QUALQUER UNIDADE')).toBe(true);
+	});
+
+	it('Admin Geral administra a subárvore do NÓ da conta, e nada fora dela (E65)', async () => {
+		const escopo = await lotacoesAdministradas(
+			db,
+			usuario({ tipo: 'admin', unidade_id: 9300, atuandoComo: 'rede' })
+		);
+		expect([...(escopo ?? [])].sort()).toEqual(
+			['DEP DE TESTE', 'POSTO DO DEP', 'SECCIONAL NORTE', 'DP PRIMEIRA', 'DP SEGUNDA'].sort()
+		);
+		// A seccional do outro ramo não entra: é o que o `null` de antes deixava passar.
+		expect(lotacaoNoEscopo(escopo, 'SECCIONAL SUL')).toBe(false);
+	});
+
+	it('no chapéu de UNIDADE alcança só a casa — o nó e as subunidades (E71)', async () => {
+		const escopo = await lotacoesAdministradas(
+			db,
+			usuario({ tipo: 'admin', unidade_id: 9300, atuandoComo: 'unidade' })
+		);
+		expect([...(escopo ?? [])].sort()).toEqual(['DEP DE TESTE', 'POSTO DO DEP']);
+		// A delegacia que o departamento administra pela REDE fica de fora.
+		expect(lotacaoNoEscopo(escopo, 'DP PRIMEIRA')).toBe(false);
+	});
+
+	it('conta admin SEM nó não administra nada — o bootstrap por env caiu nisso (E65)', async () => {
+		const escopo = await lotacoesAdministradas(db, usuario({ tipo: 'admin' }));
+		expect(escopo).not.toBeNull();
+		expect(escopo?.size).toBe(0);
+		expect(lotacaoNoEscopo(escopo, 'DP PRIMEIRA')).toBe(false);
 	});
 
 	it('admin_seccional administra a seccional e as unidades abaixo dela', async () => {
