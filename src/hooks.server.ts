@@ -23,6 +23,7 @@
  * (`pathnameNoEscopo` em `onboarding-gates.ts`), senão `/termo` liberaria
  * `/termos-secretos`.
  */
+import { temChapeu } from '$lib/server/unidades/escopo';
 import type { Handle, HandleServerError } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { redirect } from '@sveltejs/kit';
@@ -303,11 +304,15 @@ const handleAuth: Handle = async ({ event, resolve }) => {
 	}
 
 	// O CHAPÉU (E71): cookie, como o `admin_modulo` — preferência de navegação,
-	// não permissão. Só vale na sessão admin que tem nó; qualquer outro valor
-	// (ou a falta dele) é `rede`, que é o comportamento de sempre. Guardar no
-	// cookie e não na linha da sessão é o que deixa duas abas em chapéus
-	// diferentes sem uma derrubar a outra.
-	if (usuario.tipo === 'admin' && usuario.unidade_id != null) {
+	// não permissão. Qualquer valor diferente de `unidade` (ou a falta dele) é
+	// `rede`, que é o comportamento de sempre. Guardar no cookie e não na linha
+	// da sessão é o que deixa duas abas em chapéus diferentes sem uma derrubar
+	// a outra.
+	//
+	// Vale para quem administra uma REDE e também é uma casa: o Admin Geral do
+	// departamento e o admin de SECCIONAL. O admin de unidade não tem chapéu —
+	// a casa dele já é todo o alcance que ele tem.
+	if (temChapeu(usuario)) {
 		usuario.atuandoComo = event.cookies.get('atuando_como') === 'unidade' ? 'unidade' : 'rede';
 	}
 

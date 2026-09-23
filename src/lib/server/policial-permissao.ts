@@ -94,6 +94,12 @@ export async function lotacoesAdministradas(
 	}
 
 	if (isAdminSeccional(u)) {
+		// No chapéu de unidade a seccional é só uma casa: administra os próprios
+		// servidores, não os das delegacias (E71).
+		if (u.atuandoComo === 'unidade') {
+			const escopo = await escopoDeUnidades(db, u);
+			return new Set((escopo?.nos ?? []).map((n) => n.nome));
+		}
 		return new Set(await lotacoesDaSeccional(db, u.papel_unidade_id));
 	}
 	if (isAdminUnidade(u)) {

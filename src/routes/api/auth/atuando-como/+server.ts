@@ -15,13 +15,14 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { cookieOptions } from '$lib/server/auth/auth-flow';
-import { requireAdmin, forbidden, badRequest } from '$lib/server/api';
+import { requireAuth, forbidden, badRequest } from '$lib/server/api';
+import { temChapeu } from '$lib/server/unidades/escopo';
 
 export const POST: RequestHandler = async ({ cookies, locals, request, url }) => {
-	const u = requireAdmin(locals);
+	const u = requireAuth(locals);
 	if (u instanceof Response) return u;
-	if (u.unidade_id == null) {
-		return forbidden('Esta conta não administra um nó da árvore.');
+	if (!temChapeu(u)) {
+		return forbidden('Este perfil não tem os dois chapéus.');
 	}
 
 	const corpo = (await request.json().catch(() => null)) as { chapeu?: unknown } | null;

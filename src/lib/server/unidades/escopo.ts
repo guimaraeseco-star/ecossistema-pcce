@@ -69,10 +69,11 @@ export async function escopoDeUnidades(
  *
  * Três respostas diferentes, porque são três coisas diferentes:
  *
- * - **admin de seccional**: a subárvore. Administrar as delegacias abaixo é
- *   justamente o trabalho dele;
- * - **sessão admin (Admin Geral)**: depende do CHAPÉU — ele é as duas coisas,
- *   e o seletor diz qual vale agora;
+ * - **admin de seccional** e **sessão admin (Admin Geral)**: depende do
+ *   CHAPÉU. Os dois são as duas coisas ao mesmo tempo — uma rede que
+ *   administra as unidades abaixo e uma casa com os seus próprios servidores,
+ *   que pede diária, lança férias e monta a escala como qualquer outra —, e o
+ *   seletor diz qual vale agora;
  * - **admin de unidade e colaborador**: sempre a casa. Quem administra uma
  *   UNIDADE administra aquela unidade e os postos dela, nunca outras unidades
  *   penduradas no mesmo nó. Isto passou despercebido enquanto ninguém era
@@ -80,9 +81,20 @@ export async function escopoDeUnidades(
  *   papel de unidade passou a enxergar as 61 unidades do DPI SUL.
  */
 function alcancaSoACasa(u: UsuarioLogado | null): boolean {
-	if (isAdminSeccional(u)) return false;
-	if (isAdminGeral(u)) return u?.atuandoComo === 'unidade';
+	if (temChapeu(u)) return u?.atuandoComo === 'unidade';
 	return true;
+}
+
+/**
+ * Esta sessão tem os dois chapéus, e portanto seletor? (E71)
+ *
+ * Quem administra uma REDE é também uma casa: o Admin Geral do departamento e
+ * o admin de seccional. O admin de unidade fica de fora porque não há o que
+ * escolher — a casa dele já é todo o alcance que ele tem.
+ */
+export function temChapeu(u: UsuarioLogado | null): boolean {
+	if (isAdminSeccional(u)) return true;
+	return isAdminGeral(u) && u?.unidade_id != null;
 }
 
 /**

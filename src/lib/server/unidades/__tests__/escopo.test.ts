@@ -132,3 +132,36 @@ describe('escopoDeUnidades para o PAPEL do servidor', () => {
 		]);
 	});
 });
+
+describe('o chapéu da SECCIONAL (E71)', () => {
+	const seccional = (chapeu?: string) =>
+		({
+			id: 3,
+			tipo: 'policial',
+			nome: 'Admin da Seccional',
+			primeiro_acesso: false,
+			papel: 'admin_seccional',
+			papel_unidade_id: SECCIONAL,
+			atuandoComo: chapeu
+		}) as UsuarioLogado;
+
+	it('no chapéu de rede administra as delegacias abaixo', async () => {
+		const escopo = await escopoDeUnidades(db, seccional('rede'));
+		expect((escopo?.nos ?? []).map((n) => n.nome).sort()).toEqual([
+			'DELEGACIA DA SECCIONAL',
+			'POSTO DA DELEGACIA',
+			'SECCIONAL DO DEP'
+		]);
+	});
+
+	it('no chapéu de unidade é só uma casa — é dela que ela faz os próprios pedidos', async () => {
+		const escopo = await escopoDeUnidades(db, seccional('unidade'));
+		expect((escopo?.nos ?? []).map((n) => n.nome)).toEqual(['SECCIONAL DO DEP']);
+		expect(unidadeNoEscopo(escopo!, DELEGACIA)).toBe(false);
+	});
+
+	it('sem chapéu declarado vale o de rede — nada muda para quem não usa o seletor', async () => {
+		const escopo = await escopoDeUnidades(db, seccional());
+		expect((escopo?.nos ?? []).length).toBe(3);
+	});
+});

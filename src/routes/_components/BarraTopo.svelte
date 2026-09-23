@@ -46,11 +46,24 @@
 	 * Admin e as contas sem nó não têm o que alternar.
 	 */
 	const usuario = $derived(
-		page.data.usuario as { atuandoComo?: string; unidade_id?: number | null } | null
+		page.data.usuario as {
+			atuandoComo?: string;
+			unidade_id?: number | null;
+			papel?: string | null;
+		} | null
 	);
-	const temChapeu = $derived(usuario?.unidade_id != null);
+	/**
+	 * Quem administra uma REDE é também uma casa: o Admin Geral do departamento
+	 * e o admin de seccional. O servidor só devolve `atuandoComo` nesses casos,
+	 * então a presença do campo já é a resposta.
+	 */
+	const temChapeu = $derived(!!usuario?.atuandoComo);
 	const naUnidade = $derived(usuario?.atuandoComo === 'unidade');
-	const nomeDoNo = $derived(trilha[0] ?? 'unidade');
+	/** "Departamento" ou "Seccional": o rótulo da REDE que a pessoa administra. */
+	const rotuloDaRede = $derived(
+		usuario?.papel === 'admin_seccional' ? 'Seccional' : 'Departamento'
+	);
+	const nomeDoNo = $derived(trilha.at(-1) ?? 'a sua unidade');
 
 	let trocandoChapeu = $state(false);
 
@@ -159,9 +172,9 @@
 				aria-pressed={!naUnidade}
 				disabled={trocandoChapeu}
 				onclick={() => trocarChapeu('rede')}
-				title="Atuar sobre tudo o que está abaixo do departamento"
+				title="Atuar sobre {nomeDoNo} e tudo o que responde a ela"
 			>
-				Departamento
+				{rotuloDaRede}
 			</button>
 			<button
 				type="button"
