@@ -12,6 +12,11 @@
  *    usa no modo direto, e por isso a tela mostra o conteúdo INTEIRO do pedido,
  *    com o PDF anexo para baixar, antes de qualquer clique.
  *
+ * **A fila é RECORTADA pelo nó da conta (E65)**: o administrador vê e decide
+ * os pedidos dos servidores que ele administra, e mais ninguém. Esconder não é
+ * autorização — as três actions conferem o escopo de novo antes de decidir,
+ * porque o id do pedido vem do cliente.
+ *
  * Recusar um pedido com anexo apaga o PDF do bucket: nenhuma linha voltaria a
  * apontar para ele, e um objeto sem referência é dado pessoal guardado sem base
  * e sem rastro (a mesma regra do FLW-RBAC-005). Aprovar não apaga nada — a chave
@@ -47,6 +52,38 @@ const ROTULO_TIPO_AVISO: Record<string, string> = {
 	retorno_antecipado: 'Retorno antecipado'
 };
 import { decidirSolicitacaoAcao } from '$lib/server/policiais/solicitacoes';
+import { lotacoesAdministradas, lotacaoNoEscopo } from '$lib/server/policial-permissao';
+import { buscarPolicial, buscarSolicitacaoCadastro, buscarSolicitacaoAcao } from '$lib/db';
+
+/** Das linhas já lidas, só as do nó desta conta (E65). */
+async function soDoEscopo<T extends { policial_lotacao: string }>(
+	db: ReturnType<typeof getDB>,
+	u: NonNullable<App.Locals['usuario']>,
+	linhas: T[]
+): Promise<T[]> {
+	const escopo = await lotacoesAdministradas(db, u);
+	return linhas.filter((l) => lotacaoNoEscopo(escopo, l.policial_lotacao));
+}
+
+/**
+ * O pedido é de alguém que esta conta administra?
+ *
+ * Confere pela lotação do SERVIDOR, que é o que define de quem é o pedido — e
+ * relê do banco em vez de confiar no que a tela mandou. Devolve a mensagem de
+ * recusa, ou `null` quando pode.
+ */
+async function foraDoEscopo(
+	db: ReturnType<typeof getDB>,
+	u: NonNullable<App.Locals['usuario']>,
+	policialId: number
+): Promise<string | null> {
+	const escopo = await lotacoesAdministradas(db, u);
+	const policial = await buscarPolicial(db, policialId);
+	if (!policial) return 'Servidor não encontrado.';
+	return lotacaoNoEscopo(escopo, policial.lotacao)
+		? null
+		: 'Este pedido é de um servidor fora do seu escopo.';
+}
 
 export const load: PageServerLoad = async ({ locals, platform }) => {
 	const u = locals.usuario;
@@ -54,6 +91,10 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 	if (u.tipo !== 'admin') redirect(302, '/bem-vindo');
 
 	const db = getDB(platform);
+	// O recorte é em memória, e não na consulta: a fila tem dezenas de linhas
+	// (não milhares), e o escopo pode passar dos 90 nomes que o D1 aceita por
+	// consulta. Quando a E51 trocar o nome por id, isto vira um WHERE.
+	const escopo = await lotacoesAdministradas(db, u);
 	const [pendentes, acoesPendentes, designacoes] = await Promise.all([
 		listarSolicitacoesCadastroPendentes(db),
 		listarSolicitacoesAcaoPendentes(db),
@@ -61,7 +102,11 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 		// pediria ao Admin Geral que decidisse entre "9" e "11" (E50).
 		listarDesignacoes(db)
 	]);
-	return { pendentes, acoesPendentes, designacoes };
+	return {
+		pendentes: pendentes.filter((s) => lotacaoNoEscopo(escopo, s.policial_lotacao)),
+		acoesPendentes: acoesPendentes.filter((a) => lotacaoNoEscopo(escopo, a.policial_lotacao)),
+		designacoes
+	};
 };
 
 /** `id` + `decisao` do formulário, ou a mensagem de recusa. */
@@ -85,6 +130,10 @@ export const actions: Actions = {
 		const { id, aprovar } = lida;
 
 		const db = getDB(platform);
+		const pedido = await buscarSolicitacaoCadastro(db, id);
+		if (!pedido) return fail(404, { error: 'Solicitação não encontrada.' });
+		const recusa = await foraDoEscopo(db, u, pedido.policial_id);
+		if (recusa) return fail(403, { error: recusa });
 		let sol;
 		try {
 			sol = await decidirSolicitacaoCadastro(db, id, aprovar, u.id, platform?.env);
@@ -146,7 +195,7 @@ export const actions: Actions = {
 		});
 
 		const pendentes = await listarSolicitacoesCadastroPendentes(db);
-		return { success: true, pendentes };
+		return { success: true, pendentes: await soDoEscopo(db, u, pendentes) };
 	},
 
 	decidirAcao: async (event) => {
@@ -159,6 +208,10 @@ export const actions: Actions = {
 		const { id, aprovar } = lida;
 
 		const db = getDB(platform);
+		const alvo = await buscarSolicitacaoAcao(db, id);
+		if (!alvo) return fail(404, { error: 'Pedido não encontrado.' });
+		const recusa = await foraDoEscopo(db, u, alvo.policial_id);
+		if (recusa) return fail(403, { error: recusa });
 		let pedido;
 		try {
 			pedido = await decidirSolicitacaoAcao(db, id, aprovar, u.id);
@@ -234,7 +287,7 @@ export const actions: Actions = {
 					)
 				: [];
 
-		const acoesPendentes = await listarSolicitacoesAcaoPendentes(db);
+		const acoesPendentes = await soDoEscopo(db, u, await listarSolicitacoesAcaoPendentes(db));
 		return { success: true, acoesPendentes, avisos: desfalques };
 	}
 };

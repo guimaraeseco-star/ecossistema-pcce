@@ -22,9 +22,9 @@ export interface ResumoDeAvisos {
 
 /** A caixa que este usuário lê. */
 export async function caixaDoUsuario(db: Database, u: UsuarioLogado): Promise<CaixaDeAvisos> {
-	if (isAdminGeral(u)) return { adminGeral: true, lotacoes: [] };
 	const escopo = await lotacoesAdministradas(db, u);
-	return { adminGeral: false, lotacoes: escopo ? [...escopo] : [] };
+	// `null` é o Super Admin: caixa sem recorte, como o resto do sistema.
+	return { adminGeral: isAdminGeral(u), lotacoes: escopo ? [...escopo] : [] };
 }
 
 /** Só quem tem home de módulos tem caixa: Admin Geral, admin de seccional e de unidade. */

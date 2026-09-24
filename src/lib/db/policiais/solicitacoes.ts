@@ -159,6 +159,28 @@ export async function listarSolicitacoesCadastroPendentes(
  * índice único. O chamador distingue com `ehViolacaoUnique` e responde 409 — a
  * solicitação já ficou fechada, o cadastro não mudou.
  */
+/**
+ * Um pedido de cadastro por id — para conferir de QUEM ele é antes de decidir.
+ *
+ * A fila é recortada pelo nó da conta (E65), e o id vem do cliente: sem esta
+ * leitura, a action decidiria sobre um pedido que a tela daquele administrador
+ * nunca mostrou.
+ */
+export async function buscarSolicitacaoCadastro(
+	db: Database,
+	id: number
+): Promise<{ id: number; policial_id: number; status: string } | undefined> {
+	return db
+		.select({
+			id: cadastroSolicitacoes.id,
+			policial_id: cadastroSolicitacoes.policial_id,
+			status: cadastroSolicitacoes.status
+		})
+		.from(cadastroSolicitacoes)
+		.where(eq(cadastroSolicitacoes.id, id))
+		.get();
+}
+
 export async function decidirSolicitacaoCadastro(
 	db: Database,
 	solicitacaoId: number,

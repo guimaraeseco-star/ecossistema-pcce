@@ -39,7 +39,11 @@ export function destinatariosDe(
 	if (isAdminGeral(autor)) {
 		return lotacoes.map((lotacao) => ({ tipo: 'lotacao' as const, lotacao }));
 	}
-	return [{ tipo: 'admin_geral' as const }];
+	// A ponta agiu: a notícia vai para o Admin Geral, carregando a lotação a que
+	// se refere — é por ela que a caixa dele é recortada pelo nó (E65). Sem
+	// lotação conhecida, o aviso fica visível a todos os administradores, que é
+	// o comportamento de antes.
+	return [{ tipo: 'admin_geral' as const, lotacao: lotacoes[0] }];
 }
 
 /** Emite o aviso para o outro lado. Nunca lança. */
