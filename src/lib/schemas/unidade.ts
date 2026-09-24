@@ -24,6 +24,12 @@ export const unidadeSchema = z.object({
 	// Forma curta do departamento ("DPI SUL"). Vai para indexador e interface,
 	// nunca para o cargo impresso — por isso o teto é curto e o vazio é válido.
 	sigla: textoCurto(20, 'Sigla'),
+	/**
+	 * O código da unidade na COTIC (migração 0101). Identificador EXTERNO, que
+	 * fica ao lado do nosso `id` em vez de substituí-lo; texto porque código de
+	 * outro sistema pode ter zero à esquerda ou letra. Vazio = ainda não se sabe.
+	 */
+	id_cotic: textoCurto(30, 'Código na COTIC'),
 	// ---- A ficha (migração 0085), editável pelo Super Admin em /unidades ----
 	endereco: textoCurto(300, 'Endereço'),
 	telefone: textoCurto(60, 'Telefone'),

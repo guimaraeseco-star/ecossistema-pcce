@@ -144,6 +144,8 @@ export const load: PageServerLoad = async ({ locals, platform, params }) => {
 			id: unidade.id,
 			nome: unidade.nome,
 			sigla: unidade.sigla,
+			/** O código na COTIC (0101), quando já conhecido. */
+			id_cotic: unidade.id_cotic,
 			tipo: unidade.tipo,
 			tipoRotulo: rotuloTipoUnidade(unidade.tipo),
 			cidade: unidade.cidade,

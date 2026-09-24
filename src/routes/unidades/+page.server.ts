@@ -63,6 +63,9 @@ function lerUnidadeDoForm(data: FormData) {
 		tem_fds: data.get('tem_fds') === 'on',
 		cidade,
 		sigla: data.get('sigla')?.toString() || '',
+		// O código da unidade na COTIC (0101): dado da unidade, não a identidade
+		// dela aqui — o id continua sendo o nosso.
+		id_cotic: data.get('id_cotic')?.toString() ?? '',
 		// A ficha (0085). O modal de cadastro não envia estes campos: caem nos
 		// padrões do schema.
 		endereco: data.get('endereco')?.toString() ?? '',
@@ -104,7 +107,14 @@ async function lerFotoDoForm(
  */
 function falhaDeGravacao(e: unknown, acao: string) {
 	if (ehViolacaoUnique(e)) {
-		const coluna = /unidades\.sigla/.test(mensagemComCausas(e)) ? 'sigla' : 'nome';
+		const causa = mensagemComCausas(e);
+		// Três colunas únicas: dizer qual delas repetiu é o que evita o admin
+		// procurar o erro no campo errado.
+		const coluna = /unidades\.sigla/.test(causa)
+			? 'sigla'
+			: /unidades\.id_cotic/.test(causa)
+				? 'código na COTIC'
+				: 'nome';
 		return fail(409, {
 			error: `Já existe uma unidade com est${coluna === 'sigla' ? 'a' : 'e'} ${coluna}`
 		});

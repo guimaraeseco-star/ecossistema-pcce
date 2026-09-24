@@ -323,6 +323,18 @@ export const unidades = sqliteTable(
 		 * usa o `nome` por extenso; a sigla é para indexador e interface.
 		 */
 		sigla: text('sigla').notNull().default(''),
+		/**
+		 * O código da unidade na COTIC (migração 0101), quando conhecido.
+		 *
+		 * É DADO da unidade, como a sigla ou o AIS — não a identidade dela aqui
+		 * dentro: o `id` continua sendo o nosso, e é ele que as outras tabelas
+		 * referenciam. Serve para conferir o cadastro contra a lista oficial e
+		 * para integrar com os sistemas da corporação quando isso existir.
+		 *
+		 * Texto, e não inteiro: código externo pode ter zero à esquerda ou letra.
+		 * Único entre os PREENCHIDOS (índice parcial); '' é "não sei ainda".
+		 */
+		id_cotic: text('id_cotic').notNull().default(''),
 		tem_plantao: integer('tem_plantao', { mode: 'boolean' }).default(false).notNull(),
 		tem_expediente: integer('tem_expediente', { mode: 'boolean' }).default(false).notNull(),
 		tem_fds: integer('tem_fds', { mode: 'boolean' }).default(false).notNull(),

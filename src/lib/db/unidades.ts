@@ -30,6 +30,8 @@ type DadosUnidade = {
 	tem_fds: boolean;
 	cidade: string;
 	sigla: string;
+	/** O código da unidade na COTIC (0101); vazio enquanto não se sabe. */
+	id_cotic?: string;
 	// A ficha (0085) — opcionais para quem só cria a estrutura (o modal de cadastro).
 	endereco?: string;
 	telefone?: string;
@@ -43,6 +45,7 @@ type DadosUnidade = {
 /** As colunas da ficha, como vão ao INSERT/UPDATE (ausente = valor padrão da coluna). */
 function colunasDaFicha(data: DadosUnidade) {
 	return {
+		id_cotic: (data.id_cotic ?? '').trim(),
 		endereco: data.endereco ?? '',
 		telefone: data.telefone ?? '',
 		email: data.email ?? '',

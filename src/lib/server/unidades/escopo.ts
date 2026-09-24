@@ -14,6 +14,12 @@
  * é o caso do bootstrap por env depois da E65, que passou a ser só a chave do
  * Super Admin.
  *
+ * O **Super Admin** é a exceção: ele não tem nó e enxerga TUDO, como em
+ * `lotacoesAdministradas`. Sem isto a E65 o teria trancado para fora da ficha
+ * de unidade — quem cuida da estrutura precisa abrir a unidade que está
+ * arrumando, e o corporativo (que fica com ele) mora fora de qualquer
+ * departamento.
+ *
  * O CHAPÉU (E71) entra aqui: no de **rede** o escopo é a subárvore inteira do
  * nó; no de **unidade**, só o nó e as suas SUBUNIDADES — posto, núcleo, seção,
  * célula. Seccional e delegacia nunca entram pelo chapéu de unidade, mesmo
@@ -26,7 +32,14 @@
  * unidade" — e, por `trilhaDaUnidade`, "de onde ele olha", para a barra do
  * topo.
  */
-import { ancestraisDe, arvoreUnidades, subarvoreDe, type Database, type NoUnidade } from '$lib/db';
+import {
+	ancestraisDe,
+	arvoreUnidades,
+	buscarDepartamentoPadrao,
+	subarvoreDe,
+	type Database,
+	type NoUnidade
+} from '$lib/db';
 import { buscarUnidadePorNome } from '$lib/db/unidades';
 import { nivelTipoUnidade, TIPOS_DE_SUBUNIDADE } from '$lib/unidades/tipos';
 import {
@@ -55,12 +68,30 @@ export async function escopoDeUnidades(
 	u: UsuarioLogado
 ): Promise<EscopoUnidades | null> {
 	const arvore = await arvoreUnidades(db);
+	if (u.isSuperAdmin) return escopoIrrestrito(db, arvore);
 	const raizId = await idDaRaiz(db, u);
 	if (raizId == null) return null;
 	const raiz = arvore.get(raizId);
 	if (!raiz) return null;
 	const nos = subarvoreDe(arvore, raizId);
 	return { raiz, arvore, nos: alcancaSoACasa(u) ? soACasa(nos, raizId) : nos };
+}
+
+/**
+ * O escopo do Super Admin: a árvore inteira, inclusive o que está fora de
+ * qualquer departamento (o corporativo, as unidades técnicas).
+ *
+ * A `raiz` continua sendo o departamento padrão porque é dela que a tela tira
+ * o título e a trilha; o que vale para "posso abrir esta unidade?" é `nos`.
+ */
+async function escopoIrrestrito(
+	db: Database,
+	arvore: Map<number, NoUnidade>
+): Promise<EscopoUnidades | null> {
+	const padrao = await buscarDepartamentoPadrao(db);
+	const raiz = padrao ? arvore.get(padrao.id) : undefined;
+	if (!raiz) return null;
+	return { raiz, arvore, nos: [...arvore.values()] };
 }
 
 /**
