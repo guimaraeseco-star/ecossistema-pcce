@@ -77,8 +77,12 @@ const CAMPOS_VALOR = [
 type ChaveValor = (typeof CAMPOS_VALOR)[number]['chave'];
 
 export const load: PageServerLoad = async ({ locals, platform }) => {
-	// Sessão de admin = Admin Geral (bootstrap ou vinculado) ou Super Admin.
-	if (locals.usuario?.tipo !== 'admin') redirect(302, '/');
+	// Só o SUPER ADMIN (E65): a tabela de hora extra e de diária é da
+	// CORPORAÇÃO, não de um departamento. Quem planeja a operação escolhe
+	// QUANTAS horas; quanto vale a hora é outra decisão, e de outro dono — é o
+	// que o menu já dizia desde a fase 1, enquanto este portão ainda aceitava
+	// qualquer sessão admin.
+	if (!locals.usuario?.isSuperAdmin) redirect(302, '/');
 
 	const db = getDB(platform);
 	const [vigente, historico] = await Promise.all([
@@ -106,7 +110,12 @@ export const actions: Actions = {
 	salvarValores: async (event) => {
 		const { request, locals, platform } = event;
 		const u = locals.usuario;
-		if (u?.tipo !== 'admin') return fail(403, { error: 'Acesso restrito ao Administrador Geral' });
+		// Esconder a tela não é autorização: a action confere o mesmo que o load.
+		if (!u?.isSuperAdmin) {
+			return fail(403, {
+				error: 'Os valores da corporação são do Super Administrador.'
+			});
+		}
 
 		const fd = await request.formData();
 
