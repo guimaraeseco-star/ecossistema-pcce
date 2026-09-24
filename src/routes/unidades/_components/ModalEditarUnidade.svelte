@@ -43,6 +43,8 @@
 	let superiorId = $state<number | null>(null);
 	let cidade = $state('');
 	let sigla = $state('');
+	/** O código da unidade na COTIC (0101) — identificador externo, opcional. */
+	let idCotic = $state('');
 	let temPlantao = $state(false);
 	let temExpediente = $state(false);
 	let temFds = $state(false);
@@ -68,6 +70,7 @@
 		superiorId = unidade.seccional_id;
 		cidade = unidade.cidade ?? '';
 		sigla = unidade.sigla ?? '';
+		idCotic = unidade.id_cotic ?? '';
 		temPlantao = unidade.tem_plantao ?? false;
 		temExpediente = unidade.tem_expediente ?? false;
 		temFds = unidade.tem_fds ?? false;
@@ -202,6 +205,23 @@
 				{:else}
 					<input type="hidden" name="sigla" value="" />
 				{/if}
+				<!-- O código na COTIC (0101): preenchido quando a lista oficial chegar.
+				     Fica aqui, junto da sigla, porque é da mesma natureza — um
+				     identificador externo da unidade, não a identidade dela aqui. -->
+				<label class="label">
+					<span class={ROTULO}>
+						Código na COTIC
+						<span class="font-normal normal-case opacity-70">— opcional</span>
+					</span>
+					<input
+						class={CAMPO}
+						type="text"
+						name="id_cotic"
+						maxlength="30"
+						bind:value={idCotic}
+						placeholder="ainda não informado"
+					/>
+				</label>
 			</div>
 			<div class="flex flex-wrap items-center gap-4 text-sm">
 				<span class={ROTULO}>Regimes:</span>

@@ -115,8 +115,16 @@
 			{#if u.abrangencia === 'corporativa'}
 				· abrangência corporativa{/if}
 		</p>
-		{#if u.endereco || u.telefone || u.email}
+		{#if u.endereco || u.telefone || u.email || u.id_cotic}
 			<dl class="mt-3 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
+				<!-- O código na COTIC (0101): identificador da unidade nos sistemas da
+				     corporação. Só aparece quando já se sabe qual é. -->
+				{#if u.id_cotic}
+					<dt class="text-2xs font-semibold tracking-[0.18em] text-surface-500 uppercase sm:pt-0.5">
+						Código na COTIC
+					</dt>
+					<dd class="font-mono text-surface-700 dark:text-surface-300">{u.id_cotic}</dd>
+				{/if}
 				{#if u.endereco}
 					<dt class="text-2xs font-semibold tracking-[0.18em] text-surface-500 uppercase sm:pt-0.5">
 						Endereço

@@ -74,6 +74,7 @@ export {
 	criarSolicitacoesCadastro,
 	listarSolicitacoesDoPolicial,
 	listarSolicitacoesCadastroPendentes,
+	buscarSolicitacaoCadastro,
 	decidirSolicitacaoCadastro
 } from './solicitacoes';
 export type { CampoSolicitacao, MudancaSolicitada } from './solicitacoes';

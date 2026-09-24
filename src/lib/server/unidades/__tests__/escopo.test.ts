@@ -165,3 +165,29 @@ describe('o chapéu da SECCIONAL (E71)', () => {
 		expect((escopo?.nos ?? []).length).toBe(3);
 	});
 });
+
+describe('o Super Admin (E65)', () => {
+	const superAdmin = () =>
+		({
+			id: 9,
+			tipo: 'admin',
+			nome: 'Super',
+			primeiro_acesso: false,
+			isSuperAdmin: true
+		}) as UsuarioLogado;
+
+	it('enxerga a árvore inteira, mesmo sem nó — inclusive o que está fora de departamento', async () => {
+		// Sem isto a E65 o trancaria para fora da ficha de unidade: ele não tem
+		// nó, e quem cuida da estrutura precisa abrir a unidade que está
+		// arrumando. O corporativo, que é dele, mora fora de qualquer
+		// departamento — por isso a asserção inclui a unidade solta.
+		sqlite.exec(
+			`INSERT INTO unidades (id, nome, tipo, seccional_id) VALUES (93009, 'UNIDADE SOLTA', 'delegacia', NULL);`
+		);
+		const escopo = await escopoDeUnidades(db, superAdmin());
+		expect(escopo).not.toBeNull();
+		expect(unidadeNoEscopo(escopo!, DEP)).toBe(true);
+		expect(unidadeNoEscopo(escopo!, DELEGACIA)).toBe(true);
+		expect(unidadeNoEscopo(escopo!, 93009)).toBe(true);
+	});
+});

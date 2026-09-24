@@ -17,7 +17,15 @@ import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { avisos, type Aviso } from '../server/schema';
 import { batchNonEmpty, type Database } from './core';
 
-/** Quem pode ler: o Admin Geral lê a caixa `admin_geral`; os demais, as lotações do escopo. */
+/**
+ * Quem pode ler: o Admin Geral lê a caixa `admin_geral`; os demais, as
+ * lotações do escopo.
+ *
+ * Desde a E65 a caixa `admin_geral` também tem recorte: o aviso guarda a
+ * lotação A QUE SE REFERE, e o administrador vê só o que está dentro do nó
+ * dele. Aviso antigo, gravado sem lotação, continua visível para todos —
+ * esconder o passado seria pior do que mostrá-lo a mais gente.
+ */
 export interface CaixaDeAvisos {
 	adminGeral: boolean;
 	/** As lotações administradas; vazio para quem não administra nenhuma. */
@@ -26,7 +34,9 @@ export interface CaixaDeAvisos {
 
 /** Uma notícia a gravar. */
 export interface NovoAviso {
-	destinatario: { tipo: 'admin_geral' } | { tipo: 'lotacao'; lotacao: string };
+	destinatario:
+		| { tipo: 'admin_geral'; /** A lotação a que o aviso se refere (E65). */ lotacao?: string }
+		| { tipo: 'lotacao'; lotacao: string };
 	/** O cartão da home que acende: `servidores`, `unidade`… */
 	cartao: string;
 	tipo: string;
@@ -44,7 +54,9 @@ export async function criarAvisos(db: Database, novos: readonly NovoAviso[]): Pr
 		novos.map((n) =>
 			db.insert(avisos).values({
 				destinatario_tipo: n.destinatario.tipo,
-				destinatario_lotacao: n.destinatario.tipo === 'lotacao' ? n.destinatario.lotacao : null,
+				// Na caixa do Admin Geral a lotação não é o destinatário e sim o
+				// ASSUNTO: é por ela que o recorte por nó filtra (E65).
+				destinatario_lotacao: n.destinatario.lotacao ?? null,
 				cartao: n.cartao,
 				tipo: n.tipo,
 				titulo: n.titulo,
@@ -60,8 +72,22 @@ export async function criarAvisos(db: Database, novos: readonly NovoAviso[]): Pr
 /** A cláusula "é da minha caixa" — `null` quando a caixa não alcança nada. */
 function daCaixa(caixa: CaixaDeAvisos) {
 	const partes = [];
-	if (caixa.adminGeral) partes.push(eq(avisos.destinatario_tipo, 'admin_geral'));
-	if (caixa.lotacoes.length > 0) {
+	if (caixa.adminGeral) {
+		partes.push(
+			caixa.lotacoes.length > 0
+				? and(
+						eq(avisos.destinatario_tipo, 'admin_geral'),
+						or(
+							isNull(avisos.destinatario_lotacao),
+							inArray(avisos.destinatario_lotacao, caixa.lotacoes.slice(0, 90))
+						)
+					)
+				: eq(avisos.destinatario_tipo, 'admin_geral')
+		);
+	}
+	// A caixa da ponta: as lotações são o DESTINATÁRIO. No Admin Geral as
+	// mesmas lotações já entraram acima como assunto, e não se repetem aqui.
+	if (!caixa.adminGeral && caixa.lotacoes.length > 0) {
 		partes.push(
 			and(
 				eq(avisos.destinatario_tipo, 'lotacao'),

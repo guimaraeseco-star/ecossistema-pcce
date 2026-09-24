@@ -117,6 +117,7 @@ export {
 	criarSolicitacoesCadastro,
 	listarSolicitacoesDoPolicial,
 	listarSolicitacoesCadastroPendentes,
+	buscarSolicitacaoCadastro,
 	decidirSolicitacaoCadastro,
 	criarSolicitacaoAcao,
 	listarSolicitacoesAcaoDoPolicial,

@@ -24,11 +24,30 @@ describe('o outro lado', () => {
 		]);
 	});
 
-	it('a ponta agiu → o Admin Geral, e só ele', () => {
-		expect(destinatariosDe(UNIDADE, { lotacoes: ['DP Tauá'] })).toEqual([{ tipo: 'admin_geral' }]);
+	it('a ponta agiu → o Admin Geral, e só ele — levando a lotação como ASSUNTO', () => {
+		// A lotação não é o destinatário aqui: é por ela que a caixa do Admin
+		// Geral é recortada pelo nó da conta (E65). Sem lotação conhecida o aviso
+		// fica visível a todos os administradores, como antes.
+		expect(destinatariosDe(UNIDADE, { lotacoes: ['DP Tauá'] })).toEqual([
+			{ tipo: 'admin_geral', lotacao: 'DP Tauá' }
+		]);
+		expect(destinatariosDe(UNIDADE, { lotacoes: [null] })).toEqual([
+			{ tipo: 'admin_geral', lotacao: undefined }
+		]);
 	});
 
 	it('o Admin Geral agiu sem lotação conhecida → ninguém', () => {
 		expect(destinatariosDe(ADMIN, { lotacoes: [null] })).toEqual([]);
+	});
+});
+
+describe('a caixa do Admin Geral tem recorte (E65)', () => {
+	it('a lotação vai no aviso como ASSUNTO, e é por ela que a caixa filtra', () => {
+		// Duas unidades de departamentos diferentes: a caixa de quem administra
+		// uma não pode acender com o que aconteceu na outra. O destinatário
+		// continua sendo "admin_geral" — o que mudou é o aviso passar a dizer de
+		// que casa ele fala.
+		const [destino] = destinatariosDe(UNIDADE, { lotacoes: ['DP Tauá', 'DP Crato'] });
+		expect(destino).toEqual({ tipo: 'admin_geral', lotacao: 'DP Tauá' });
 	});
 });

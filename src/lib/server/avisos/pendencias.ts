@@ -5,14 +5,14 @@
  * distingue das notícias (`lib/db/avisos.ts`), que se leem e se marcam.
  *
  * Para o Admin Geral: os pedidos da ponta aguardando a homologação dele
- * (alterações de cadastro e ações de RH, direção incluída). Para o admin de
+ * (alterações de cadastro e ações de RH, direção incluída), **recortados pelo
+ * nó da conta** (E65) — contar pedido que a fila dele não mostra faria o
+ * badge cobrar um trabalho que não é dele. Para o admin de
  * unidade e o de seccional: o que a unidade precisa resolver nas férias —
  * pedidos à COGEP aguardando a homologação da resposta e abonos deferidos
  * sem a ciência dela. Cada item traz o LINK do lugar onde se resolve e o
  * CARTÃO da home que acende.
  */
-import { eq, sql } from 'drizzle-orm';
-import { cadastroSolicitacoes, policialAcaoSolicitacoes } from '$lib/server/schema';
 import { pendenciasDeFeriasPorLotacao } from '$lib/db/policiais/ferias';
 import {
 	titularesAusentesSemRespondencia,
@@ -20,7 +20,9 @@ import {
 } from '$lib/db/unidades-responsaveis';
 import type { Database } from '$lib/db/core';
 import { isAdminGeral, type UsuarioLogado } from '$lib/auth';
-import { lotacoesAdministradas } from '$lib/server/policial-permissao';
+import { lotacoesAdministradas, lotacaoNoEscopo } from '$lib/server/policial-permissao';
+import { listarSolicitacoesCadastroPendentes } from '$lib/db/policiais/solicitacoes';
+import { listarSolicitacoesAcaoPendentes } from '$lib/db/policiais/acao-solicitacoes';
 
 export interface Pendencia {
 	/** O cartão da home que acende. */
@@ -35,26 +37,34 @@ export interface Pendencia {
 
 /** As pendências do usuário, na ordem em que a caixa as mostra. */
 export async function pendenciasDoUsuario(db: Database, u: UsuarioLogado): Promise<Pendencia[]> {
-	if (isAdminGeral(u)) return pendenciasDoAdminGeral(db);
 	const escopo = await lotacoesAdministradas(db, u);
+	if (isAdminGeral(u)) return pendenciasDoAdminGeral(db, escopo);
 	if (!escopo || escopo.size === 0) return [];
 	return pendenciasDaUnidade(db, escopo);
 }
 
-async function pendenciasDoAdminGeral(db: Database): Promise<Pendencia[]> {
-	const [cadastro, acoes, ausentes] = await Promise.all([
-		db
-			.select({ n: sql<number>`count(*)` })
-			.from(cadastroSolicitacoes)
-			.where(eq(cadastroSolicitacoes.status, 'pendente'))
-			.get(),
-		db
-			.select({ tipo: policialAcaoSolicitacoes.tipo, n: sql<number>`count(*)` })
-			.from(policialAcaoSolicitacoes)
-			.where(eq(policialAcaoSolicitacoes.status, 'pendente'))
-			.groupBy(policialAcaoSolicitacoes.tipo),
+async function pendenciasDoAdminGeral(
+	db: Database,
+	escopo: Set<string> | null
+): Promise<Pendencia[]> {
+	// Conta as MESMAS linhas que a fila mostra, e pelo mesmo recorte: a
+	// contagem sai das listas em vez de um `count(*)`, porque o filtro é por
+	// nome de lotação e o escopo pode passar dos 90 binds do D1. A fila tem
+	// dezenas de linhas; quando a E51 trocar nome por id, isto volta a ser
+	// agregação no banco.
+	const [cadastroPendentes, acoesPendentes, ausentes] = await Promise.all([
+		listarSolicitacoesCadastroPendentes(db),
+		listarSolicitacoesAcaoPendentes(db),
 		titularesAusentesSemRespondencia(db)
 	]);
+	const doNo = <T extends { policial_lotacao: string }>(linhas: T[]) =>
+		linhas.filter((l) => lotacaoNoEscopo(escopo, l.policial_lotacao));
+	const cadastro = { n: doNo(cadastroPendentes).length };
+	const acoesDoNo = doNo(acoesPendentes);
+	const acoes = [...new Set(acoesDoNo.map((a) => a.tipo))].map((tipo) => ({
+		tipo,
+		n: acoesDoNo.filter((a) => a.tipo === tipo).length
+	}));
 	const itens: Pendencia[] = [];
 	const nCadastro = Number(cadastro?.n ?? 0);
 	if (nCadastro > 0) {
@@ -86,7 +96,11 @@ async function pendenciasDoAdminGeral(db: Database): Promise<Pendencia[]> {
 			link: '/solicitacoes'
 		});
 	}
-	const semRespondencia = pendenciaDeRespondencia(ausentes);
+	// A ausência de titular também é do nó: a unidade da ausência tem de estar
+	// no escopo desta conta.
+	const semRespondencia = pendenciaDeRespondencia(
+		ausentes.filter((a) => lotacaoNoEscopo(escopo, a.unidade_nome))
+	);
 	if (semRespondencia) itens.push(semRespondencia);
 	return itens;
 }
