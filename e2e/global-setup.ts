@@ -132,20 +132,22 @@ export default async function globalSetup() {
 		ON CONFLICT(id) DO UPDATE SET nome = excluded.nome, tipo = excluded.tipo,
 			seccional_id = excluded.seccional_id;
 		INSERT INTO policiais
-			(id, matricula, nome, cargo, lotacao, senha, primeiro_acesso, email, ativo, cpf)
+			(id, matricula, nome, cargo, lotacao, unidade_id, senha, primeiro_acesso, email, ativo, cpf)
 		VALUES
-			(${FIXTURE.policialA.id}, '${FIXTURE.policialA.matricula}', '${FIXTURE.policialA.nome}', 'OIP', '${FIXTURE.unidadeA.nome}', '${senhaHash}', 0, NULL, 1, '${FIXTURE.policialA.cpf}'),
-			(${FIXTURE.policialB.id}, '${FIXTURE.policialB.matricula}', 'Policial Fixture B', 'OIP', '${FIXTURE.unidadeB.nome}', '${senhaHash}', 0, NULL, 1, NULL)
+			(${FIXTURE.policialA.id}, '${FIXTURE.policialA.matricula}', '${FIXTURE.policialA.nome}', 'OIP', '${FIXTURE.unidadeA.nome}', ${FIXTURE.unidadeA.id}, '${senhaHash}', 0, NULL, 1, '${FIXTURE.policialA.cpf}'),
+			(${FIXTURE.policialB.id}, '${FIXTURE.policialB.matricula}', 'Policial Fixture B', 'OIP', '${FIXTURE.unidadeB.nome}', ${FIXTURE.unidadeB.id}, '${senhaHash}', 0, NULL, 1, NULL)
 		ON CONFLICT(id) DO UPDATE SET matricula = excluded.matricula, nome = excluded.nome,
-			cargo = excluded.cargo, lotacao = excluded.lotacao, senha = excluded.senha,
+			cargo = excluded.cargo, lotacao = excluded.lotacao, unidade_id = excluded.unidade_id,
+			senha = excluded.senha,
 			primeiro_acesso = excluded.primeiro_acesso, email = excluded.email,
 			ativo = excluded.ativo, cpf = excluded.cpf;
 		INSERT INTO policiais
-			(id, matricula, nome, cargo, lotacao, senha, primeiro_acesso, email, ativo, papel, papel_unidade_id)
+			(id, matricula, nome, cargo, lotacao, unidade_id, senha, primeiro_acesso, email, ativo, papel, papel_unidade_id)
 		VALUES
-			(${FIXTURE.adminUnidade.id}, '${FIXTURE.adminUnidade.matricula}', '${FIXTURE.adminUnidade.nome}', 'DPC', '${FIXTURE.unidadeA.nome}', '${senhaHash}', 0, NULL, 1, 'admin_unidade', ${FIXTURE.unidadeA.id})
+			(${FIXTURE.adminUnidade.id}, '${FIXTURE.adminUnidade.matricula}', '${FIXTURE.adminUnidade.nome}', 'DPC', '${FIXTURE.unidadeA.nome}', ${FIXTURE.unidadeA.id}, '${senhaHash}', 0, NULL, 1, 'admin_unidade', ${FIXTURE.unidadeA.id})
 		ON CONFLICT(id) DO UPDATE SET matricula = excluded.matricula, nome = excluded.nome,
-			cargo = excluded.cargo, lotacao = excluded.lotacao, senha = excluded.senha,
+			cargo = excluded.cargo, lotacao = excluded.lotacao, unidade_id = excluded.unidade_id,
+			senha = excluded.senha,
 			primeiro_acesso = excluded.primeiro_acesso, email = excluded.email,
 			ativo = excluded.ativo, papel = excluded.papel, papel_unidade_id = excluded.papel_unidade_id;
 		INSERT INTO administradores (id, login, senha, nome, email, primeiro_acesso, unidade_id)
@@ -155,21 +157,21 @@ export default async function globalSetup() {
 		ON CONFLICT(id) DO UPDATE SET login = excluded.login, senha = excluded.senha,
 			nome = excluded.nome, email = excluded.email, primeiro_acesso = excluded.primeiro_acesso,
 			unidade_id = excluded.unidade_id;
-		INSERT INTO escalas (id, titulo, cidade, tipo, lotacao, data_inicio, data_fim)
+		INSERT INTO escalas (id, titulo, cidade, tipo, lotacao, unidade_id, data_inicio, data_fim)
 		VALUES
-			(${FIXTURE.escalaA.id}, 'Escala E2E Fixture A', 'Fortaleza', 'plantao', '${FIXTURE.unidadeA.nome}', '2026-01-01', '2026-01-01')
+			(${FIXTURE.escalaA.id}, 'Escala E2E Fixture A', 'Fortaleza', 'plantao', '${FIXTURE.unidadeA.nome}', ${FIXTURE.unidadeA.id}, '2026-01-01', '2026-01-01')
 		ON CONFLICT(id) DO UPDATE SET titulo = excluded.titulo, cidade = excluded.cidade,
-			tipo = excluded.tipo, lotacao = excluded.lotacao,
+			tipo = excluded.tipo, lotacao = excluded.lotacao, unidade_id = excluded.unidade_id,
 			data_inicio = excluded.data_inicio, data_fim = excluded.data_fim;
 		DELETE FROM escala_documentos WHERE escala_id = ${FIXTURE.escalaA.id};
 		INSERT INTO escala_documentos (escala_id, r2_key, assinante_nome, verificacao_hash)
 		VALUES (${FIXTURE.escalaA.id}, 'test/fixture-${FIXTURE.escalaA.id}.pdf', 'Policial Fixture A', 'fixture-hash-${FIXTURE.escalaA.id}');
-		INSERT INTO escalas (id, titulo, cidade, tipo, lotacao, data_inicio, data_fim)
+		INSERT INTO escalas (id, titulo, cidade, tipo, lotacao, unidade_id, data_inicio, data_fim)
 		VALUES
-			(${FIXTURE.escalaAssinavel.id}, 'Escala E2E Assinável', 'Fortaleza', 'plantao', '${FIXTURE.unidadeA.nome}', '2026-02-01', '2026-02-28'),
-			(${FIXTURE.escalaAssinavelA3.id}, 'Escala E2E Assinável A3', 'Fortaleza', 'plantao', '${FIXTURE.unidadeA.nome}', '2026-03-01', '2026-03-31')
+			(${FIXTURE.escalaAssinavel.id}, 'Escala E2E Assinável', 'Fortaleza', 'plantao', '${FIXTURE.unidadeA.nome}', ${FIXTURE.unidadeA.id}, '2026-02-01', '2026-02-28'),
+			(${FIXTURE.escalaAssinavelA3.id}, 'Escala E2E Assinável A3', 'Fortaleza', 'plantao', '${FIXTURE.unidadeA.nome}', ${FIXTURE.unidadeA.id}, '2026-03-01', '2026-03-31')
 		ON CONFLICT(id) DO UPDATE SET titulo = excluded.titulo, cidade = excluded.cidade,
-			tipo = excluded.tipo, lotacao = excluded.lotacao,
+			tipo = excluded.tipo, lotacao = excluded.lotacao, unidade_id = excluded.unidade_id,
 			data_inicio = excluded.data_inicio, data_fim = excluded.data_fim;
 		DELETE FROM escala_policiais WHERE escala_id IN (${FIXTURE.escalaAssinavel.id}, ${FIXTURE.escalaAssinavelA3.id});
 		INSERT INTO escala_policiais (escala_id, policial_id, data_plantao, hora_entrada, hora_saida, equipe)

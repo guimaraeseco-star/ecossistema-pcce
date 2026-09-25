@@ -46,6 +46,25 @@ export async function lotacoesDaSeccional(db: Database, seccionalId: number): Pr
 	return rows.map((r) => r.nome);
 }
 
+/**
+ * Os IDS da unidade `seccionalId` e das subordinadas a ela — irmã exata de
+ * `lotacoesDaSeccional`, com a MESMA expansão de uma volta.
+ *
+ * É "uma volta", não a subárvore: o posto pendurado numa delegacia da
+ * seccional NÃO entra. Isso difere de `escopoDeUnidades`, que desce a árvore
+ * inteira — divergência conhecida e coberta em
+ * `__tests__/escopo-duas-reguas.test.ts`, onde está escrito por que ela existe
+ * e o que decidir sobre ela.
+ */
+async function idsDaSeccional(db: Database, seccionalId: number): Promise<number[]> {
+	const rows = await db
+		.select({ id: unidades.id })
+		.from(unidades)
+		.where(or(eq(unidades.id, seccionalId), eq(unidades.seccional_id, seccionalId)))
+		.all();
+	return rows.map((r) => r.id);
+}
+
 /** O nome da unidade, ou `null` se o id não existe. */
 async function nomeDaUnidade(db: Database, unidadeId: number): Promise<string | null> {
 	const r = await db
@@ -110,7 +129,7 @@ export async function lotacoesAdministradas(
 }
 
 /**
- * O MESMO escopo, em ids de unidade (E51).
+ * O MESMO escopo de `lotacoesAdministradas`, em ids de unidade (E51).
  *
  * Existe ao lado do de nomes porque a migração é gradual: as consultas passam
  * a comparar `policiais.unidade_id` e `escalas.unidade_id`, que sobrevivem a
@@ -118,17 +137,49 @@ export async function lotacoesAdministradas(
  * Quando a última consulta por nome sair, `lotacoesAdministradas` some e fica
  * só esta.
  *
+ * **Espelha a irmã galho por galho, de propósito.** A primeira versão desta
+ * função (E51 parte 1) delegava TUDO a `escopoDeUnidades`, que desce a árvore
+ * inteira — e isso não é o que a régua de nomes faz para `admin_seccional`
+ * (uma volta) nem para `admin_unidade` (só a própria unidade). Trocar uma pela
+ * outra numa consulta, portanto, não era migrar de nome para id: era ALARGAR
+ * escopo de carona. Enquanto as duas convivem, elas têm de responder a mesma
+ * coisa, e `__tests__/escopo-duas-reguas.test.ts` trava isso par a par.
+ *
+ * Qual das duas réguas é a CERTA é outra pergunta, e é dele: o comentário da
+ * E71 diz que quem administra uma unidade administra "aquela unidade e os
+ * postos dela", o que aponta para a árvore. Está registrado no ESTADO como
+ * decisão pendente — e não se decide por efeito colateral de uma migração.
+ *
  * `null` significa o mesmo de lá: sem restrição (Super Admin).
  */
 export async function unidadesAdministradas(
 	db: Database,
 	u: NonNullable<App.Locals['usuario']>
 ): Promise<Set<number> | null> {
-	if (isAdminGeral(u) && u.isSuperAdmin) return null;
-	// `escopoDeUnidades` já resolve os três casos e já aplica o chapéu (E71):
-	// a subárvore do nó, a casa do admin de unidade, a seccional inteira.
-	const escopo = await escopoDeUnidades(db, u);
-	return new Set((escopo?.nos ?? []).map((n) => n.id));
+	if (isAdminGeral(u)) {
+		if (u.isSuperAdmin) return null;
+		const escopo = await escopoDeUnidades(db, u);
+		return new Set((escopo?.nos ?? []).map((n) => n.id));
+	}
+	if (u.papel_unidade_id == null) return new Set();
+
+	// Colaborador lotado (E61) e admin de unidade: a unidade do PAPEL, e só
+	// ela. A conferência de existência não é zelo: a irmã de nomes devolve
+	// vazio quando o id não existe, e sem isto o gêmeo devolveria um id órfão.
+	if (colaboradorComAcesso(u) || isAdminUnidade(u)) {
+		const existe = await nomeDaUnidade(db, u.papel_unidade_id);
+		return new Set(existe ? [u.papel_unidade_id] : []);
+	}
+
+	if (isAdminSeccional(u)) {
+		// No chapéu de unidade a seccional é só uma casa (E71).
+		if (u.atuandoComo === 'unidade') {
+			const escopo = await escopoDeUnidades(db, u);
+			return new Set((escopo?.nos ?? []).map((n) => n.id));
+		}
+		return new Set(await idsDaSeccional(db, u.papel_unidade_id));
+	}
+	return new Set();
 }
 
 /** Aceita `null` (sem restrição) e retorna true para qualquer lotação nesse caso. */

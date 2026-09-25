@@ -25,7 +25,7 @@ import type { RequestHandler } from './$types';
 import { getDB, buscarGiseEscala, buscarEscala } from '$lib/db';
 import { requireAuth, badRequest, serverError } from '$lib/server/api';
 import { isAdminGeral, isAdminSeccional } from '$lib/auth';
-import { lotacoesAdministradas } from '$lib/server/policial-permissao';
+import { unidadesAdministradas } from '$lib/server/policial-permissao';
 import { verificarPermissaoGise } from '$lib/server/gise/permissao';
 import { verificarPermissaoEscala } from '$lib/server/escalas/permissao';
 import { lerPapelGise } from '$lib/server/gise/papel-cache';
@@ -110,9 +110,10 @@ export const GET: RequestHandler = async ({ locals, platform, url }) => {
 		) {
 			tasks.push(
 				(async () => {
-					const escopo = await lotacoesAdministradas(db, u);
-					const lotacoes = escopo ? [...escopo] : [];
-					body.escalas = await resumoEscalasPendentes(db, u, lotacoes);
+					// O escopo em IDS (E51): `null` é o Super Admin, que não cai neste
+					// ramo — só admin_seccional e admin_unidade chegam aqui.
+					const escopo = await unidadesAdministradas(db, u);
+					body.escalas = await resumoEscalasPendentes(db, u, escopo ? [...escopo] : []);
 				})()
 			);
 		}
