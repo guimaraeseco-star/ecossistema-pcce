@@ -24,6 +24,7 @@ import { limparMatricula } from '../../utils/formato';
 import { gerarSenhaAleatoriaHash } from '../../auth';
 import { prepararCpfParaDB, type CpfCriptoEnv } from '../../crypto/cpf-cripto';
 import { paginarComContagem, buscaPorPartes, type Database } from '../core';
+import { idDaUnidadePeloNome } from '../unidades';
 
 /**
  * Uma linha da listagem: o cadastro sem a senha, MAIS o nome e o símbolo da
@@ -72,7 +73,7 @@ export async function listarPoliciais(
 		cargo?: string;
 		seccionalId?: number;
 		somentePapel?: boolean;
-		escopoLotacoes?: string[];
+		escopoUnidades?: number[];
 		/** Situação de HOJE (`hojeISO` obrigatório junto): quem está ativo, de férias ou afastado. */
 		situacao?: 'ativos' | 'ferias' | 'afastados';
 		hojeISO?: string;
@@ -99,9 +100,15 @@ export async function listarPoliciais(
 	// Recorte de permissão: entra ANTES dos filtros de tela e independe deles.
 	// `inArray` com lista vazia produziria SQL inválido no D1, e o caso não é
 	// teórico — é o admin cujo `papel_unidade_id` aponta para unidade removida.
-	if (opts?.escopoLotacoes) {
+	//
+	// Compara por ID desde a E51: era por nome, e uma renomeação de unidade
+	// tirava o servidor do escopo do administrador até alguém reescrever a
+	// lotação dele a mão.
+	if (opts?.escopoUnidades) {
 		baseConditions.push(
-			opts.escopoLotacoes.length > 0 ? inArray(policiais.lotacao, opts.escopoLotacoes) : sql`0 = 1`
+			opts.escopoUnidades.length > 0
+				? inArray(policiais.unidade_id, opts.escopoUnidades)
+				: sql`0 = 1`
 		);
 	}
 
@@ -168,6 +175,7 @@ export async function listarPoliciais(
 			cpf_index: policiais.cpf_index,
 			telefone: policiais.telefone,
 			lotacao: policiais.lotacao,
+			unidade_id: policiais.unidade_id,
 			ativo: policiais.ativo,
 			regime: policiais.regime,
 			classe: policiais.classe,
@@ -333,7 +341,12 @@ async function colunasDoPolicial(data: DadosPolicial, env?: CpfCriptoEnv) {
  */
 export async function criarPolicial(db: Database, data: DadosPolicial, env?: CpfCriptoEnv) {
 	const { nova } = await colunasDoPolicial(data, env);
-	return db.insert(policiais).values(nova);
+	// O par nome + id (E51): o nome continua sendo gravado porque telas e
+	// relatórios o leem direto; o id é o que o escopo e as consultas passam a
+	// usar, e é ele que sobrevive a uma renomeação da unidade.
+	return db
+		.insert(policiais)
+		.values({ ...nova, unidade_id: await idDaUnidadePeloNome(db, nova.lotacao) });
 }
 
 /**
@@ -368,14 +381,20 @@ export async function criarPolicial(db: Database, data: DadosPolicial, env?: Cpf
  */
 export async function upsertPolicial(db: Database, data: DadosPolicial, env?: CpfCriptoEnv) {
 	const { daFolha, nova } = await colunasDoPolicial(data, env);
+	// A folha manda a lotação por NOME; aqui ela vira também id (E51). Sem isto
+	// a carga — que reenvia o efetivo inteiro a cada rodada — apagaria o id de
+	// todo mundo na primeira sincronização, e o escopo dos administradores
+	// esvaziaria em silêncio.
+	const unidade_id = await idDaUnidadePeloNome(db, nova.lotacao);
 
 	return db
 		.insert(policiais)
-		.values(nova)
+		.values({ ...nova, unidade_id })
 		.onConflictDoUpdate({
 			target: policiais.matricula,
 			set: {
 				...daFolha,
+				unidade_id,
 				// Nome de coluna sem qualificação dentro do DO UPDATE SET = o valor
 				// JÁ GRAVADO na linha, como nos `sql\`email\`` abaixo.
 				...(data.designacao_id !== undefined
@@ -411,7 +430,7 @@ export async function atualizarPolicial(
 ) {
 	return db
 		.update(policiais)
-		.set(await camposDeAtualizacao(data, env))
+		.set(await comUnidadeId(db, await camposDeAtualizacao(data, env)))
 		.where(eq(policiais.id, id));
 }
 
@@ -449,6 +468,21 @@ export type CamposDoPolicial = Partial<{
  * (FLW-RBAC-005). Quem precisa do par cadastro+histórico usa
  * `atualizarPolicialComHistorico`.
  */
+/**
+ * Acrescenta `unidade_id` ao SET quando a `lotacao` está sendo escrita (E51).
+ *
+ * Mora aqui, e não em cada chamador, porque o par nome + id não pode depender
+ * de alguém lembrar: uma escrita que mude só o nome deixaria o id apontando
+ * para a unidade anterior — pior do que não ter id nenhum.
+ */
+async function comUnidadeId(
+	db: Database,
+	campos: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+	if (campos.lotacao === undefined) return campos;
+	return { ...campos, unidade_id: await idDaUnidadePeloNome(db, String(campos.lotacao)) };
+}
+
 export async function camposDeAtualizacao(
 	data: CamposDoPolicial,
 	env?: CpfCriptoEnv

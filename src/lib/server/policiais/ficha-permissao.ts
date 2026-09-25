@@ -64,7 +64,7 @@ export function modoDaFicha(u: UsuarioLogado): ModoFicha {
  * As lotações que este usuário alcança (`null` = irrestrito), ou `null` de
  * recusa — quem chama distingue pelo `podeAbrirFichaDePolicial` anterior.
  */
-export async function escopoDaFicha(db: Database, u: UsuarioLogado): Promise<Set<string> | null> {
+async function escopoDaFicha(db: Database, u: UsuarioLogado): Promise<Set<string> | null> {
 	return lotacoesAdministradas(db, u);
 }
 

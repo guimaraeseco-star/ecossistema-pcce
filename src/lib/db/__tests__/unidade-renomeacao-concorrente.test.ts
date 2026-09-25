@@ -86,11 +86,13 @@ beforeEach(() => {
 		INSERT INTO unidades (id, nome, tipo, cidade)
 		VALUES (${UNID}, 'DELEGACIA A', 'delegacia', 'CIDADE X');
 
-		INSERT INTO policiais (id, matricula, nome, cargo, lotacao, senha)
-		VALUES (96101, 'M96101', 'Fulano', 'OIP', 'DELEGACIA A', 'h');
+		-- O par nome + id (E51): a cascata da renomeação mira o ID, então a
+		-- fixture precisa ter os dois, como toda linha que o sistema grava.
+		INSERT INTO policiais (id, matricula, nome, cargo, lotacao, unidade_id, senha)
+		VALUES (96101, 'M96101', 'Fulano', 'OIP', 'DELEGACIA A', ${UNID}, 'h');
 
-		INSERT INTO escalas (id, titulo, tipo, lotacao, cidade, data_inicio, data_fim)
-		VALUES (96201, 'ESCALA', 'plantao', 'DELEGACIA A', 'CIDADE X', '2026-09-01', '2026-09-30');
+		INSERT INTO escalas (id, titulo, tipo, lotacao, unidade_id, cidade, data_inicio, data_fim)
+		VALUES (96201, 'ESCALA', 'plantao', 'DELEGACIA A', ${UNID}, 'CIDADE X', '2026-09-01', '2026-09-30');
 	`);
 });
 

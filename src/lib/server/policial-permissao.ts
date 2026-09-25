@@ -109,6 +109,28 @@ export async function lotacoesAdministradas(
 	return new Set();
 }
 
+/**
+ * O MESMO escopo, em ids de unidade (E51).
+ *
+ * Existe ao lado do de nomes porque a migração é gradual: as consultas passam
+ * a comparar `policiais.unidade_id` e `escalas.unidade_id`, que sobrevivem a
+ * uma renomeação, enquanto o que ainda lê por nome continua funcionando.
+ * Quando a última consulta por nome sair, `lotacoesAdministradas` some e fica
+ * só esta.
+ *
+ * `null` significa o mesmo de lá: sem restrição (Super Admin).
+ */
+export async function unidadesAdministradas(
+	db: Database,
+	u: NonNullable<App.Locals['usuario']>
+): Promise<Set<number> | null> {
+	if (isAdminGeral(u) && u.isSuperAdmin) return null;
+	// `escopoDeUnidades` já resolve os três casos e já aplica o chapéu (E71):
+	// a subárvore do nó, a casa do admin de unidade, a seccional inteira.
+	const escopo = await escopoDeUnidades(db, u);
+	return new Set((escopo?.nos ?? []).map((n) => n.id));
+}
+
 /** Aceita `null` (sem restrição) e retorna true para qualquer lotação nesse caso. */
 export function lotacaoNoEscopo(escopo: Set<string> | null, lotacao: string): boolean {
 	return escopo === null || escopo.has(lotacao);
