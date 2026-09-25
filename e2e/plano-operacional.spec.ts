@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { test, expect } from '@playwright/test';
 import type { APIResponse } from '@playwright/test';
 import { FIXTURE } from './global-setup';
@@ -43,13 +45,22 @@ const NOME_VIZINHO = 'OPERACAO E2E PLANO VIZINHO';
 const NOME_MEDIDO = 'OPERACAO E2E DISTANCIA MEDIDA';
 
 /**
- * Admin Geral grava os valores desde a decisão E39 (`/valores` é da sessão de
- * admin). Antes era o Super Admin, e o spec dependia de `SUPER_ADMIN_LOGIN`
- * bater com o fixture — o que nunca acontecia na máquina de um dev com o seu
- * próprio login, e deixava metade do spec pulada.
+ * Quem grava os valores é o SUPER ADMIN, e só ele (E65, recorte do
+ * corporativo): a tabela de hora extra e de diária é da CORPORAÇÃO, não de um
+ * departamento — quem planeja a operação escolhe QUANTAS horas, quanto vale a
+ * hora é decisão de outro dono.
+ *
+ * Isto REVOGA parte da E39, que havia passado a tela para qualquer sessão de
+ * admin — e com ela volta a dependência que a E39 tinha eliminado: o fixture só
+ * É super admin quando `SUPER_ADMIN_LOGIN` bate com o login dele. Ver
+ * `fixtureEhSuperAdmin` abaixo: em CI bate, na máquina de um dev com o seu
+ * próprio super admin NÃO bate, e por isso os três testes que GRAVAM valores
+ * pulam lá em vez de reprovar.
  */
+let tokenSuper: string | null = null;
+/** Admin Geral: dono dos PLANOS, e quem a tela de valores passou a RECUSAR. */
 let tokenAdmin: string | null = null;
-/** Policial comum: quem a tela de valores RECUSA. */
+/** Policial comum: quem a tela de valores sempre recusou. */
 let tokenPolicial: string | null = null;
 let planoId: number | null = null;
 let planoVizinhoId: number | null = null;
@@ -79,6 +90,34 @@ async function resultadoDaAction(res: APIResponse) {
 		dados: String(corpo.data ?? '')
 	};
 }
+
+/**
+ * O fixture de Super Admin só é super admin quando `SUPER_ADMIN_LOGIN` bate com
+ * o login dele.
+ *
+ * Em CI bate: não existe `.dev.vars`, e o wrapper `servidor-e2e.ts` escreve o
+ * valor de teste. Na máquina de um dev que tem o SEU super admin, o wrapper
+ * PRESERVA o login do dev de propósito (`garantirDevVar` não sobrescreve) — e
+ * então nenhuma sessão do fixture é super admin, e a tela de valores recusa.
+ *
+ * Os três testes que GRAVAM valores pulam nessa máquina em vez de reprovar, e
+ * quem os cobre é a CI. O resto do spec (planos, equipe, PDF) continua rodando
+ * local com a versão de custo que já exista no D1 — a mesma premissa de
+ * `proximaVigencia()`. Em CI o skip NUNCA vale: se o ambiente estiver errado, o
+ * teste tem de reprovar alto, não sumir do relatório.
+ */
+function fixtureEhSuperAdmin(): boolean {
+	try {
+		const conteudo = readFileSync(join(process.cwd(), '.dev.vars'), 'utf8');
+		const m = conteudo.match(/^s*SUPER_ADMIN_LOGINs*=s*(.+)$/m);
+		return (m?.[1].trim().replace(/^["']|["']$/g, '') ?? '') === FIXTURE.superAdmin.login;
+	} catch {
+		return false;
+	}
+}
+const PULAR_GRAVACAO_DE_VALORES = !process.env.CI && !fixtureEhSuperAdmin();
+const MOTIVO_PULO =
+	'o super admin desta máquina é o do dev, não o fixture — a gravação de valores é coberta pela CI';
 
 /** O `id` do único registro que a consulta devolve, ou `null`. */
 function idDe(sql: string): number | null {
@@ -115,9 +154,10 @@ function proximaVigencia(): string {
 }
 
 test.beforeAll(async () => {
+	tokenSuper = seedSession(FIXTURE.superAdmin.id, 'admin');
 	tokenAdmin = seedSession(FIXTURE.adminGeral.id, 'admin');
 	tokenPolicial = seedSession(FIXTURE.policialA.id);
-	if (!tokenAdmin || !tokenPolicial) return;
+	if (!tokenSuper || !tokenAdmin || !tokenPolicial) return;
 
 	// Dois servidores no MESMO cargo e classes diferentes: um resolve faixa de
 	// custo, o outro não. É a diferença que o gate de emissão enxerga.
@@ -146,14 +186,16 @@ test.afterAll(() => {
 });
 
 test.describe.serial('Plano operacional — valores, plano e PDF', () => {
-	test.skip(() => !tokenAdmin || !tokenPolicial, 'D1 local indisponível');
+	test.skip(() => !tokenSuper || !tokenAdmin || !tokenPolicial, 'D1 local indisponível');
 
-	test('Admin Geral grava a tabela de valores; policial não alcança a tela', async ({
+	test('Super Admin grava a tabela de valores; Admin Geral e policial não alcançam', async ({
 		request
 	}) => {
+		test.skip(PULAR_GRAVACAO_DE_VALORES, MOTIVO_PULO);
+		const versaoAntes = versaoVigente();
 		const res = await request.post('/valores?/salvarValores', {
 			headers: {
-				...headersFormAction(tokenAdmin!),
+				...headersFormAction(tokenSuper!),
 				'content-type': 'application/x-www-form-urlencoded'
 			},
 			data: form({
@@ -171,23 +213,49 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 				vigente_desde: proximaVigencia()
 			})
 		});
-		expect(res.status()).toBe(200);
+		// HTTP 200 não diz nada aqui, e é o que `resultadoDaAction` avisa logo
+		// acima: com `x-sveltekit-action`, a recusa também volta 200 e o status
+		// real viaja no corpo. Asserir `res.status()` fazia um 403 passar por
+		// gravação bem-sucedida — foi exatamente o que aconteceu quando este
+		// teste ainda gravava como Admin Geral.
+		const gravou = await resultadoDaAction(res);
+		expect(gravou.tipo, 'a gravação tem de ser ACEITA, não só respondida').toBe('success');
 
 		const versao = versaoVigente();
 		expect(versao, 'a gravação tem de criar uma versão').not.toBeNull();
+		// E uma versão NOVA: o D1 local é compartilhado e já tem versões de
+		// outros dias, então "existe versão" não prova que ESTA gravação gravou.
+		expect(versao, 'a versão tem de ser nova, não a que já estava no banco').not.toBe(versaoAntes);
 		versoesCriadas.push(versao!);
 
-		// A tela é da sessão de admin (Admin Geral e Super Admin — E39). O
-		// policial é redirecionado — o `load` recusa, não o menu.
-		const negado = await request.get('/valores', {
-			headers: cookieDeSessao(tokenPolicial!),
-			maxRedirects: 0
+		// A tela é do Super Admin, e só dele (E65). Os dois abaixo são recusados
+		// pelo `load`, não pelo menu: esconder o cartão não é autorizar.
+		for (const [quem, cookie] of [
+			['Admin Geral', cookieDeSessao(tokenAdmin!)],
+			['policial comum', cookieDeSessao(tokenPolicial!)]
+		] as const) {
+			const negado = await request.get('/valores', { headers: cookie, maxRedirects: 0 });
+			expect(negado.status(), `${quem} devia ser redirecionado`).toBeGreaterThanOrEqual(300);
+			expect(negado.status(), `${quem} devia ser redirecionado`).toBeLessThan(400);
+		}
+
+		// E a ACTION confere o mesmo que o `load`. Sem esta asserção, o PR que
+		// tirou o cartão do menu do Admin Geral teria deixado o POST direto
+		// gravando os valores da corporação inteira.
+		const postNegado = await request.post('/valores?/salvarValores', {
+			headers: {
+				...headersFormAction(tokenAdmin!),
+				'content-type': 'application/x-www-form-urlencoded'
+			},
+			data: form({ vigente_desde: proximaVigencia() })
 		});
-		expect(negado.status()).toBeGreaterThanOrEqual(300);
-		expect(negado.status()).toBeLessThan(400);
+		const recusaAction = await resultadoDaAction(postNegado);
+		expect(recusaAction.tipo, 'a action tem de recusar o Admin Geral').toBe('failure');
+		expect(recusaAction.status).toBe(403);
 	});
 
 	test('o limite de km é GRAVADO na versão, e a versão o congela', async ({ request }) => {
+		test.skip(PULAR_GRAVACAO_DE_VALORES, MOTIVO_PULO);
 		const valores = {
 			oip_cd_normal: '27,30',
 			oip_ab_normal: '34,13',
@@ -205,7 +273,7 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 		// afirmar um limite que ninguém escolheu.
 		const semKm = await request.post('/valores?/salvarValores', {
 			headers: {
-				...headersFormAction(tokenAdmin!),
+				...headersFormAction(tokenSuper!),
 				'content-type': 'application/x-www-form-urlencoded'
 			},
 			data: form({ ...valores, distancia_minima_diaria_km: '', vigente_desde: proximaVigencia() })
@@ -219,7 +287,7 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 		for (const km of ['0', '2001', '99,5']) {
 			const invalido = await request.post('/valores?/salvarValores', {
 				headers: {
-					...headersFormAction(tokenAdmin!),
+					...headersFormAction(tokenSuper!),
 					'content-type': 'application/x-www-form-urlencoded'
 				},
 				data: form({
@@ -235,7 +303,7 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 
 		const ok = await request.post('/valores?/salvarValores', {
 			headers: {
-				...headersFormAction(tokenAdmin!),
+				...headersFormAction(tokenSuper!),
 				'content-type': 'application/x-www-form-urlencoded'
 			},
 			data: form({
@@ -651,6 +719,7 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 	});
 
 	test('reajustar os valores NÃO muda o PDF do plano já criado', async ({ request }) => {
+		test.skip(PULAR_GRAVACAO_DE_VALORES, MOTIVO_PULO);
 		const antes = await request.get(`/api/planos/${planoId}/download`, {
 			headers: cookieDeSessao(tokenAdmin!)
 		});
@@ -659,7 +728,7 @@ test.describe.serial('Plano operacional — valores, plano e PDF', () => {
 		// Uma versão NOVA, com o dobro do valor da hora do OIP C.
 		const reajuste = await request.post('/valores?/salvarValores', {
 			headers: {
-				...headersFormAction(tokenAdmin!),
+				...headersFormAction(tokenSuper!),
 				'content-type': 'application/x-www-form-urlencoded'
 			},
 			data: form({

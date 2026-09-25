@@ -177,18 +177,21 @@ describe('a organização fixada em 13/09/2026', () => {
 	const idsDe = (grupos: typeof geral, grupo: string) =>
 		grupos.find((g) => g.id === grupo)?.cartoes.map((c) => c.id) ?? [];
 
-	it('E39: Diárias, Extras e Atualização de valores ficam em Gestão de pessoal', () => {
-		const pessoal = idsDe(geral, 'pessoal');
-		expect(pessoal).toEqual(
-			expect.arrayContaining(['servidores', 'escalas', 'diarias', 'extras', 'valores'])
+	it('E39: Diárias e Extras ficam em Gestão de pessoal; Valores foi para o Super Admin (E65)', () => {
+		expect(idsDe(geral, 'pessoal')).toEqual(
+			expect.arrayContaining(['servidores', 'escalas', 'diarias', 'extras'])
 		);
+		// A E39 punha "valores" aqui; a E65 moveu o corporativo para o Super
+		// Admin, e é a decisão mais nova que vale. Ele não chega à tela por esta
+		// home — tem menu exclusivo, onde a aba Valores já estava.
+		expect(idsDe(geral, 'pessoal')).not.toContain('valores');
 	});
 
-	it('E39: Atualização de valores e Municípios são de departamento para cima', () => {
-		expect(idsDe(geral, 'pessoal')).toContain('valores');
+	it('Municípios continua de departamento para cima; Valores é só do Super Admin (E65)', () => {
 		expect(idsDe(geral, 'administrativa')).toContain('municipios');
-		expect(idsDe(unidade, 'pessoal')).not.toContain('valores');
 		expect(idsDe(unidade, 'administrativa')).not.toContain('municipios');
+		expect(idsDe(unidade, 'pessoal')).not.toContain('valores');
+		expect(idsDe(geral, 'pessoal')).not.toContain('valores');
 	});
 
 	it('E40: Armamento e Veículos em Gestão operacional; Patrimônio móvel em Gestão administrativa', () => {
@@ -257,9 +260,9 @@ describe('a organização fixada em 13/09/2026', () => {
 
 	it('o resumo do cartão grande segue o que o perfil alcança', () => {
 		const pessoalGeral = geral.find((g) => g.id === 'pessoal');
-		expect(pessoalGeral?.descricao).toBe(
-			'Servidores, Férias, Escalas ordinárias, Diárias, Extras, Atualização de valores'
-		);
+		// Sem "Atualização de valores": ela saiu do departamento com a E65, e o
+		// resumo não promete o que o cartão não tem.
+		expect(pessoalGeral?.descricao).toBe('Servidores, Férias, Escalas ordinárias, Diárias, Extras');
 		expect(geral.find((g) => g.id === 'unidade')?.descricao).toBe(
 			'Vê os dados da unidade e vinculadas'
 		);

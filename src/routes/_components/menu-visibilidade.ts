@@ -28,6 +28,8 @@ import { ICONE } from '$lib/constants/icones';
 interface UsuarioDoMenu {
 	tipo?: 'policial' | 'admin' | 'colaborador';
 	papel?: 'admin_seccional' | 'admin_unidade' | null;
+	/** O Super Admin: o corporativo é dele (E65) — valores, config, estrutura. */
+	isSuperAdmin?: boolean;
 }
 
 type AdminModulo = 'ambas' | 'gise' | 'escalas';
@@ -132,7 +134,12 @@ export function visibilidadeDoMenu(entrada: EntradaVisibilidade): FlagsMenu {
 		showSolicitacoes: ehAdmin,
 		showColaboradores: ehAdmin,
 		showUnidade: ehAdmin || temPapelComEscopo,
-		showValores: ehAdmin,
+		// Só o Super Admin (E65): a tabela de hora extra e de diária é da
+		// CORPORAÇÃO. O Admin Geral planeja a operação e escolhe QUANTAS horas;
+		// quanto vale a hora é decisão de outro dono. O menu exclusivo do Super
+		// Admin já trazia a tela; o que saiu daqui foi a duplicata no menu do
+		// Admin Geral, que abria uma porta que o portão passou a recusar.
+		showValores: !!usuario?.isSuperAdmin,
 		showMunicipios: ehAdmin,
 		temPresencaGiseAtiva: temPresencaGisePendente,
 		temGiseHistorico,

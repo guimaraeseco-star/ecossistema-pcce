@@ -138,8 +138,16 @@ describe('Policiais e Solicitações são perguntas diferentes', () => {
 		).toBe(false);
 	});
 
-	it('Atualização de valores é de departamento para cima — só a sessão de admin', () => {
-		expect(visibilidadeDoMenu(entrada({ usuario: { tipo: 'admin' } })).showValores).toBe(true);
+	it('Atualização de valores é do SUPER ADMIN — o corporativo não é de departamento (E65)', () => {
+		// A E39 (13/09) punha esta tela em "departamento para cima"; a E65
+		// (22/09) moveu o corporativo para o Super Admin, e é a decisão mais
+		// nova que vale: a tabela de hora extra e de diária é da CORPORAÇÃO.
+		// Quem planeja a operação escolhe QUANTAS horas; quanto vale a hora é
+		// decisão de outro dono. O portão da rota recusa igual desde 24/09.
+		expect(
+			visibilidadeDoMenu(entrada({ usuario: { tipo: 'admin', isSuperAdmin: true } })).showValores
+		).toBe(true);
+		expect(visibilidadeDoMenu(entrada({ usuario: { tipo: 'admin' } })).showValores).toBe(false);
 		for (const papel of PAPEIS_COM_ESCOPO) {
 			expect(
 				visibilidadeDoMenu(entrada({ usuario: { tipo: 'policial', papel } })).showValores,
