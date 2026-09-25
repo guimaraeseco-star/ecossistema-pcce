@@ -43,8 +43,12 @@ import {
 } from '$lib/db';
 import { policialSchema } from '$lib/schemas/policial';
 import { isAdminGeral } from '$lib/auth';
-import { lotacoesAdministradas, lotacaoNoEscopo } from '$lib/server/policial-permissao';
-import { escopoDaFicha, podeAbrirFichaDePolicial } from '$lib/server/policiais/ficha-permissao';
+import {
+	lotacoesAdministradas,
+	unidadesAdministradas,
+	lotacaoNoEscopo
+} from '$lib/server/policial-permissao';
+import { podeAbrirFichaDePolicial } from '$lib/server/policiais/ficha-permissao';
 import { responsaveisVigentesDe } from '$lib/db/unidades-responsaveis';
 import { arvoreUnidades } from '$lib/db/unidades';
 import { localValido } from '$lib/unidades/locais';
@@ -80,7 +84,9 @@ export const load: PageServerLoad = async ({ locals, platform, url, depends }) =
 	const seccionalId = seccional && seccional !== 'todas' ? Number(seccional) : undefined;
 
 	// `null` = irrestrito (Admin Geral); Set = as lotações do papel.
-	const escopo = await escopoDaFicha(db, u);
+	// O recorte da lista, em IDS (E51): compara `policiais.unidade_id`, que
+	// sobrevive a uma renomeação de unidade. `null` = irrestrito (Super Admin).
+	const escopoIds = await unidadesAdministradas(db, u);
 
 	// A árvore vem primeiro porque as direções se consultam pelos ids dela — o
 	// atalho "designar como titular" (E66) só aparece para unidade SEM titular.
@@ -90,7 +96,7 @@ export const load: PageServerLoad = async ({ locals, platform, url, depends }) =
 			busca,
 			cargo,
 			seccionalId,
-			escopoLotacoes: escopo ? [...escopo] : undefined,
+			escopoUnidades: escopoIds ? [...escopoIds] : undefined,
 			situacao,
 			hojeISO: hoje,
 			designacaoId,

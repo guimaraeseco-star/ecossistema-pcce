@@ -29,6 +29,7 @@ import {
 	escalaSolicitacoesAssinatura
 } from '../server/schema';
 import type * as schema from '../server/schema';
+import { idDaUnidadePeloNome } from './unidades';
 import type { EscalaPolicialComDados, EscalaListagem } from '../types';
 import {
 	batchNonEmpty,
@@ -177,6 +178,7 @@ export async function listarEscalas(
 			hora_entrada: escalas.hora_entrada,
 			hora_saida: escalas.hora_saida,
 			lotacao: escalas.lotacao,
+			unidade_id: escalas.unidade_id,
 			tipo: escalas.tipo,
 			visto_por_admin: escalas.visto_por_admin,
 			finalizada_em: escalas.finalizada_em,
@@ -228,7 +230,14 @@ export async function criarEscala(
 	db: Database,
 	data: Omit<schema.NovaEscala, 'id' | 'created_at'>
 ) {
-	return db.insert(escalas).values(data).returning({ id: escalas.id });
+	// O par nome + id (E51): a escala guarda a lotação por nome (o chamador a
+	// escolhe assim) e passa a guardar o id junto, que é o que sobrevive a uma
+	// renomeação da unidade.
+	const unidade_id = data.unidade_id ?? (await idDaUnidadePeloNome(db, data.lotacao));
+	return db
+		.insert(escalas)
+		.values({ ...data, unidade_id })
+		.returning({ id: escalas.id });
 }
 
 /**

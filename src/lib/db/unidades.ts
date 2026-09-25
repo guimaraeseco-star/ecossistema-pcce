@@ -14,7 +14,7 @@
  *   quebraria evidência de assinatura ou deixaria RBAC falhando em silêncio.
  *   Ver `definirUnidadeAtiva` para o raciocínio completo.
  */
-import { and, eq, asc } from 'drizzle-orm';
+import { sql, and, eq, asc } from 'drizzle-orm';
 import { unidades, policiais, escalas, giseSeccionais } from '../server/schema';
 import type * as schema from '../server/schema';
 import { linhasAfetadas, type Database } from './core';
@@ -67,6 +67,32 @@ function colunasDaFicha(data: DadosUnidade) {
  */
 export async function listarUnidades(db: Database): Promise<schema.Unidade[]> {
 	return db.select().from(unidades).where(eq(unidades.ativo, true)).orderBy(asc(unidades.nome));
+}
+
+/**
+ * O ID da unidade a partir do NOME — o tradutor da E51.
+ *
+ * Toda escrita que guarda lotação por nome passa por aqui para guardar o id
+ * junto. Devolve `null` quando o nome não corresponde a unidade nenhuma, e
+ * isso é resposta e não falha: a carga da planilha traz nomes de unidades de
+ * fora do DPI SUL, e o histórico guarda nomenclatura antiga. Nesses casos o
+ * texto continua valendo e o id fica vazio, que é a verdade.
+ *
+ * Aceita a unidade DESATIVADA de propósito: um servidor lotado numa unidade
+ * que acabou de ser desativada não pode perder o vínculo por causa disso.
+ */
+export async function idDaUnidadePeloNome(
+	db: Database,
+	nome: string | null | undefined
+): Promise<number | null> {
+	const limpo = (nome ?? '').trim();
+	if (!limpo) return null;
+	const linha = await db
+		.select({ id: unidades.id })
+		.from(unidades)
+		.where(eq(unidades.nome, limpo))
+		.get();
+	return linha?.id ?? null;
 }
 
 /** Todas as unidades, ativas e desativadas. Para a tela de gestão. */
@@ -168,6 +194,12 @@ export async function atualizarUnidade(
 		})
 		.where(and(eq(unidades.id, id), eq(unidades.nome, nomeAntigo)));
 
+	/**
+	 * "O UPDATE da unidade, nesta transação, pegou?" — a unidade `id` já está
+	 * com o nome NOVO. Usada para condicionar a cascata do texto.
+	 */
+	const renomeouNesta = sql`EXISTS (SELECT 1 FROM unidades u WHERE u.id = ${id} AND u.nome = ${nomeTrimmed})`;
+
 	if (nomeTrimmed === nomeAntigo) {
 		// Sem troca de nome não há cascata a fazer, mas a condição continua: se
 		// outra requisição renomeou no meio, esta edição escreveria os demais
@@ -183,8 +215,25 @@ export async function atualizarUnidade(
 	// e é a contagem de linhas do primeiro que a denuncia.
 	const [resUnidade] = await db.batch([
 		alterarUnidade,
-		db.update(policiais).set({ lotacao: nomeTrimmed }).where(eq(policiais.lotacao, nomeAntigo)),
-		db.update(escalas).set({ lotacao: nomeTrimmed }).where(eq(escalas.lotacao, nomeAntigo))
+		// Por ID desde a E51, e não mais pelo nome antigo: o vínculo real é
+		// `unidade_id`, e o texto só acompanha para a tela não mostrar o nome
+		// velho. Se esta atualização falhasse, antes o servidor sumia do escopo;
+		// agora o pior que acontece é a tela exibir o nome anterior até a próxima
+		// gravação — e o escopo continua certo.
+		//
+		// A condição `renomeouNesta` é o que faltava ao trocar nome por id: mirando
+		// o id, a cascata da renomeação RECUSADA (a segunda de duas concorrentes)
+		// ainda encontrava as linhas e gravava nelas um nome que a unidade nunca
+		// chegou a ter. Amarrada ao nome NOVO, ela só corre se o UPDATE da unidade,
+		// na mesma transação, tiver valido.
+		db
+			.update(policiais)
+			.set({ lotacao: nomeTrimmed })
+			.where(and(eq(policiais.unidade_id, id), renomeouNesta)),
+		db
+			.update(escalas)
+			.set({ lotacao: nomeTrimmed })
+			.where(and(eq(escalas.unidade_id, id), renomeouNesta))
 	]);
 
 	if (linhasAfetadas(resUnidade) === 0) throw new ConflitoDeRenomeacaoUnidade(nomeAntigo);
@@ -226,29 +275,25 @@ export async function motivoParaRecusarSuperior(
 /**
  * Quantos registros ainda apontam para a unidade, por tipo de vínculo.
  *
- * São cinco caminhos, e eles NÃO se equivalem — dois ligam por nome (herança da
- * planilha) e três por id:
+ * São cinco caminhos, e desde a E51 todos ligam por ID — antes escalas e
+ * policiais lotados ligavam pelo NOME, herança da planilha:
  *
  * | vínculo             | como liga                       |
  * | ------------------- | ------------------------------- |
- * | escalas             | `escalas.lotacao` = nome        |
- * | policiais lotados   | `policiais.lotacao` = nome      |
+ * | escalas             | `escalas.unidade_id`            |
+ * | policiais lotados   | `policiais.unidade_id`          |
  * | policiais com papel | `policiais.papel_unidade_id`    |
  * | unidades filhas     | `unidades.seccional_id`         |
  * | GISE                | `gise_seccionais.seccional_id`  |
  *
- * O `nome` vem por parâmetro, e não relido daqui, porque quem chama já carregou
- * a linha para a auditoria — reler abriria janela para checar um nome e apagar
- * outro.
+ * Desde a E51 tudo se conta pelo ID, então o nome deixou de ser necessário: a
+ * janela que o parâmetro evitava (checar um nome e apagar outro) fechou
+ * sozinha quando o vínculo deixou de ser textual.
  */
-async function contarVinculosUnidade(
-	db: Database,
-	id: number,
-	nome: string
-): Promise<VinculosUnidade> {
+async function contarVinculosUnidade(db: Database, id: number): Promise<VinculosUnidade> {
 	const [escalasVinc, lotados, comPapel, filhas, gises] = await Promise.all([
-		db.select({ id: escalas.id }).from(escalas).where(eq(escalas.lotacao, nome)),
-		db.select({ id: policiais.id }).from(policiais).where(eq(policiais.lotacao, nome)),
+		db.select({ id: escalas.id }).from(escalas).where(eq(escalas.unidade_id, id)),
+		db.select({ id: policiais.id }).from(policiais).where(eq(policiais.unidade_id, id)),
 		db.select({ id: policiais.id }).from(policiais).where(eq(policiais.papel_unidade_id, id)),
 		db.select({ id: unidades.id }).from(unidades).where(eq(unidades.seccional_id, id)),
 		db
@@ -320,7 +365,7 @@ export async function vinculosDaUnidade(db: Database, id: number): Promise<Vincu
 		.where(eq(unidades.id, id))
 		.get();
 	if (!unidade) return null;
-	return contarVinculosUnidade(db, id, unidade.nome);
+	return contarVinculosUnidade(db, id);
 }
 
 /**

@@ -87,11 +87,15 @@ export const GET: RequestHandler = async ({ platform, locals, url }) => {
 	const rangeMin = fdsHoje.inicio < inicioMesRel ? fdsHoje.inicio : inicioMesRel;
 	const rangeMax = fdsHoje.fim > fimMesRel ? fdsHoje.fim : fimMesRel;
 
-	const nomesUnidades = unidadesComRegime.map((u) => u.nome);
+	// O cruzamento é por ID (E51): uma unidade renomeada continua achando as
+	// escalas dela. Pelo nome, a escala montada antes da renomeação sumia do
+	// painel e a unidade aparecia como "sem escala" — falso positivo de
+	// descumprimento.
+	const idsUnidades = unidadesComRegime.map((u) => u.id);
 	const escalasEncontradas = await db
 		.select({
 			id: escalas.id,
-			lotacao: escalas.lotacao,
+			unidade_id: escalas.unidade_id,
 			data_inicio: escalas.data_inicio,
 			tipo: escalas.tipo,
 			is_assinada: sql<number>`CASE WHEN ${escalaDocumentos.id} IS NOT NULL THEN 1 ELSE 0 END`
@@ -100,7 +104,7 @@ export const GET: RequestHandler = async ({ platform, locals, url }) => {
 		.leftJoin(escalaDocumentos, eq(escalas.id, escalaDocumentos.escala_id))
 		.where(
 			and(
-				inArray(escalas.lotacao, nomesUnidades),
+				inArray(escalas.unidade_id, idsUnidades),
 				gte(escalas.data_inicio, rangeMin),
 				lte(escalas.data_inicio, rangeMax)
 			)
@@ -110,7 +114,7 @@ export const GET: RequestHandler = async ({ platform, locals, url }) => {
 	const resultado: ItemCompliance[] = [];
 
 	for (const unidade of unidadesComRegime) {
-		const escalasUnidade = escalasEncontradas.filter((e) => e.lotacao === unidade.nome);
+		const escalasUnidade = escalasEncontradas.filter((e) => e.unidade_id === unidade.id);
 
 		// ── PLANTÃO ──
 		if (unidade.tem_plantao) {

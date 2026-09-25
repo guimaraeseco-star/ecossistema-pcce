@@ -52,12 +52,18 @@ export const load: PageServerLoad = async ({ locals, platform, params, url }) =>
 		descendentes.push(n);
 		fila.push(...escopo.nos.filter((f) => f.seccional_id === n.id));
 	}
-	const lotacoes = [unidade.nome, ...descendentes.map((d) => d.nome)];
+	// O escopo carrega id E nome: o id conta o efetivo (E51), o nome ainda é a
+	// chave das outras consultas e do payload da tela.
+	const unidadesDoEscopo = [
+		{ id: unidade.id, nome: unidade.nome },
+		...descendentes.map((d) => ({ id: d.id, nome: d.nome }))
+	];
+	const lotacoes = unidadesDoEscopo.map((x) => x.nome);
 
 	const [ferias, pendencias, efetivos] = await Promise.all([
 		feriasDoAno(db, lotacoes, ano),
 		pendenciasDeFeriasPorLotacao(db),
-		efetivoPorLotacoes(db, lotacoes)
+		efetivoPorLotacoes(db, unidadesDoEscopo)
 	]);
 
 	return {
@@ -76,21 +82,34 @@ export const load: PageServerLoad = async ({ locals, platform, params, url }) =>
 	};
 };
 
-/** Servidores ativos por lotação, numa consulta — o denominador do teto. */
+/**
+ * Servidores ativos por unidade, numa consulta — o denominador do teto.
+ *
+ * Conta por `unidade_id` (E51) e devolve indexado pelo NOME, que é a chave que
+ * a tela usa. Pelo nome, um servidor de unidade recém-renomeada ficava fora da
+ * conta e o teto de 15 % era calculado sobre um efetivo menor que o real — o
+ * aviso disparava cedo. As fatias de 90 continuam por causa do limite de 100
+ * parâmetros por consulta do D1.
+ */
 async function efetivoPorLotacoes(
 	db: ReturnType<typeof getDB>,
-	lotacoes: string[]
+	unidadesDoEscopo: { id: number; nome: string }[]
 ): Promise<Map<string, number>> {
+	const nomePorId = new Map(unidadesDoEscopo.map((x) => [x.id, x.nome]));
 	const mapa = new Map<string, number>();
-	for (let i = 0; i < lotacoes.length; i += 90) {
-		const fatia = lotacoes.slice(i, i + 90);
+	const ids = unidadesDoEscopo.map((x) => x.id);
+	for (let i = 0; i < ids.length; i += 90) {
+		const fatia = ids.slice(i, i + 90);
 		if (fatia.length === 0) continue;
 		const linhas = await db
-			.select({ lotacao: policiais.lotacao, n: sql<number>`count(*)` })
+			.select({ unidade_id: policiais.unidade_id, n: sql<number>`count(*)` })
 			.from(policiais)
-			.where(and(inArray(policiais.lotacao, fatia), eq(policiais.ativo, 1)))
-			.groupBy(policiais.lotacao);
-		for (const l of linhas) mapa.set(l.lotacao, l.n);
+			.where(and(inArray(policiais.unidade_id, fatia), eq(policiais.ativo, 1)))
+			.groupBy(policiais.unidade_id);
+		for (const l of linhas) {
+			const nome = l.unidade_id == null ? null : nomePorId.get(l.unidade_id);
+			if (nome) mapa.set(nome, l.n);
+		}
 	}
 	return mapa;
 }

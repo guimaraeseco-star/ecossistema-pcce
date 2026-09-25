@@ -80,6 +80,17 @@ export const policiais = sqliteTable(
 		 */
 		local_id: integer('local_id'),
 		/**
+		 * A unidade de LOTAÇÃO por id (E51, migração 0102) — a chave real da
+		 * ligação servidor → unidade. `lotacao` (texto) fica ao lado como cache
+		 * de exibição enquanto as leituras migram, e some numa limpeza futura.
+		 *
+		 * Por que o id: nome é dado de exibição. Renomear uma unidade obrigava a
+		 * reescrever o nome antigo em cinco tabelas, e a linha que escapasse
+		 * ficava órfã em silêncio — o servidor sumia do escopo, a escala perdia a
+		 * lotação, e ninguém via até montarem a próxima escala.
+		 */
+		unidade_id: integer('unidade_id').references(() => unidades.id),
+		/**
 		 * Quem definiu a designação (0089). `'planilha'` é o que a carga de
 		 * pessoal grava e regrava; `'sistema'` é a escolha feita na ficha do
 		 * servidor, e essa a carga NÃO sobrescreve — só relata a divergência.
@@ -120,6 +131,8 @@ export const escalas = sqliteTable(
 		hora_entrada: text('hora_entrada').notNull().default('08'),
 		hora_saida: text('hora_saida').notNull().default('08'),
 		lotacao: text('lotacao').notNull().default(''),
+		/** A unidade dona da escala, por id (E51, 0102). */
+		unidade_id: integer('unidade_id').references(() => unidades.id),
 		tipo: text('tipo', { enum: ['plantao', 'expediente', 'fds'] }),
 		visto_por_admin: integer('visto_por_admin').notNull().default(0),
 		finalizada_em: text('finalizada_em'),
@@ -1697,6 +1710,14 @@ export const policialAcaoSolicitacoes = sqliteTable(
 		descricao: text('descricao'),
 		unidade_origem: text('unidade_origem'),
 		unidade_destino: text('unidade_destino'),
+		/**
+		 * Origem e destino por id (E51, 0102). Nulo com texto preenchido é
+		 * resposta e não falha: o histórico guarda nomes de unidades que não
+		 * existem neste cadastro (nomenclatura antiga da planilha, unidades de
+		 * fora do DPI SUL), e o passado não se reescreve.
+		 */
+		unidade_origem_id: integer('unidade_origem_id').references(() => unidades.id),
+		unidade_destino_id: integer('unidade_destino_id').references(() => unidades.id),
 		data_evento: text('data_evento'),
 		data_inicio: text('data_inicio'),
 		data_fim: text('data_fim'),
@@ -1752,6 +1773,9 @@ export const policialHistorico = sqliteTable(
 		// ---- Movimentação ----
 		unidade_origem: text('unidade_origem'),
 		unidade_destino: text('unidade_destino'),
+		/** Origem e destino por id (E51, 0102); o texto fica como exibição. */
+		unidade_origem_id: integer('unidade_origem_id').references(() => unidades.id),
+		unidade_destino_id: integer('unidade_destino_id').references(() => unidades.id),
 		// ---- Datas ----
 		/** Data principal do evento (movimentação/desvinculação). */
 		data_evento: text('data_evento'),
@@ -2516,6 +2540,12 @@ export const avisos = sqliteTable(
 		destinatario_tipo: text('destinatario_tipo', { enum: ['admin_geral', 'lotacao'] }).notNull(),
 		/** O nome da lotação, quando o destinatário é uma unidade. */
 		destinatario_lotacao: text('destinatario_lotacao'),
+		/**
+		 * O destinatário por id (E51, 0102). Na caixa do `admin_geral` esta
+		 * unidade não é o destinatário e sim o ASSUNTO — é por ela que o recorte
+		 * por nó filtra (E65).
+		 */
+		destinatario_unidade_id: integer('destinatario_unidade_id').references(() => unidades.id),
 		/** O cartão da home que o aviso acende: `servidores`, `unidade`… */
 		cartao: text('cartao').notNull(),
 		tipo: text('tipo').notNull(),
