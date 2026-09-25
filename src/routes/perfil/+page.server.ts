@@ -20,11 +20,34 @@
  *    cadastrada por terceiro.
  *
  * Os dois vão por API, não por form action — daí este arquivo não ter `actions`.
+ *
+ * **A vida funcional do titular (E53)**: desde 24/09 a página também mostra o
+ * que era visível só dentro da ficha administrativa — a linha do tempo (férias,
+ * afastamentos com o CID, movimentações, designações, posse) e os dias em que
+ * ele está escalado. Enquanto o sistema era ferramenta de gestão, fazia sentido
+ * que o servidor não visse nada disso; com ele virando a fonte da verdade
+ * (E52), não ver a própria vida funcional virou defeito.
+ *
+ * Tudo em LEITURA: os mesmos componentes da ficha, com as ações desligadas. A
+ * correção continua vindo do administrador da unidade, e não daqui — por isso
+ * este arquivo continua sem `actions`.
  */
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { eq } from 'drizzle-orm';
-import { getDB, buscarCredencialAtiva } from '$lib/db';
+import {
+	getDB,
+	buscarCredencialAtiva,
+	listarHistoricoPolicial,
+	listarDesignacoes,
+	listarUnidades,
+	afastamentoVigente
+} from '$lib/db';
+import { ocupadosDoAbono, ocupadosDoHistorico } from '$lib/servidores/conflitos';
+import { escalasDoServidorNoPeriodo } from '$lib/db/policiais/afastamento-escalas';
+import { listarFeriasDoPolicial } from '$lib/db/policiais/ferias';
+import { feriadosNoIntervalo } from '$lib/db/diarias/feriados';
+import { adicionarDias, hojeBrasilISO } from '$lib/utils/datas';
 import { temCadastro } from '$lib/auth';
 import { credencialDoUsuario } from '$lib/server/auth/credencial';
 import { descreverVinculoCredencial } from '$lib/server/assinatura/webauthn/authenticator-data';
@@ -43,6 +66,7 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 	const [row, credencial] = await Promise.all([
 		db
 			.select({
+				id: policiais.id,
 				nome: policiais.nome,
 				matricula: policiais.matricula,
 				cargo: policiais.cargo,
@@ -52,7 +76,8 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 				lotacao: policiais.lotacao,
 				email: policiais.email,
 				email_pessoal: policiais.email_pessoal,
-				email_pessoal_verificado: policiais.email_pessoal_verificado
+				email_pessoal_verificado: policiais.email_pessoal_verificado,
+				data_posse: policiais.data_posse
 			})
 			.from(policiais)
 			.where(eq(policiais.id, u.id))
@@ -62,8 +87,41 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 
 	if (!row) redirect(302, '/login');
 
+	const hoje = hojeBrasilISO();
+	const [historico, ferias, feriados, designacoes, unidades, escalas] = await Promise.all([
+		listarHistoricoPolicial(db, u.id),
+		listarFeriasDoPolicial(db, u.id),
+		// Os mesmos 18 meses da ficha: o cartão de férias marca feriado no
+		// calendário, e ele é de leitura aqui, mas o calendário é o mesmo.
+		feriadosNoIntervalo(db, hoje, adicionarDias(hoje, 540)),
+		listarDesignacoes(db),
+		listarUnidades(db),
+		// A janela das escalas: do início do ano passado ao fim do que vem. É
+		// ampla de propósito — a pergunta "em que dia eu estou escalado" olha
+		// para a frente, e a de "quando eu estive" olha para trás.
+		escalasDoServidorNoPeriodo(
+			db,
+			u.id,
+			`${Number(hoje.slice(0, 4)) - 1}-01-01`,
+			`${Number(hoje.slice(0, 4)) + 1}-12-31`
+		)
+	]);
+
 	return {
 		perfil: row,
+		/**
+		 * A vida funcional do titular (E53), em leitura: os mesmos dados da ficha
+		 * administrativa, sem nenhuma ação.
+		 */
+		historico,
+		ferias,
+		ocupados: [...ocupadosDoHistorico(historico), ...ocupadosDoAbono(ferias.fracoes)],
+		feriados: feriados.map((f: { data: string }) => f.data),
+		afastamentoVigenteId: afastamentoVigente(historico, hoje)?.id ?? null,
+		designacoes,
+		unidades: unidades.map((x: { id: number; nome: string }) => ({ id: x.id, nome: x.nome })),
+		/** Os dias em que ele está (ou esteve) escalado — ordinária e GISE. */
+		escalas,
 		// Recorte do identificador (o mesmo do manifesto) + último uso. O id
 		// completo e a chave pública NÃO vão para o cliente.
 		passkey: credencial
