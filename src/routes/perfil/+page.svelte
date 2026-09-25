@@ -18,12 +18,22 @@
 	 * O que continua sendo do titular: o e-mail pessoal (troca com senha + código
 	 * enviado ao novo endereço) e a chave de assinatura. Os dois vão por API e
 	 * refletem na hora — daí o espelho local em `$state` depois do sucesso.
+	 *
+	 * **A vida funcional (E53)**, desde 24/09: a linha do tempo e as férias do
+	 * titular, nos MESMOS componentes da ficha administrativa, com as ações
+	 * desligadas — nada de corrigir, pedir ou dar ciência por aqui. Reusar os
+	 * componentes em vez de escrever versões "de leitura" é o que garante que o
+	 * servidor veja exatamente o que o administrador vê sobre ele: duas telas
+	 * paralelas divergiriam na primeira mudança.
 	 */
 	import type { PageProps } from './$types';
 	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import { cartaoChaveVisivel } from '$lib/chave-assinatura-ui';
 	import CartaoPasskey from './_components/CartaoPasskey.svelte';
+	import HistoricoServidor from '../servidores/[id]/_components/HistoricoServidor.svelte';
+	import CartaoFerias from '../servidores/[id]/_components/CartaoFerias.svelte';
+	import MinhasEscalas from './_components/MinhasEscalas.svelte';
 	import ModalAlterarEmailPessoal from './_components/ModalAlterarEmailPessoal.svelte';
 	import { limparTelefone } from '$lib/utils/formato';
 
@@ -161,6 +171,45 @@
 		<CartaoPasskey credencialAtual={data.passkey} />
 	{/if}
 </div>
+
+<!-- Minha vida funcional (E53): o mesmo cartão de férias e a mesma linha do
+     tempo da ficha administrativa, em leitura. `podeAgir`, `isAdmin` e
+     `podeDarCiencia` desligados tiram TODOS os botões; a correção continua
+     vindo do administrador da unidade. -->
+<section class="mt-4" aria-labelledby="minha-vida-funcional">
+	<h2
+		id="minha-vida-funcional"
+		class="mb-2 text-base font-semibold text-surface-900 dark:text-surface-50"
+	>
+		Minha vida funcional
+	</h2>
+	<p class="mb-3 text-xs text-surface-600 dark:text-surface-400">
+		Férias, afastamentos, movimentações e designações — o que o sistema registra sobre você. Para
+		corrigir algo, fale com quem administra a sua unidade.
+	</p>
+	<div class="space-y-4">
+		<CartaoFerias
+			ferias={data.ferias}
+			feriados={data.feriados}
+			dataPosse={data.perfil.data_posse}
+			ocupados={data.ocupados}
+			isAdmin={false}
+			podeDarCiencia={false}
+			podeAgir={false}
+		/>
+		<HistoricoServidor
+			historico={data.historico}
+			afastamentoVigenteId={data.afastamentoVigenteId}
+			unidades={data.unidades}
+			designacoes={data.designacoes}
+			policialId={data.perfil.id}
+			isAdmin={false}
+		/>
+	</div>
+</section>
+
+<!-- Minhas escalas (E53): em que dias ele está escalado, mês a mês. -->
+<MinhasEscalas escalas={data.escalas} />
 
 <ModalAlterarEmailPessoal
 	bind:open={alterandoEmail}
