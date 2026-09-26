@@ -67,7 +67,17 @@ function usuario(over: Partial<UsuarioLogado>): UsuarioLogado {
 	return { id: 1, tipo: 'policial', nome: 'Fulano', primeiro_acesso: false, ...over };
 }
 
-const admGeral = usuario({ tipo: 'admin', nome: 'Admin Geral' });
+/**
+ * O Admin Geral com o NÓ da conta (E65) no departamento que contém as duas
+ * seccionais — a situação real do DPI SUL. Montado no `beforeEach`, porque o
+ * id do departamento só existe depois da inserção.
+ *
+ * Até a E75 este usuário não tinha nó e mesmo assim recebia todas as
+ * participantes: a regra das operações era uma CÓPIA, e a cópia não tinha
+ * aprendido a E65. Agora ela usa a régua única, e conta sem nó não administra
+ * nada — ver "Admin Geral sem nó", abaixo.
+ */
+let admGeral: UsuarioLogado;
 
 beforeEach(async () => {
 	sqlite = bancoMigrado();
@@ -84,10 +94,12 @@ beforeEach(async () => {
 		(sqlite.prepare(`SELECT id FROM operacoes WHERE nome = 'GISE'`).get() as { id: number }).id
 	);
 
-	seccional = novaUnidade('2ª SECCIONAL DO CARIRI', 'seccional');
+	const departamento = novaUnidade('DEPARTAMENTO DE TESTE', 'departamento');
+	admGeral = usuario({ tipo: 'admin', nome: 'Admin Geral', unidade_id: departamento });
+	seccional = novaUnidade('2ª SECCIONAL DO CARIRI', 'seccional', departamento);
 	crato = novaUnidade('DELEGACIA DO CRATO', 'delegacia', seccional);
 	barbalha = novaUnidade('DELEGACIA DE BARBALHA', 'delegacia', seccional);
-	const outraSec = novaUnidade('1ª SECCIONAL', 'seccional');
+	const outraSec = novaUnidade('1ª SECCIONAL', 'seccional', departamento);
 	deOutraSeccional = novaUnidade('DELEGACIA DE FORTALEZA', 'delegacia', outraSec);
 	foraDaOperacao = novaUnidade('DELEGACIA DE SOBRAL', 'delegacia', seccional);
 
@@ -99,6 +111,13 @@ beforeEach(async () => {
 });
 
 describe('sem sessão ou sem papel', () => {
+	it('Admin Geral sem nó da conta não administra nada (E65)', async () => {
+		// Era o caso que a cópia antiga da regra escondia: ela devolvia todas as
+		// participantes a qualquer sessão de Admin Geral.
+		const semNo = usuario({ tipo: 'admin', nome: 'Admin sem nó' });
+		expect(await unidadesLinhaBaseAdministradas(db, semNo, craId)).toEqual(new Set());
+	});
+
 	it('usuário nulo não administra nada', async () => {
 		expect(await unidadesLinhaBaseAdministradas(db, null, craId)).toEqual(new Set());
 	});

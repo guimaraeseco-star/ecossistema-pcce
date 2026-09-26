@@ -26,7 +26,6 @@ import type { Database } from '$lib/db';
 import {
 	lotacoesAdministradas,
 	lotacaoNoEscopo,
-	lotacoesDaSeccional,
 	motivoParaRecusarPapel
 } from '../policial-permissao';
 import { bancoMigrado, drizzleSobre } from '$lib/db/__tests__/sqlite-migrado';
@@ -62,23 +61,6 @@ beforeAll(() => {
 			(9200, 'SECCIONAL SUL', 'seccional', NULL),
 			(9201, 'DP TERCEIRA', 'delegacia', 9200);
 	`);
-});
-
-describe('lotacoesDaSeccional', () => {
-	it('devolve a própria seccional E as unidades subordinadas a ela', async () => {
-		const nomes = await lotacoesDaSeccional(db, 9100);
-		expect([...nomes].sort()).toEqual(['DP PRIMEIRA', 'DP SEGUNDA', 'SECCIONAL NORTE']);
-	});
-
-	it('não vaza para as unidades de outra seccional', async () => {
-		const nomes = await lotacoesDaSeccional(db, 9200);
-		expect([...nomes].sort()).toEqual(['DP TERCEIRA', 'SECCIONAL SUL']);
-	});
-
-	it('devolve vazio para um id que não é seccional de ninguém', async () => {
-		expect(await lotacoesDaSeccional(db, 9101)).toEqual(['DP PRIMEIRA']);
-		expect(await lotacoesDaSeccional(db, 987654)).toEqual([]);
-	});
 });
 
 describe('lotacoesAdministradas', () => {
