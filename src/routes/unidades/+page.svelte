@@ -329,6 +329,12 @@
 												class="btn btn-sm preset-outlined-surface-500"
 												onclick={() => iniciarEdicao(u)}>Editar</button
 											>
+											{#if u.ativo}
+												<!-- O guia passo a passo de transferir ou desativar (E73). -->
+												<a class="btn btn-sm preset-tonal-primary" href="/unidades/{u.id}/guia"
+													>Guia</a
+												>
+											{/if}
 											<button
 												type="button"
 												class="btn btn-sm {u.ativo
@@ -397,6 +403,9 @@
 										class="btn btn-sm preset-outlined-surface-500"
 										onclick={() => iniciarEdicao(u)}>Editar</button
 									>
+									{#if u.ativo}
+										<a class="btn btn-sm preset-tonal-primary" href="/unidades/{u.id}/guia">Guia</a>
+									{/if}
 									<button
 										type="button"
 										class="btn btn-sm {u.ativo

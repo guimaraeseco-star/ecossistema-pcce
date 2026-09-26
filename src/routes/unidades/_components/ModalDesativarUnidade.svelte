@@ -26,6 +26,8 @@
 	let pending = $state(false);
 	/** A recusa da trava (E73), com os passos — some ao fechar a janela. */
 	let recusa = $state<string | null>(null);
+	/** Só a recusa da TRAVA (409) leva ao guia; erro de outra natureza, não. */
+	let recusaDaTrava = $state(false);
 	$effect(() => {
 		if (!open) recusa = null;
 	});
@@ -56,6 +58,7 @@
 						? (result.data as Record<string, unknown> | undefined)
 						: undefined;
 				recusa = String(d?.error || 'Erro ao alterar a unidade');
+				recusaDaTrava = result.type === 'failure' && result.status === 409;
 			}
 		};
 	}
@@ -79,7 +82,10 @@
 	{/snippet}
 
 	{#if recusa}
-		<RecusaDaEstrutura texto={recusa} />
+		<RecusaDaEstrutura
+			texto={recusa}
+			guia={recusaDaTrava && unidade ? `/unidades/${unidade.id}/guia?ato=desativar` : null}
+		/>
 	{/if}
 
 	{#if !reativando}

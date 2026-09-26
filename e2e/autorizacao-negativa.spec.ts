@@ -316,6 +316,19 @@ function totalDocumentos(): number | null {
 const todas = operacoesMateriais();
 const protegidas = todas.filter((o) => !ehPublica(o));
 
+/**
+ * O tempo das duas varreduras que batem em TODA operação protegida.
+ *
+ * O trabalho delas cresce com o sistema — cada action ou rota de API nova
+ * entra sozinha na lista, que é o ponto de a lista ser descoberta —, e o
+ * limite padrão de 30 s não cresce junto. Em 25/09 a do anônimo já levava
+ * 31,7 s quando passava; na E73 parte 2 (uma action a mais, a do guia) ela
+ * passou a estourar. Um teto fixo aqui é um teste com data para quebrar: o
+ * teto acompanha o tamanho da lista, com folga de um segundo por operação
+ * (a medida real é da ordem de 0,3 s) e um piso de um minuto.
+ */
+const TEMPO_DA_VARREDURA = Math.max(60_000, protegidas.length * 1_000);
+
 test.describe('Autorização negativa', () => {
 	test('a varredura encontrou as operações (a tabela não pode estar vazia)', () => {
 		// Sem isto, um erro de caminho faria a suíte inteira "passar" sem exercer
@@ -328,6 +341,7 @@ test.describe('Autorização negativa', () => {
 	test('anônimo é recusado ANTES de qualquer trabalho, em toda operação material', async ({
 		request
 	}) => {
+		test.setTimeout(TEMPO_DA_VARREDURA);
 		const antes = totalDocumentos();
 		const falhas: string[] = [];
 
@@ -360,6 +374,7 @@ test.describe('Autorização negativa', () => {
 	});
 
 	test('policial de outra unidade é recusado em todo recurso alheio', async ({ request }) => {
+		test.setTimeout(TEMPO_DA_VARREDURA);
 		// `policialB` mora na unidade B, não tem papel administrativo, não
 		// participa da GISE fixture e não está escalado em nada de A. Toda
 		// operação abaixo recebe um id de recurso REAL da unidade A: é o

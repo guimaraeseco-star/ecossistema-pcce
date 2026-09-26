@@ -29,9 +29,6 @@ import {
 	criarUnidade,
 	atualizarUnidade,
 	motivoParaRecusarSuperior,
-	definirUnidadeAtiva,
-	vinculosDaUnidade,
-	descreverVinculosUnidade,
 	auditar,
 	contextoDeEvento
 } from '$lib/db';
@@ -42,7 +39,8 @@ import { ehViolacaoUnique, mensagemComCausas } from '$lib/server/db-errors';
 import { ConflitoDeRenomeacaoUnidade } from '$lib/db/unidades';
 import { logger } from '$lib/server/logger';
 import { detectarTipoImagem } from '$lib/server/assinatura/selfie-upload';
-import { travaDaDesativacao, travaDaTrocaDeMae } from '$lib/server/unidades/travas';
+import { travaDaTrocaDeMae } from '$lib/server/unidades/travas';
+import { alternarAtivoDaUnidade } from '$lib/server/unidades/atos';
 
 /** Teto da foto da fachada: 3 MB já é uma foto de celular em boa resolução. */
 const FOTO_MAX_BYTES = 3 * 1024 * 1024;
@@ -279,9 +277,11 @@ export const actions: Actions = {
 	 * Desativa ou reativa a unidade. **Não existe ação de excluir** — ver o
 	 * cabeçalho: apagar a linha destruiria prova de documento assinado.
 	 *
-	 * Desativar nunca é recusado. Os vínculos são só informados na confirmação,
-	 * porque continuam válidos depois: escala, lotação e assinatura antigas
-	 * seguem resolvendo a unidade normalmente.
+	 * Desde a E73, desativar é RECUSADO quando ainda há gente ou unidade viva
+	 * dependendo dela (servidor lotado ou trabalhando nela, unidade ativa
+	 * abaixo), e a recusa diz os passos. Escalas, GISE e registros antigos não
+	 * travam: são o passado da unidade, que desativar existe para preservar.
+	 * O ato mora em `alternarAtivoDaUnidade`, o mesmo que o guia executa.
 	 */
 	definirAtivo: async (event) => {
 		const { request, locals, platform } = event;
@@ -294,43 +294,8 @@ export const actions: Actions = {
 		if (isNaN(id)) return fail(400, { error: 'ID inválido' });
 		const ativo = data.get('ativo') === 'true';
 
-		const db = getDB(platform);
-		const unidade = await db.select().from(unidades).where(eq(unidades.id, id)).get();
-		if (!unidade) return fail(404, { error: 'Unidade não encontrada' });
-
-		// Desativar com gente ou unidade viva dependendo dela é recusado (E73):
-		// primeiro se movem as pessoas, depois se mexe na estrutura. Reativar
-		// nunca é travado.
-		if (!ativo) {
-			const trava = await travaDaDesativacao(db, id);
-			if (trava) return fail(409, { error: trava });
-		}
-
-		await definirUnidadeAtiva(db, id, ativo);
-
-		const vinculos = ativo ? null : await vinculosDaUnidade(db, id);
-		const resumo = vinculos ? descreverVinculosUnidade(vinculos) : null;
-
-		const { contexto, env } = contextoDeEvento(event);
-		await auditar(
-			db,
-			{
-				acao: ativo ? 'reativar_unidade' : 'desativar_unidade',
-				usuario: u,
-				entidade: 'unidade',
-				entidade_id: id,
-				alvo_tipo: 'unidade',
-				alvo_id: id,
-				alvo_nome: unidade.nome,
-				detalhes: ativo
-					? `Unidade reativada: ${unidade.nome}`
-					: `Unidade desativada: ${unidade.nome}${resumo ? ` (mantém ${resumo})` : ''}`,
-				dados_antes: unidade,
-				dados_depois: { ...unidade, ativo },
-				...contexto
-			},
-			{ env }
-		);
+		const desfecho = await alternarAtivoDaUnidade(event, getDB(platform), u, id, ativo);
+		if (!desfecho.ok) return fail(desfecho.status, { error: desfecho.erro });
 		return { success: true, ativo };
 	}
 };
