@@ -10,7 +10,13 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import type { DatabaseSync } from 'node:sqlite';
 import type { Database } from '$lib/db';
 import { bancoMigrado, drizzleSobre } from '$lib/db/__tests__/sqlite-migrado';
-import { travaDaDesativacao, travaDaSincronizacao, travaDaTrocaDeMae } from '../travas';
+import {
+	pendenciasDaDesativacao,
+	pendenciasDaTrocaDeMae,
+	travaDaDesativacao,
+	travaDaSincronizacao,
+	travaDaTrocaDeMae
+} from '../travas';
 
 let sqlite: DatabaseSync;
 let db: Database;
@@ -145,5 +151,38 @@ describe('a porta da planilha', () => {
 
 	it('a mesma mãe de sempre não trava nem carrega a árvore', async () => {
 		expect(await travaDaSincronizacao(db, 'POSTO FORTIM TESTE', ARACATI)).toBeNull();
+	});
+});
+
+describe('as pendências que o guia mostra (E73, parte 2)', () => {
+	it('cada pessoa vem com o id da ficha, para o guia virar link', async () => {
+		const p = await pendenciasDaDesativacao(db, FORTIM);
+		expect(p?.trabalhando).toEqual([
+			{ id: 96001, nome: 'ANA DE FORTIM', lotacao: `UNIDADE ${ARACATI}` },
+			{ id: 96002, nome: 'BRUNO DE FORTIM', lotacao: `UNIDADE ${ARACATI}` }
+		]);
+		const t = await pendenciasDaTrocaDeMae(db, FORTIM, RUSSAS);
+		expect(t?.perdemOLocal.map((s) => s.id)).toEqual([96001, 96002]);
+	});
+
+	it('a unidade abaixo vem com o id, para o guia levar ao guia dela', async () => {
+		const p = await pendenciasDaDesativacao(db, ARACATI);
+		expect(p?.filhasAtivas).toEqual([{ id: FORTIM, nome: 'POSTO FORTIM TESTE' }]);
+	});
+
+	it('o aviso das escalas conta só as que ainda não terminaram — e não trava', async () => {
+		sqlite.exec(`
+			INSERT INTO escalas (titulo, cidade, tipo, lotacao, unidade_id, data_inicio, data_fim) VALUES
+				('PASSADA', 'X', 'plantao', 'DP RUSSAS TESTE', ${RUSSAS}, '2020-01-01', '2020-01-31'),
+				('FUTURA', 'X', 'plantao', 'DP RUSSAS TESTE', ${RUSSAS}, '2099-01-01', '2099-01-31');
+		`);
+		const p = await pendenciasDaDesativacao(db, RUSSAS);
+		expect(p?.escalasNaoEncerradas).toBe(1);
+		// Aviso, não trava — decisão dele em 26/09 sobre a escala futura: "avisa".
+		expect(await travaDaDesativacao(db, RUSSAS)).toBeNull();
+	});
+
+	it('sem troca de mãe, não há pendência a avaliar', async () => {
+		expect(await pendenciasDaTrocaDeMae(db, FORTIM, ARACATI)).toBeNull();
 	});
 });
