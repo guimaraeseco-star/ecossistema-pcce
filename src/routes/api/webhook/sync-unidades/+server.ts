@@ -23,6 +23,7 @@ import type { RequestHandler } from './$types';
 import { linhaVazia, respostaDeSync } from '$lib/server/sync/resultado';
 import { getDB, auditar, contextoDeEvento } from '$lib/db';
 import { upsertUnidade, buscarUnidadePorNome } from '$lib/db/unidades';
+import { travaDaSincronizacao } from '$lib/server/unidades/travas';
 import {
 	validarWebhookSync,
 	validarReplayProtection,
@@ -172,6 +173,11 @@ export const POST: RequestHandler = async (event) => {
 			const nome = trimCol(item, 'seccional');
 			if (!nome) continue;
 			try {
+				const trava = await travaDaSincronizacao(db, nome, null);
+				if (trava) {
+					errors.push(`Departamento ${nome}: ${trava}`);
+					continue;
+				}
 				await upsertUnidade(db, {
 					nome,
 					tipo: 'departamento',
@@ -195,6 +201,11 @@ export const POST: RequestHandler = async (event) => {
 					errors.push(
 						`Subdepartamento ${nome}: pai "${nomePai}" não é um departamento cadastrado.`
 					);
+					continue;
+				}
+				const trava = await travaDaSincronizacao(db, nome, pai.id);
+				if (trava) {
+					errors.push(`Subdepartamento ${nome}: ${trava}`);
 					continue;
 				}
 				await upsertUnidade(db, {
@@ -230,6 +241,15 @@ export const POST: RequestHandler = async (event) => {
 					parentId = org.id;
 				}
 
+				// A planilha também troca a unidade-mãe, e passa pela mesma trava da
+				// tela (E73): a linha que deixaria alguém com o "trabalha em" fora da
+				// lotação é recusada; o resto do lote segue.
+				const trava = await travaDaSincronizacao(db, nomeSec, parentId);
+				if (trava) {
+					errors.push(`Seccional ${nomeSec}: ${trava}`);
+					continue;
+				}
+
 				await upsertUnidade(db, {
 					nome: nomeSec,
 					tipo: 'seccional',
@@ -254,6 +274,12 @@ export const POST: RequestHandler = async (event) => {
 					errors.push(
 						`Delegacia ${nomeUni}: seccional "${nomeSec}" não encontrada ou não é seccional.`
 					);
+					continue;
+				}
+
+				const trava = await travaDaSincronizacao(db, nomeUni, sec.id);
+				if (trava) {
+					errors.push(`Delegacia ${nomeUni}: ${trava}`);
 					continue;
 				}
 
