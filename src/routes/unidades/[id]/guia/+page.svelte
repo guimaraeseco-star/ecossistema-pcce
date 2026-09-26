@@ -12,6 +12,8 @@
 	import type { ActionData, PageData } from './$types';
 	import RecusaDaEstrutura from '../../_components/RecusaDaEstrutura.svelte';
 	import FormularioDadosUnidade from '../../_components/FormularioDadosUnidade.svelte';
+	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
+	import { opcoesDeUnidades } from '$lib/unidades/opcoes';
 
 	/** Como cada ato aparece para quem escolhe — frase de ação, não termo técnico. */
 	const ROTULO_DO_ATO: Record<string, string> = {
@@ -46,6 +48,13 @@
 		d != null && d.lotados.length + d.trabalhando.length + d.filhasAtivas.length === 0
 	);
 	const t = $derived(data.transferir);
+	/** As mães possíveis, sem a mãe de hoje — trocar por ela não é troca. */
+	const opcoesNovaMae = $derived(
+		opcoesDeUnidades(
+			data.opcoesDeMae.filter((o) => o.id !== data.unidade.seccional_id),
+			{ maes: data.opcoesDeMae }
+		)
+	);
 	const transferenciaLiberada = $derived(
 		t != null && !t.recusa && t.pendencias != null && t.pendencias.perdemOLocal.length === 0
 	);
@@ -273,14 +282,13 @@
 			<input type="hidden" name="ato" value="transferir" />
 			<label class="flex flex-col gap-1 text-sm">
 				<span class="text-xs font-semibold text-surface-600">Nova unidade-mãe</span>
-				<select name="para" class="select text-sm min-w-72" value={t?.para ?? ''}>
-					<option value="" disabled>Escolha…</option>
-					{#each data.opcoesDeMae as o (o.id)}
-						{#if o.id !== data.unidade.seccional_id}
-							<option value={o.id}>{o.nome}</option>
-						{/if}
-					{/each}
-				</select>
+				<SearchableSelect
+					class="min-w-72"
+					name="para"
+					ariaLabel="Nova unidade-mãe"
+					value={t?.para ?? null}
+					options={opcoesNovaMae}
+				/>
 			</label>
 			<button type="submit" class="btn btn-sm preset-tonal-primary">Ver o que é preciso</button>
 		</form>

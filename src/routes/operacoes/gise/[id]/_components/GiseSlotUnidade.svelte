@@ -28,6 +28,8 @@
 	import type { GiseSeccionalActions } from '$lib/composables/gise/useGiseSeccionalActions.svelte';
 	import type { GiseSeccionalEstado } from './gise-seccional-estado.svelte';
 	import GiseEquipeCard from './GiseEquipeCard.svelte';
+	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
+	import { opcoesDeUnidades } from '$lib/unidades/opcoes';
 	import PenLine from '@lucide/svelte/icons/pen-line';
 	import Building from '@lucide/svelte/icons/building';
 	import UserPlus from '@lucide/svelte/icons/user-plus';
@@ -71,6 +73,20 @@
 			(isAdminGeral && podeEditar && modoEdicaoGeral)
 	);
 
+	/** As delegacias da seccional que ainda não estão em outro quadro desta escala. */
+	const opcoesDoSlot = $derived(
+		opcoesDeUnidades(
+			todasUnidades.filter(
+				(d: Unidade) =>
+					d.tipo === 'delegacia' &&
+					d.seccional_id === sec.seccional_id &&
+					!(sec.unidades ?? []).some(
+						(s: GiseUnidadeSlot) => s.unidade_id === d.id && s.id !== slot.id
+					)
+			)
+		)
+	);
+
 	/** Só o Admin Geral em modo edição remove a unidade do quadro. */
 	const podeRemoverUnidade = $derived(isAdminGeral && podeEditar && modoEdicaoGeral);
 
@@ -92,17 +108,14 @@
 		{#if podeEditarCabecalhoUnidade && estado.selecionandoUnidadeSlotId === slot.id}
 			<div class="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
 				<div class="w-full flex-1">
-					<select
-						bind:value={estado.slotUnidadeId}
-						class="w-full rounded-xl border border-surface-300 bg-white px-2 py-1.5 text-sm font-medium dark:border-surface-700 dark:bg-surface-800"
-					>
-						<option value=""
-							>{slot.nome ? 'Selecionar outra unidade...' : 'Selecionar unidade...'}</option
-						>
-						{#each todasUnidades.filter((d: Unidade) => d.tipo === 'delegacia' && d.seccional_id === sec.seccional_id && !(sec.unidades ?? []).some((s: GiseUnidadeSlot) => s.unidade_id === d.id && s.id !== slot.id)) as d (d.id)}
-							<option value={d.id}>{d.nome}</option>
-						{/each}
-					</select>
+					<SearchableSelect
+						bind:value={
+							() => (estado.slotUnidadeId === '' ? null : estado.slotUnidadeId),
+							(v) => (estado.slotUnidadeId = v == null ? '' : Number(v))
+						}
+						options={opcoesDoSlot}
+						ariaLabel={slot.nome ? 'Outra unidade para este quadro' : 'Unidade deste quadro'}
+					/>
 				</div>
 				<div class="flex w-full shrink-0 gap-2 sm:w-auto">
 					<form

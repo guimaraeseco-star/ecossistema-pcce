@@ -68,9 +68,12 @@
 		CLASSE_CAIXA_FILTRO,
 		CLASSE_CONTROLE_SEGMENTO_LARGO,
 		CLASSE_INPUT_FILTRO,
+		CLASSE_INPUT_SEARCHABLE,
 		CLASSE_ITEM_SEGMENTO_LARGO,
 		CLASSE_ROTULO_FILTRO
 	} from '$lib/gise/filtro-historico-ui';
+	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
+	import { opcoesDeUnidades } from '$lib/unidades/opcoes';
 
 	const { data }: PageProps = $props();
 
@@ -134,6 +137,13 @@
 	// Special sentinel value for "sem lotação" filter
 	const SEM_LOTACAO = '__sem_lotacao__';
 	const TODAS_UNIDADES = '__todas__';
+
+	const opcoesSeccional = $derived(opcoesDeUnidades(seccionais));
+	// A lotação do servidor ainda é filtrada pelo NOME (`?lotacao=`), então a escolha devolve o nome.
+	const opcoesLotacao = $derived([
+		...opcoesDeUnidades(delegaciasDropdown, { valor: 'nome', maes: unidades }),
+		{ value: SEM_LOTACAO, label: '— Sem lotação —' }
+	]);
 
 	// Persistência dos filtros + navegação (query server-side). A paginação
 	// abaixo preserva a URL corrente; por isso navegarComFiltros vai sempre à
@@ -434,34 +444,35 @@
 			{#if isAdmin}
 				<label class="flex flex-col gap-1.5 flex-1 min-w-[220px] lg:max-w-xs">
 					<span class={CLASSE_ROTULO_FILTRO}>Seccional</span>
-					<select
-						class="{CLASSE_INPUT_FILTRO} w-full"
-						bind:value={filtroSeccional}
+					<SearchableSelect
+						class="w-full {CLASSE_INPUT_SEARCHABLE}"
+						ariaLabel="Seccional"
+						bind:value={
+							() => (filtroSeccional === 'todas' ? null : filtroSeccional),
+							(v) => (filtroSeccional = v == null ? 'todas' : Number(v))
+						}
+						options={opcoesSeccional}
+						opcaoVazia="Todas as Seccionais"
 						onchange={() => {
 							filtroLotacao = '';
 							navegarComFiltros();
 						}}
-					>
-						<option value="todas">Todas as Seccionais</option>
-						{#each seccionais as sec (sec.id)}
-							<option value={sec.id}>{sec.nome}</option>
-						{/each}
-					</select>
+					/>
 				</label>
 				<label class="flex flex-col gap-1.5 flex-1 min-w-[240px] lg:max-w-xs">
 					<span class={CLASSE_ROTULO_FILTRO}>Unidade de Lotação</span>
-					<select
-						class="{CLASSE_INPUT_FILTRO} w-full"
-						bind:value={filtroLotacao}
+					<SearchableSelect
+						class="w-full {CLASSE_INPUT_SEARCHABLE}"
+						ariaLabel="Unidade de Lotação"
+						bind:value={
+							() =>
+								filtroLotacao === '' || filtroLotacao === TODAS_UNIDADES ? null : filtroLotacao,
+							(v) => (filtroLotacao = v == null ? '' : String(v))
+						}
+						options={opcoesLotacao}
+						opcaoVazia="Todas as unidades"
 						onchange={navegarComFiltros}
-					>
-						<option value="">Selecione uma unidade...</option>
-						<option value={TODAS_UNIDADES}>Todas as unidades</option>
-						{#each delegaciasDropdown as del (del.id)}
-							<option value={del.nome}>{del.nome}</option>
-						{/each}
-						<option value={SEM_LOTACAO}>— Sem lotação —</option>
-					</select>
+					/>
 				</label>
 			{/if}
 

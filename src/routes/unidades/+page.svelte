@@ -6,9 +6,9 @@
 	 *
 	 * É a tabela mais estrutural do sistema: `policiais.lotacao` e
 	 * `escalas.lotacao` referenciam a unidade pelo NOME, não por chave
-	 * estrangeira. Renomear aqui cascateia no servidor (`atualizarUnidade`
-	 * reescreve as duas colunas) e excluir exige checar vínculos antes — daí o
-	 * modal de exclusão dedicado, que não é confirmação genérica.
+	 * estrangeira. Renomear cascateia no servidor (`atualizarUnidade` reescreve
+	 * as duas colunas) e desativar exige resolver os vínculos antes — daí o
+	 * guia de cada unidade, que não é confirmação genérica.
 	 *
 	 * Filtro e busca são do CLIENTE: são poucas centenas de unidades, todas já
 	 * carregadas pelo `load`, e filtrar local dá resposta imediata.
@@ -39,8 +39,12 @@
 	import {
 		CLASSE_CAIXA_FILTRO,
 		CLASSE_INPUT_FILTRO,
+		CLASSE_INPUT_SEARCHABLE,
 		CLASSE_ROTULO_FILTRO
 	} from '$lib/gise/filtro-historico-ui';
+	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
+	import { casaPorPartes } from '$lib/utils/busca-por-partes';
+	import { opcoesDeUnidades } from '$lib/unidades/opcoes';
 
 	const { data }: PageProps = $props();
 
@@ -68,7 +72,8 @@
 				if (u.tipo === 'seccional' && u.id !== filtroSeccional) return false;
 				if (u.tipo === 'delegacia' && u.seccional_id !== filtroSeccional) return false;
 			}
-			if (filtroBusca && !u.nome.toLowerCase().includes(filtroBusca.toLowerCase())) return false;
+			// Busca por partes (E76): "jua nor" acha Juazeiro do Norte, sem ordem nem acento.
+			if (!casaPorPartes(u.nome, filtroBusca)) return false;
 			return true;
 		})
 	);
@@ -130,6 +135,7 @@
 	});
 
 	const seccionais = $derived(unidades.filter((u) => u.tipo === 'seccional'));
+	const opcoesSeccional = $derived(opcoesDeUnidades(seccionais));
 
 	// Editar, transferir, desativar e reativar entram pelo GUIA da unidade
 	// (E73, "tudo no Guia" — decisão dele em 26/09): cada ato com o seu
@@ -191,12 +197,16 @@
 	<div class="flex flex-col sm:flex-row gap-4">
 		<label class="flex flex-col gap-1.5 flex-1">
 			<span class={CLASSE_ROTULO_FILTRO}>Filtrar por Seccional</span>
-			<select class="{CLASSE_INPUT_FILTRO} w-full" bind:value={filtroSeccional}>
-				<option value="todas">Todas as Seccionais</option>
-				{#each seccionais as sec (sec.id)}
-					<option value={sec.id}>{sec.nome}</option>
-				{/each}
-			</select>
+			<SearchableSelect
+				class="w-full {CLASSE_INPUT_SEARCHABLE}"
+				ariaLabel="Filtrar por Seccional"
+				bind:value={
+					() => (filtroSeccional === 'todas' ? null : filtroSeccional),
+					(v) => (filtroSeccional = v == null ? 'todas' : Number(v))
+				}
+				options={opcoesSeccional}
+				opcaoVazia="Todas as Seccionais"
+			/>
 		</label>
 		<label class="flex flex-col gap-1.5 flex-1">
 			<span class={CLASSE_ROTULO_FILTRO}>Buscar por Nome</span>
@@ -205,7 +215,7 @@
 					type="text"
 					class="{CLASSE_INPUT_FILTRO} w-full pl-10"
 					bind:value={filtroBusca}
-					placeholder="Digite o nome da unidade..."
+					placeholder="Digite um nome ou partes dele"
 				/>
 				<div class="absolute inset-y-0 left-3 flex items-center pointer-events-none opacity-50">
 					<Search class="w-4 h-4" />

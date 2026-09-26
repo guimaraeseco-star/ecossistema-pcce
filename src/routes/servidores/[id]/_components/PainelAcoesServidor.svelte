@@ -50,6 +50,8 @@
 	import { adicionarDias } from '$lib/utils/datas';
 	import { formatarNUP } from '$lib/utils/formato';
 	import { MAX_JUSTIFICATIVA } from '$lib/cadastro-campos';
+	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
+	import { opcoesDeNomesDeUnidades } from '$lib/unidades/opcoes';
 	import ArrowRightLeft from '@lucide/svelte/icons/arrow-right-left';
 	import CalendarOff from '@lucide/svelte/icons/calendar-off';
 	import UserMinus from '@lucide/svelte/icons/user-minus';
@@ -87,6 +89,8 @@
 
 	// ---- Campos controlados (resetados ao fechar) ----
 	let unidadeDestino = $state('');
+	// A movimentação ainda grava o destino pelo NOME; a escolha devolve o nome.
+	const opcoesDestino = $derived(opcoesDeNomesDeUnidades(lotacoes));
 	/** O atalho da E66 só cabe em DELEGADO indo para unidade sem titular. */
 	const podeDesignarTitular = $derived(
 		!solicitando && cargo === 'DPC' && semTitular.includes(unidadeDestino)
@@ -118,6 +122,9 @@
 	/** No modo solicitação, nada é enviado sem motivo escrito; no afastamento, sem NUP válido. */
 	const bloqueado = $derived(
 		enviando ||
+			// A caixa de busca envia por um campo escondido, que o `required` do
+			// navegador não alcança: sem destino, o botão é que não deixa enviar.
+			(modal === 'movimentacao' && !unidadeDestino) ||
 			(solicitando && modal !== 'afastamento' && justificativa.trim().length === 0) ||
 			(modal === 'afastamento' &&
 				(!subtipo || !nupConferido.ok || conflitosFerias.some((c) => c.nivel === 'erro')))
@@ -347,17 +354,14 @@
 						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"
 							>Unidade Destino</span
 						>
-						<select
-							class="select py-1 px-3 text-sm"
+						<SearchableSelect
 							name="unidade_destino"
-							bind:value={unidadeDestino}
-							required
-						>
-							<option value="" disabled>Selecione...</option>
-							{#each lotacoes as u (u)}
-								<option value={u}>{u}</option>
-							{/each}
-						</select>
+							ariaLabel="Unidade Destino"
+							bind:value={
+								() => unidadeDestino || null, (v) => (unidadeDestino = v == null ? '' : String(v))
+							}
+							options={opcoesDestino}
+						/>
 					</label>
 				</div>
 				{#if podeDesignarTitular}

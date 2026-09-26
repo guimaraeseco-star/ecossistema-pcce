@@ -13,6 +13,8 @@
 	import type { ActionResult } from '@sveltejs/kit';
 	import type { PageProps } from './$types';
 	import ModalShell from '$lib/components/ModalShell.svelte';
+	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
+	import { opcoesDeUnidades } from '$lib/unidades/opcoes';
 	import { toaster } from '$lib/toast';
 
 	const { data }: PageProps = $props();
@@ -22,7 +24,8 @@
 	let nome = $state('');
 	let cpf = $state('');
 	let emailPessoal = $state('');
-	let unidadeId = $state('');
+	let unidadeId = $state<unknown>(null);
+	const opcoesUnidade = $derived(opcoesDeUnidades(data.unidades));
 	const nomeDaUnidade = (id: number | null) =>
 		id == null ? null : (data.unidades.find((u) => u.id === id)?.nome ?? `#${id}`);
 	let vinculo = $state('');
@@ -35,7 +38,7 @@
 		nome = '';
 		cpf = '';
 		emailPessoal = '';
-		unidadeId = '';
+		unidadeId = null;
 		vinculo = '';
 	}
 
@@ -155,18 +158,16 @@
 							class="flex items-center gap-1"
 						>
 							<input type="hidden" name="colaborador_id" value={c.id} />
-							<select
-								class="select w-48 py-1 text-xs"
+							<SearchableSelect
+								class="w-56"
 								name="unidade_id"
-								value={c.unidade_id ?? ''}
-								onchange={(e) => e.currentTarget.form?.requestSubmit()}
+								value={c.unidade_id}
+								options={opcoesUnidade}
+								opcaoVazia="— sem lotação —"
+								ariaLabel="Unidade de {c.nome}"
+								onchange={(_v, campo) => campo.form?.requestSubmit()}
 								disabled={pending}
-							>
-								<option value="">— sem lotação —</option>
-								{#each data.unidades as un (un.id)}
-									<option value={un.id}>{un.nome}</option>
-								{/each}
-							</select>
+							/>
 							{#if c.unidade_id != null}
 								<a
 									href="/unidade/{c.unidade_id}"
@@ -287,12 +288,13 @@
 		</label>
 		<label class="label">
 			<span class="label-text">Unidade em que está lotado(a)</span>
-			<select class="select" name="unidade_id" bind:value={unidadeId}>
-				<option value="">— definir depois —</option>
-				{#each data.unidades as un (un.id)}
-					<option value={un.id}>{un.nome}</option>
-				{/each}
-			</select>
+			<SearchableSelect
+				name="unidade_id"
+				bind:value={unidadeId}
+				options={opcoesUnidade}
+				opcaoVazia="— definir depois —"
+				ariaLabel="Unidade em que está lotado(a)"
+			/>
 			<span class="text-xs text-surface-600 dark:text-surface-400"
 				>O que a pessoa pode fazer é definido pela unidade, na ficha dela.</span
 			>

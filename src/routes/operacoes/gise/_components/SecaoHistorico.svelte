@@ -41,10 +41,12 @@
 	import {
 		CLASSE_BARRA_FILTRO,
 		CLASSE_CAMPO_FILTRO,
-		CLASSE_INPUT_FILTRO,
+		CLASSE_INPUT_SEARCHABLE,
 		CLASSE_ROTULO_FILTRO,
 		CLASSE_TITULO_FILTRO
 	} from '$lib/gise/filtro-historico-ui';
+	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
+	import { opcoesDeUnidades } from '$lib/unidades/opcoes';
 	import Download from '@lucide/svelte/icons/download';
 	import Search from '@lucide/svelte/icons/search';
 	import { mensagemDeErro } from '$lib/utils/erro';
@@ -81,6 +83,7 @@
 	const cicloCorrente = cicloQueContem(hojeLocalISO());
 
 	let filtroSeccional = $state<number | ''>('');
+	const opcoesSeccional = $derived(opcoesDeUnidades(seccionaisList));
 	let filtroTipoEquipe = $state<TipoEquipe | ''>('');
 	let modoPeriodo = $state<ModoPeriodo>('ciclo');
 	let filtroMesAno = $state(getCurrentMonth());
@@ -230,17 +233,17 @@
 		<div class={CLASSE_BARRA_FILTRO}>
 			<div class={CLASSE_CAMPO_FILTRO}>
 				<label class={CLASSE_ROTULO_FILTRO} for="filtro-seccional">Seccional</label>
-				<select
+				<SearchableSelect
 					id="filtro-seccional"
-					bind:value={filtroSeccional}
+					bind:value={
+						() => (filtroSeccional === '' ? null : filtroSeccional),
+						(v) => (filtroSeccional = v == null ? '' : Number(v))
+					}
+					options={opcoesSeccional}
+					opcaoVazia="Todas"
 					onchange={() => (paginaHistorico = 1)}
-					class="{CLASSE_INPUT_FILTRO} w-full sm:w-[11.5rem]"
-				>
-					<option value="">Todas</option>
-					{#each seccionaisList as sec (sec.id)}
-						<option value={sec.id}>{sec.nome}</option>
-					{/each}
-				</select>
+					class="w-full sm:w-[14rem] {CLASSE_INPUT_SEARCHABLE}"
+				/>
 			</div>
 			<FiltroHistoricoSegmento
 				kind="tipo"

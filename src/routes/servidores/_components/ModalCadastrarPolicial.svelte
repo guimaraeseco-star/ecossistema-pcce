@@ -18,6 +18,7 @@
 	import ModalShell from '$lib/components/ModalShell.svelte';
 	import ToggleSwitch from '$lib/components/ToggleSwitch.svelte';
 	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
+	import { opcoesDeUnidades } from '$lib/unidades/opcoes';
 	import { limparTelefone, formatarCPF, limparCPF } from '$lib/utils/formato';
 	import type { Unidade } from '$lib/types';
 	import type { ActionResult } from '@sveltejs/kit';
@@ -71,6 +72,11 @@
 
 	const seccionaisParaPapel = $derived(unidades.filter((u) => u.tipo === 'seccional'));
 	const unidadesParaAdmin = $derived(unidades.filter((u) => u.tipo !== 'seccional'));
+	const opcoesPapelUnidade = $derived(
+		opcoesDeUnidades(papel === 'admin_seccional' ? seccionaisParaPapel : unidadesParaAdmin, {
+			maes: unidades
+		})
+	);
 
 	// Admin Geral escolhe; demais papéis herdam a lotação do escopo (readonly).
 	const lotacaoInput = $derived(isAdmin ? lotacaoAdmin : (lotacaoUsuario ?? ''));
@@ -88,6 +94,7 @@
 					.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
 			: []
 	);
+	const opcoesLocal = $derived(locais.map((l) => ({ value: String(l.id), label: l.nome })));
 	/** O atalho só aparece para DELEGADO em unidade que está sem titular. */
 	const podeDesignarTitular = $derived(
 		isAdmin && cargo === 'DPC' && !!unidadeDaLotacao && semTitular.includes(unidadeDaLotacao.id)
@@ -317,12 +324,12 @@
 						Trabalha em
 						<span class="normal-case font-normal opacity-70">— a lotação continua a mesma</span>
 					</span>
-					<select class="select py-1 px-3 text-sm" bind:value={localId}>
-						<option value="">{lotacaoInput} (sede)</option>
-						{#each locais as l (l.id)}
-							<option value={String(l.id)}>{l.nome}</option>
-						{/each}
-					</select>
+					<SearchableSelect
+						ariaLabel="Trabalha em"
+						bind:value={() => localId || null, (v) => (localId = v == null ? '' : String(v))}
+						options={opcoesLocal}
+						opcaoVazia="{lotacaoInput} (sede)"
+					/>
 				</label>
 			{/if}
 		</div>
@@ -395,12 +402,13 @@
 							<span class="label-text text-2xs font-bold opacity-70 ml-1">
 								{papel === 'admin_seccional' ? 'Seccional de resp.' : 'Unidade de resp.'}
 							</span>
-							<select class="select py-1 px-3 text-sm" bind:value={papelUnidadeId}>
-								<option value={null}>Selecionar...</option>
-								{#each papel === 'admin_seccional' ? seccionaisParaPapel : unidadesParaAdmin as u (u.id)}
-									<option value={u.id}>{u.nome}</option>
-								{/each}
-							</select>
+							<SearchableSelect
+								ariaLabel={papel === 'admin_seccional' ? 'Seccional de resp.' : 'Unidade de resp.'}
+								bind:value={
+									() => papelUnidadeId, (v) => (papelUnidadeId = v == null ? null : Number(v))
+								}
+								options={opcoesPapelUnidade}
+							/>
 							{#if papelSemUnidade}
 								<span class="text-3xs text-error-600 dark:text-error-400 ml-1 mt-0.5">
 									Obrigatório para o papel escolhido.

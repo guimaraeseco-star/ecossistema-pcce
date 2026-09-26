@@ -18,6 +18,7 @@
 	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
 	import type { ActionResult } from '@sveltejs/kit';
 	import { TIPOS_UNIDADE, podeSerPaiDe, type TipoUnidade } from '$lib/unidades/tipos';
+	import { opcoesDeUnidades } from '$lib/unidades/opcoes';
 
 	let {
 		open = $bindable(false),
@@ -52,6 +53,8 @@
 			.filter((u) => podeSerPaiDe(u.tipo, subTipo))
 			.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
 	);
+	const opcoesPais = $derived(opcoesDeUnidades(paisPossiveis, { maes: unidades }));
+	const opcoesSeccional = $derived(opcoesDeUnidades(seccionais));
 	let delegaciaPrefixo = $state('');
 	let delegaciaSufixo = $state('');
 	let seccionalPrefixo = $state('');
@@ -190,12 +193,11 @@
 				</label>
 				<label class="label">
 					<span class="label-text">Pertence a</span>
-					<select class="select" bind:value={subPaiId}>
-						<option value={null}>Selecione a unidade...</option>
-						{#each paisPossiveis as u (u.id)}
-							<option value={u.id}>{u.nome}</option>
-						{/each}
-					</select>
+					<SearchableSelect
+						bind:value={subPaiId}
+						options={opcoesPais}
+						ariaLabel="Unidade a que pertence"
+					/>
 					<span class="text-xs text-surface-600 dark:text-surface-400">
 						Ninguém é lotado numa subunidade: a lotação continua sendo a unidade, e quem trabalha
 						aqui é indicado na ficha do servidor ("Trabalha em").
@@ -208,12 +210,11 @@
 			<div class="flex flex-col gap-3 animate-in fade-in duration-300">
 				<label class="label">
 					<span class="label-text">Seccional Vinculada</span>
-					<select class="select" bind:value={novoSeccionalId}>
-						<option value={null}>Selecione uma Seccional...</option>
-						{#each seccionais as sec (sec.id)}
-							<option value={sec.id}>{sec.nome}</option>
-						{/each}
-					</select>
+					<SearchableSelect
+						bind:value={novoSeccionalId}
+						options={opcoesSeccional}
+						ariaLabel="Seccional Vinculada"
+					/>
 				</label>
 				<div class="grid grid-cols-[6rem_1fr] gap-2">
 					<label class="label">

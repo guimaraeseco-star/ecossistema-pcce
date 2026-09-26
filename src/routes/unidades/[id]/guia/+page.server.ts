@@ -105,7 +105,7 @@ export const load: PageServerLoad = async ({ locals, platform, params, url }) =>
 		dados: null,
 		desativar: null,
 		transferir: null,
-		opcoesDeMae: [] as { id: number; nome: string; tipo: string }[]
+		opcoesDeMae: [] as { id: number; nome: string; tipo: string; seccional_id: number | null }[]
 	};
 
 	if (ato === 'editar') {
@@ -135,7 +135,8 @@ export const load: PageServerLoad = async ({ locals, platform, params, url }) =>
 					nivelTipoUnidade(a.tipo) - nivelTipoUnidade(b.tipo) ||
 					a.nome.localeCompare(b.nome, 'pt-BR')
 			)
-			.map(({ id: oid, nome, tipo }) => ({ id: oid, nome, tipo }));
+			// A mãe de cada opção vai junto: aparece embaixo do nome na lista (E76).
+			.map(({ id: oid, nome, tipo, seccional_id }) => ({ id: oid, nome, tipo, seccional_id }));
 
 		const para = lerId(url.searchParams.get('para'));
 		let transferir = null;

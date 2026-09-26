@@ -59,6 +59,8 @@
 	import GiseLoteAssinaturas from './_components/GiseLoteAssinaturas.svelte';
 	import GiseStatusAvisos from './_components/GiseStatusAvisos.svelte';
 	import FaixaDesfalques from '$lib/components/FaixaDesfalques.svelte';
+	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
+	import { opcoesDeUnidades } from '$lib/unidades/opcoes';
 	import GiseSeccional from './_components/GiseSeccional.svelte';
 	import ModalExcluirGise from './_components/modais/ModalExcluirGise.svelte';
 	import ModalReabrir from './_components/modais/ModalReabrir.svelte';
@@ -283,6 +285,7 @@
 
 	// Gerenciamento de seccionais (Admin Geral) — derivado dos dados já carregados
 	const seccionaisDisponiveis = $derived(filtrarSeccionaisDisponiveis(gise, todasUnidades));
+	const opcoesSeccionaisDisponiveis = $derived(opcoesDeUnidades(seccionaisDisponiveis));
 	let adicionandoSeccional = $state(false);
 	let seccionalParaAdicionarIdx = $state<number | ''>('');
 	let pendingCrud = $state(false);
@@ -650,16 +653,14 @@
 								class="text-sm font-medium text-surface-600 dark:text-surface-400 block mb-1"
 								>Adicionar Seccional</label
 							>
-							<select
+							<SearchableSelect
 								id="novaSeccional"
-								bind:value={seccionalParaAdicionarIdx}
-								class="w-full px-3 py-2 rounded-xl border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
-							>
-								<option value="">Selecione a seccional...</option>
-								{#each seccionaisDisponiveis as s (s.id)}
-									<option value={s.id}>{s.nome}</option>
-								{/each}
-							</select>
+								bind:value={
+									() => (seccionalParaAdicionarIdx === '' ? null : seccionalParaAdicionarIdx),
+									(v) => (seccionalParaAdicionarIdx = v == null ? '' : Number(v))
+								}
+								options={opcoesSeccionaisDisponiveis}
+							/>
 						</div>
 						<form
 							method="POST"

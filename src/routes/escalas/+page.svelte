@@ -57,6 +57,7 @@
 	import CardNavegacao from './_components/CardNavegacao.svelte';
 	import DialogSolicitarAssinatura from '$lib/components/DialogSolicitarAssinatura.svelte';
 	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
+	import { opcoesDeUnidades } from '$lib/unidades/opcoes';
 	import BotaoVoltar from '$lib/components/BotaoVoltar.svelte';
 	import BotaoLimparFiltros from '$lib/components/BotaoLimparFiltros.svelte';
 	import ModalShell from '$lib/components/ModalShell.svelte';
@@ -156,18 +157,19 @@
 
 	const seccionaisOptions = $derived([
 		{ value: 'todas', label: 'Todas as Seccionais' },
-		...seccionais.map((sec) => ({ value: sec.id, label: sec.nome }))
+		...opcoesDeUnidades(seccionais)
 	]);
 
+	// A escala se liga à unidade pelo NOME (`lotacao`); a escolha devolve o nome.
 	const unidadesOptions = $derived([
 		{ value: '', label: 'Selecione uma unidade...' },
 		{ value: 'todas', label: 'Todas as unidades' },
-		...delegaciasDropdown.map((del) => ({ value: del.nome, label: del.nome }))
+		...opcoesDeUnidades(delegaciasDropdown, { valor: 'nome', maes: unidades })
 	]);
 
 	const unidadesDaSeccionalOptions = $derived([
 		{ value: '', label: 'Todas as unidades' },
-		...delegaciasDaSeccional.map((del) => ({ value: del.nome, label: del.nome }))
+		...opcoesDeUnidades(delegaciasDaSeccional, { valor: 'nome' })
 	]);
 
 	const escalas = $derived(data.escalas ?? []);

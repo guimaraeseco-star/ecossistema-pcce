@@ -11,6 +11,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { sql, type SQL, type SQLWrapper } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import * as schema from '../server/schema';
+import { partesDaBusca } from '../utils/busca-por-partes';
 import type { R2Bucket as _R2Bucket } from '@cloudflare/workers-types';
 
 export type Database = ReturnType<typeof getDB>;
@@ -293,9 +294,6 @@ function semAcentos(expr: SQL | SQLWrapper): SQL {
 	return sql`lower(${trocado})`;
 }
 
-/** Quantos pedaços de busca valem: o suficiente para um nome completo, sem virar consulta gigante. */
-const MAX_PARTES_DA_BUSCA = 6;
-
 /**
  * **Busca por partes** (pedido dele em 22/09): quem digita "jose silva" acha
  * "JOSÉ DA SILVA SANTOS", e "silva jose" também — cada pedaço tem de aparecer
@@ -305,24 +303,19 @@ const MAX_PARTES_DA_BUSCA = 6;
  * auditoria. Antes era um `LIKE %termo%` único, que exigia digitar o nome na
  * ordem exata e com acento — "jose silva" não achava ninguém.
  *
+ * Os pedaços saem de `partesDaBusca` (`$lib/utils/busca-por-partes`), a MESMA
+ * função que as listas de escolha usam no navegador (E76): o que se acha aqui
+ * se acha lá.
+ *
  * `undefined` quando não há nada a filtrar (termo vazio), para o chamador
  * simplesmente não acrescentar condição.
  */
 export function buscaPorPartes(colunas: SQLWrapper[], termo: string): SQL | undefined {
-	const partes = termo.trim().split(/\s+/).filter(Boolean).slice(0, MAX_PARTES_DA_BUSCA);
+	const partes = partesDaBusca(termo);
 	if (partes.length === 0 || colunas.length === 0) return undefined;
-	const condicoes = partes.map((parte) => {
-		const alvo = semAcentosDeTexto(parte);
+	const condicoes = partes.map((alvo) => {
 		const ors = colunas.map((c) => sql`instr(${semAcentos(c)}, ${alvo}) > 0`);
 		return sql`(${sql.join(ors, sql` OR `)})`;
 	});
 	return sql`(${sql.join(condicoes, sql` AND `)})`;
-}
-
-/** A mesma normalização do SQL, do lado do JS — o termo digitado. */
-function semAcentosDeTexto(texto: string): string {
-	return texto
-		.normalize('NFD')
-		.replace(/\p{Diacritic}/gu, '')
-		.toLowerCase();
 }
