@@ -4,22 +4,42 @@
 	 * cabeçalho do `+page.server.ts`. Aqui só a apresentação: cada passo com o
 	 * seu estado, cada pessoa com o link para a ficha, e o ato final quando nada
 	 * mais impede. Os textos são para quem nunca viu o sistema por dentro.
+	 *
+	 * Desde "tudo no Guia" (26/09) é a ÚNICA entrada para mexer numa unidade:
+	 * editar os dados, transferir, desativar e reativar.
 	 */
 	import { enhance } from '$app/forms';
 	import type { ActionData, PageData } from './$types';
 	import RecusaDaEstrutura from '../../_components/RecusaDaEstrutura.svelte';
+	import FormularioDadosUnidade from '../../_components/FormularioDadosUnidade.svelte';
+
+	/** Como cada ato aparece para quem escolhe — frase de ação, não termo técnico. */
+	const ROTULO_DO_ATO: Record<string, string> = {
+		editar: 'Editar os dados (nome, regimes, contato, foto)',
+		transferir: 'Transferir para outra unidade-mãe',
+		desativar: 'Desativar',
+		reativar: 'Reativar'
+	};
 
 	const { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let pending = $state(false);
+	/** Os dados foram salvos nesta visita — mostra a confirmação. */
+	let dadosSalvos = $state(false);
 
 	const titulo = $derived(
 		data.ato === 'desativar'
 			? `Desativar ${data.unidade.nome}`
 			: data.ato === 'transferir'
 				? `Transferir ${data.unidade.nome} para outra unidade-mãe`
-				: data.unidade.nome
+				: data.ato === 'editar'
+					? `Editar os dados de ${data.unidade.nome}`
+					: data.ato === 'reativar'
+						? `Reativar ${data.unidade.nome}`
+						: data.unidade.nome
 	);
+	/** Os outros atos possíveis, para o atalho "fazer outra coisa". */
+	const outrosAtos = $derived(data.possiveis.filter((a) => a !== data.ato));
 
 	const d = $derived(data.desativar);
 	const desativacaoLiberada = $derived(
@@ -75,14 +95,12 @@
 
 <h1 class="h1 text-2xl font-bold mt-3 mb-1">{titulo}</h1>
 <p class="text-xs text-surface-500 mb-2">Hoje: {data.trilhaAtual.join(' › ')}</p>
-{#if data.ato && data.unidade.ativo && !form?.concluido}
-	<p class="text-xs mb-6">
-		Quer fazer outra coisa com esta unidade?
-		{#if data.ato === 'desativar'}
-			<a class={LINK} href="?ato=transferir">Transferir para outra unidade-mãe</a>
-		{:else}
-			<a class={LINK} href="?ato=desativar">Desativar</a>
-		{/if}
+{#if data.ato && !form?.concluido}
+	<p class="text-xs mb-6 flex flex-wrap gap-x-3">
+		<span>Quer fazer outra coisa com esta unidade?</span>
+		{#each outrosAtos as a (a)}
+			<a class={LINK} href="?ato={a}">{ROTULO_DO_ATO[a]}</a>
+		{/each}
 	</p>
 {:else}
 	<div class="mb-6"></div>
@@ -96,29 +114,66 @@
 		{#if form.concluido === 'desativar'}
 			<p class="font-semibold">Pronto: {data.unidade.nome} foi desativada.</p>
 			<p>Ela sai das listas de escolha. Nada foi apagado, e ela pode ser reativada.</p>
+		{:else if form.concluido === 'reativar'}
+			<p class="font-semibold">Pronto: {data.unidade.nome} foi reativada.</p>
+			<p>Ela volta a aparecer nas listas de escolha.</p>
 		{:else}
 			<p class="font-semibold">Pronto: {data.unidade.nome} mudou de unidade-mãe.</p>
 			<p>A posição dela agora é: {data.trilhaAtual.join(' › ')}.</p>
 		{/if}
 		<p class="mt-2"><a class={LINK} href="/unidades">Voltar para Unidades</a></p>
 	</div>
-{:else if !data.unidade.ativo}
-	<div class={CARTAO}>
-		<p class="text-sm">
-			Esta unidade está <strong>desativada</strong>. Para transferi-la, reative-a antes na tela de
-			Unidades.
-		</p>
-	</div>
 {:else if !data.ato}
 	<div class={CARTAO}>
+		{#if !data.unidade.ativo}
+			<p class="text-sm mb-3">
+				Esta unidade está <strong>desativada</strong>. Para transferi-la ou mexer na estrutura, ela
+				precisa ser reativada antes.
+			</p>
+		{/if}
 		<p class="text-sm mb-3">O que você quer fazer com esta unidade?</p>
 		<div class="flex flex-wrap gap-2">
-			<a class="btn btn-sm preset-tonal-primary" href="?ato=transferir">
-				Transferir para outra unidade-mãe
-			</a>
-			<a class="btn btn-sm preset-tonal-warning" href="?ato=desativar">Desativar</a>
+			{#each data.possiveis as a (a)}
+				<a
+					class="btn btn-sm {a === 'desativar' ? 'preset-tonal-warning' : 'preset-tonal-primary'}"
+					href="?ato={a}">{ROTULO_DO_ATO[a]}</a
+				>
+			{/each}
 		</div>
 	</div>
+{:else if data.ato === 'editar' && data.dados}
+	{#if dadosSalvos}
+		<div
+			role="status"
+			class="rounded-xl border border-success-400 bg-success-50 dark:bg-success-950/40 p-4 mb-4 text-sm"
+		>
+			<p class="font-semibold">Pronto: os dados foram salvos.</p>
+			<p class="mt-1"><a class={LINK} href="/unidades">Voltar para Unidades</a></p>
+		</div>
+	{/if}
+	<p class="text-sm mb-4 max-w-3xl">
+		Aqui se editam os <strong>dados</strong> da unidade. A unidade-mãe não se troca por aqui: para
+		isso há a opção <a class={LINK} href="?ato=transferir">Transferir para outra unidade-mãe</a>,
+		que mostra antes quem é afetado.
+	</p>
+	<section class={CARTAO}>
+		{#key data.dados}
+			<FormularioDadosUnidade unidade={data.dados} onSalvo={() => (dadosSalvos = true)} />
+		{/key}
+	</section>
+{:else if data.ato === 'reativar'}
+	<section class={CARTAO}>
+		<p class="text-sm mb-3">
+			Ao reativar, <strong>{data.unidade.nome}</strong> volta a aparecer nas listas de escolha (nova escala,
+			lotação de servidor, GISE). Reativar não depende de nada: pode ser feito a qualquer momento.
+		</p>
+		<form method="POST" action="?/concluir" use:enhance={aoConcluir}>
+			<input type="hidden" name="ato" value="reativar" />
+			<button type="submit" class="btn preset-filled-success-500" disabled={pending}>
+				{pending ? 'Reativando...' : `Reativar ${data.unidade.nome}`}
+			</button>
+		</form>
+	</section>
 {:else if data.ato === 'desativar' && d}
 	<p class="text-sm mb-4 max-w-3xl">
 		Para desativar uma unidade, <strong>nada pode estar dependendo dela</strong>: nem servidor
