@@ -58,6 +58,7 @@ import { impedimentoParaExcluirPolicial } from '$lib/db/policiais';
 import { afastamentosVigentesDe, situacaoDe } from '$lib/db/efetivo';
 import { pendenciasDeFerias, abonosVigentesDe } from '$lib/db';
 import { hojeBrasilISO } from '$lib/utils/datas';
+import { SEM_LOTACAO } from './filtro-lotacao';
 
 export const load: PageServerLoad = async ({ locals, platform, url, depends }) => {
 	depends('app:policiais');
@@ -71,6 +72,8 @@ export const load: PageServerLoad = async ({ locals, platform, url, depends }) =
 
 	const db = getDB(platform);
 	const lotacaoParam = url.searchParams.get('lotacao') || undefined;
+	// "— Sem lotação —" é um pedido próprio, não o nome de uma unidade.
+	const semLotacao = lotacaoParam === SEM_LOTACAO;
 	const cargo = url.searchParams.get('cargo') || undefined;
 	const situacaoParam = url.searchParams.get('situacao') || '';
 	const situacao = (['ativos', 'ferias', 'afastados'] as const).find((s) => s === situacaoParam);
@@ -92,7 +95,7 @@ export const load: PageServerLoad = async ({ locals, platform, url, depends }) =
 	// atalho "designar como titular" (E66) só aparece para unidade SEM titular.
 	const unidades = await listarUnidades(db);
 	const [resultado, designacoes, direcoes] = await Promise.all([
-		listarPoliciais(db, lotacaoParam, false, {
+		listarPoliciais(db, semLotacao ? undefined : lotacaoParam, semLotacao, {
 			busca,
 			cargo,
 			seccionalId,
@@ -149,6 +152,12 @@ export const load: PageServerLoad = async ({ locals, platform, url, depends }) =
 		designacoes,
 		/** Unidades ativas SEM direção vigente — o atalho da E66 e o aviso da tela. */
 		semTitular: unidades.filter((x) => !direcoes.has(x.id)).map((x) => x.id),
+		/**
+		 * Quem enxerga servidor sem unidade: só o escopo irrestrito (Super
+		 * Admin). Para os demais o recorte da E75 já esconde essas linhas, e a
+		 * opção "— Sem lotação —" mostraria sempre uma lista vazia.
+		 */
+		veSemLotacao: escopoIds === null,
 		filtros: {
 			lotacao: lotacaoParam ?? '',
 			cargo: cargo ?? '',

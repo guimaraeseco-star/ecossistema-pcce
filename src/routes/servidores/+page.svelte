@@ -74,6 +74,7 @@
 	} from '$lib/gise/filtro-historico-ui';
 	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
 	import { opcoesDeUnidades } from '$lib/unidades/opcoes';
+	import { SEM_LOTACAO, TODAS_UNIDADES } from './filtro-lotacao';
 
 	const { data }: PageProps = $props();
 
@@ -134,15 +135,14 @@
 	// Dialog de confirmação
 	const confirmDialog = useConfirmationDialog<{ id: number; nome: string }>();
 
-	// Special sentinel value for "sem lotação" filter
-	const SEM_LOTACAO = '__sem_lotacao__';
-	const TODAS_UNIDADES = '__todas__';
-
 	const opcoesSeccional = $derived(opcoesDeUnidades(seccionais));
 	// A lotação do servidor ainda é filtrada pelo NOME (`?lotacao=`), então a escolha devolve o nome.
+	// "— Sem lotação —" só para quem pode ver alguém ali: servidor sem unidade
+	// não está na área de nenhum administrador (E75), e para os outros a opção
+	// daria sempre uma lista vazia.
 	const opcoesLotacao = $derived([
 		...opcoesDeUnidades(delegaciasDropdown, { valor: 'nome', maes: unidades }),
-		{ value: SEM_LOTACAO, label: '— Sem lotação —' }
+		...(data.veSemLotacao ? [{ value: SEM_LOTACAO, label: '— Sem lotação —' }] : [])
 	]);
 
 	// Persistência dos filtros + navegação (query server-side). A paginação
@@ -161,12 +161,9 @@
 		query: (p) => {
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity
 			const params = new URLSearchParams();
-			if (
-				filtroLotacao &&
-				filtroLotacao !== 'todas' &&
-				filtroLotacao !== TODAS_UNIDADES &&
-				filtroLotacao !== SEM_LOTACAO
-			) {
+			// O SEM_LOTACAO vai na URL como qualquer escolha: o `load` o reconhece.
+			// Antes ele era pulado aqui, e a opção mostrava todos os servidores.
+			if (filtroLotacao && filtroLotacao !== 'todas' && filtroLotacao !== TODAS_UNIDADES) {
 				params.set('lotacao', filtroLotacao);
 			}
 			if (filtroCargo) params.set('cargo', filtroCargo);
