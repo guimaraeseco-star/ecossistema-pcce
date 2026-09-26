@@ -42,10 +42,23 @@ import { nivelTipoUnidade } from '$lib/unidades/tipos';
 import { pendenciasDaDesativacao, pendenciasDaTrocaDeMae } from '$lib/server/unidades/travas';
 import { alternarAtivoDaUnidade, trocarMaeDaUnidade } from '$lib/server/unidades/atos';
 
-type Ato = 'desativar' | 'transferir';
+/**
+ * Os atos do guia. Desde "tudo no Guia" (decisão dele em 26/09) é o guia a
+ * única entrada para mexer numa unidade: cada ato com o seu caminho.
+ */
+const ATOS = ['editar', 'transferir', 'desativar', 'reativar'] as const;
+type Ato = (typeof ATOS)[number];
 
 function lerAto(valor: unknown): Ato | null {
-	return valor === 'desativar' || valor === 'transferir' ? valor : null;
+	return (ATOS as readonly unknown[]).includes(valor) ? (valor as Ato) : null;
+}
+
+/**
+ * Os atos que fazem sentido para a unidade como ela está. Desativada, ela só
+ * se reativa ou se edita: transferir e desativar pedem uma unidade ativa.
+ */
+function atosPossiveis(ativo: boolean): Ato[] {
+	return ativo ? ['editar', 'transferir', 'desativar'] : ['reativar', 'editar'];
 }
 
 function lerId(valor: unknown): number | null {
@@ -80,17 +93,34 @@ export const load: PageServerLoad = async ({ locals, platform, params, url }) =>
 	const trilha = (noId: number) => [...ancestraisDe(arvore, noId)].reverse().map((n) => n.nome);
 	const trilhaAtual = [...trilha(id), unidade.nome];
 
-	const ato = lerAto(url.searchParams.get('ato'));
+	const possiveis = atosPossiveis(unidade.ativo);
+	const pedido = lerAto(url.searchParams.get('ato'));
+	// Ato que não cabe na unidade (desativar uma desativada, por exemplo) volta
+	// para a escolha, em vez de mostrar um guia que não leva a lugar nenhum.
+	const ato = pedido && possiveis.includes(pedido) ? pedido : null;
+	const base = {
+		unidade,
+		trilhaAtual,
+		possiveis,
+		dados: null,
+		desativar: null,
+		transferir: null,
+		opcoesDeMae: [] as { id: number; nome: string; tipo: string }[]
+	};
+
+	if (ato === 'editar') {
+		// O formulário precisa da linha inteira (ficha, foto, regimes).
+		const dados = await db.select().from(unidades).where(eq(unidades.id, id)).get();
+		return { ...base, ato, dados: dados ?? null };
+	}
+
+	if (ato === 'reativar') {
+		// Reativar nunca trava: não há passo a cumprir, só o aviso do que acontece.
+		return { ...base, ato };
+	}
 
 	if (ato === 'desativar') {
-		return {
-			unidade,
-			trilhaAtual,
-			ato,
-			desativar: await pendenciasDaDesativacao(db, id),
-			transferir: null,
-			opcoesDeMae: []
-		};
+		return { ...base, ato, desativar: await pendenciasDaDesativacao(db, id) };
 	}
 
 	if (ato === 'transferir') {
@@ -118,10 +148,10 @@ export const load: PageServerLoad = async ({ locals, platform, params, url }) =>
 				novaTrilha: recusa ? [] : [...trilha(para), arvore.get(para)?.nome ?? '', unidade.nome]
 			};
 		}
-		return { unidade, trilhaAtual, ato, desativar: null, transferir, opcoesDeMae };
+		return { ...base, ato, transferir, opcoesDeMae };
 	}
 
-	return { unidade, trilhaAtual, ato: null, desativar: null, transferir: null, opcoesDeMae: [] };
+	return { ...base, ato: null };
 };
 
 export const actions: Actions = {
@@ -145,6 +175,11 @@ export const actions: Actions = {
 			const desfecho = await alternarAtivoDaUnidade(event, db, u, id, false);
 			if (!desfecho.ok) return fail(desfecho.status, { error: desfecho.erro });
 			return { concluido: 'desativar' as const };
+		}
+		if (ato === 'reativar') {
+			const desfecho = await alternarAtivoDaUnidade(event, db, u, id, true);
+			if (!desfecho.ok) return fail(desfecho.status, { error: desfecho.erro });
+			return { concluido: 'reativar' as const };
 		}
 		if (ato === 'transferir') {
 			const para = lerId(data.get('para'));

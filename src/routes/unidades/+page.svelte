@@ -32,8 +32,6 @@
 	import { useAutorizacao, useFiltrosPaginados, useSamePathNavigating } from '$lib/composables';
 	import { getSavedFilters } from '$lib/utils/localStorage';
 	import ModalCadastrarUnidade from './_components/ModalCadastrarUnidade.svelte';
-	import ModalEditarUnidade from './_components/ModalEditarUnidade.svelte';
-	import ModalDesativarUnidade from './_components/ModalDesativarUnidade.svelte';
 	import BadgeTipoEscala from '$lib/components/BadgeTipoEscala.svelte';
 	import EstadoVazio from '$lib/components/EstadoVazio.svelte';
 	import Building2 from '@lucide/svelte/icons/building-2';
@@ -133,28 +131,15 @@
 
 	const seccionais = $derived(unidades.filter((u) => u.tipo === 'seccional'));
 
-	// Edição (estrutura + ficha) no modal dedicado
-	let edicaoOpen = $state(false);
-	let unidadeEmEdicao = $state<Unidade | null>(null);
-
-	// Desativação (não há exclusão de unidade — ver o cabeçalho)
-	let dialogDesativarOpen = $state(false);
-	let unidadeParaDesativar = $state<{ id: number; nome: string; ativo: boolean } | null>(null);
+	// Editar, transferir, desativar e reativar entram pelo GUIA da unidade
+	// (E73, "tudo no Guia" — decisão dele em 26/09): cada ato com o seu
+	// caminho, explicando antes o que vai acontecer. Só o cadastro de unidade
+	// nova ainda é uma janela aqui; vira guia na parte 3 da E73.
 
 	// Cadastro
 	let cadastroOpen = $state(false);
 
 	const temFiltros = $derived(filtroSeccional !== 'todas' || filtroBusca !== '');
-
-	function iniciarEdicao(u: Unidade) {
-		unidadeEmEdicao = u;
-		edicaoOpen = true;
-	}
-
-	function solicitarDesativacao(id: number, nome: string, ativo: boolean) {
-		unidadeParaDesativar = { id, nome, ativo };
-		dialogDesativarOpen = true;
-	}
 
 	function limparFiltros() {
 		filtroSeccional = 'todas';
@@ -230,7 +215,6 @@
 	</div>
 </div>
 
-<ModalDesativarUnidade bind:open={dialogDesativarOpen} unidade={unidadeParaDesativar} />
 <ModalCadastrarUnidade bind:open={cadastroOpen} {seccionais} {unidades} />
 
 <div class="p-4 sm:p-6 rounded-2xl card-elevated shadow-sm overflow-hidden">
@@ -323,27 +307,8 @@
 								>
 								{#if isAdmin}
 									<td>
-										<div class="flex gap-2">
-											<button
-												type="button"
-												class="btn btn-sm preset-outlined-surface-500"
-												onclick={() => iniciarEdicao(u)}>Editar</button
-											>
-											{#if u.ativo}
-												<!-- O guia passo a passo de transferir ou desativar (E73). -->
-												<a class="btn btn-sm preset-tonal-primary" href="/unidades/{u.id}/guia"
-													>Guia</a
-												>
-											{/if}
-											<button
-												type="button"
-												class="btn btn-sm {u.ativo
-													? 'preset-outlined-surface-500'
-													: 'preset-filled-success-500'} transition-all"
-												onclick={() => solicitarDesativacao(u.id, u.nome, u.ativo)}
-												>{u.ativo ? 'Desativar' : 'Reativar'}</button
-											>
-										</div>
+										<!-- Toda alteração entra pelo Guia (E73, tudo no Guia). -->
+										<a class="btn btn-sm preset-tonal-primary" href="/unidades/{u.id}/guia">Guia</a>
 									</td>
 								{/if}
 							</tr>
@@ -397,24 +362,9 @@
 								</p>
 							</div>
 							{#if isAdmin}
-								<div class="flex gap-2 shrink-0">
-									<button
-										type="button"
-										class="btn btn-sm preset-outlined-surface-500"
-										onclick={() => iniciarEdicao(u)}>Editar</button
-									>
-									{#if u.ativo}
-										<a class="btn btn-sm preset-tonal-primary" href="/unidades/{u.id}/guia">Guia</a>
-									{/if}
-									<button
-										type="button"
-										class="btn btn-sm {u.ativo
-											? 'preset-outlined-surface-500'
-											: 'preset-filled-success-500'} transition-all"
-										onclick={() => solicitarDesativacao(u.id, u.nome, u.ativo)}
-										>{u.ativo ? 'Desativar' : 'Reativar'}</button
-									>
-								</div>
+								<a class="btn btn-sm preset-tonal-primary shrink-0" href="/unidades/{u.id}/guia"
+									>Guia</a
+								>
 							{/if}
 						</div>
 					</div>
@@ -431,4 +381,3 @@
 	{/if}
 </div>
 <FloatingRefresh chaves="app:unidades" />
-<ModalEditarUnidade bind:open={edicaoOpen} unidade={unidadeEmEdicao} {unidades} />

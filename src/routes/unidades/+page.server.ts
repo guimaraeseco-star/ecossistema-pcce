@@ -28,7 +28,6 @@ import {
 	listarTodasUnidades,
 	criarUnidade,
 	atualizarUnidade,
-	motivoParaRecusarSuperior,
 	auditar,
 	contextoDeEvento
 } from '$lib/db';
@@ -39,7 +38,6 @@ import { ehViolacaoUnique, mensagemComCausas } from '$lib/server/db-errors';
 import { ConflitoDeRenomeacaoUnidade } from '$lib/db/unidades';
 import { logger } from '$lib/server/logger';
 import { detectarTipoImagem } from '$lib/server/assinatura/selfie-upload';
-import { travaDaTrocaDeMae } from '$lib/server/unidades/travas';
 import { alternarAtivoDaUnidade } from '$lib/server/unidades/atos';
 
 /** Teto da foto da fachada: 3 MB já é uma foto de celular em boa resolução. */
@@ -215,17 +213,21 @@ export const actions: Actions = {
 		const removerFoto = data.get('remover_foto') === 'on';
 
 		const db = getDB(platform);
-		// Trocar o pai é a única edição capaz de fechar um ciclo na árvore.
-		const recusa = await motivoParaRecusarSuperior(db, id, parsed.data.seccional_id);
-		if (recusa) return fail(400, { error: recusa });
-		// E a única capaz de deixar alguém com o "trabalha em" fora da lotação
-		// (E73): se deixaria, recusa e diz o que fazer antes.
-		const trava = await travaDaTrocaDeMae(db, id, parsed.data.seccional_id ?? null);
-		if (trava) return fail(409, { error: trava });
-
 		// Estado anterior para o diff da auditoria (a linha muda logo abaixo).
 		const antes = await db.select().from(unidades).where(eq(unidades.id, id)).get();
 		if (!antes) return fail(404, { error: 'Unidade não encontrada' });
+
+		// A unidade-mãe NÃO se troca por aqui (E73, tudo no Guia — decisão dele
+		// em 26/09): cada ato tem o seu caminho, e o da mãe é o guia de
+		// transferir, que mostra as consequências e passa pelas travas do ciclo
+		// e do "trabalha em". Aceitar a troca aqui seria manter uma porta ao lado
+		// da porta — a mesma coisa que a E73 fechou na planilha.
+		if ((parsed.data.seccional_id ?? null) !== antes.seccional_id) {
+			return fail(400, {
+				error:
+					'A unidade-mãe não se troca por aqui. Use o Guia da unidade, na opção "Transferir para outra unidade-mãe".'
+			});
+		}
 		try {
 			await atualizarUnidade(db, id, parsed.data);
 
