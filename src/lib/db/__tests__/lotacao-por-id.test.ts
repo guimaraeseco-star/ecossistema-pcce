@@ -151,3 +151,30 @@ describe('renomear a unidade não quebra o vínculo (o ganho da E51)', () => {
 		expect(lerPolicial('95020')).toEqual({ lotacao: 'DELEGACIA VIZINHA', unidade_id: OUTRA });
 	});
 });
+
+/**
+ * O filtro "— Sem lotação —" de `/servidores` (achado da E76). "Sem lotação"
+ * é sem UNIDADE: o id é o vínculo, então entra também quem tem um nome antigo
+ * no texto que não casou com unidade nenhuma — ninguém o administra, e é
+ * justamente quem precisa ser achado para acertar.
+ */
+describe('sem lotação é sem unidade no sistema', () => {
+	beforeEach(() => {
+		sqlite.exec(`
+			INSERT INTO policiais (id, matricula, nome, cargo, lotacao, unidade_id, senha) VALUES
+				(95101, '95101', 'LOTADO', 'OIP', 'DELEGACIA DE ANTES', ${UNID}, 'x'),
+				(95102, '95102', 'EM BRANCO', 'OIP', '', NULL, 'x'),
+				(95103, '95103', 'NOME ANTIGO', 'OIP', 'DRPC IGUATU', NULL, 'x');
+		`);
+	});
+
+	it('traz a lotação em branco e o nome que não casou; deixa de fora quem tem unidade', async () => {
+		const r = await listarPoliciais(db, undefined, true);
+		expect(r.policiais.map((p) => p.matricula).sort()).toEqual(['95102', '95103']);
+	});
+
+	it('no recorte de um administrador não aparece ninguém — não há unidade dele ali', async () => {
+		const r = await listarPoliciais(db, undefined, true, { escopoUnidades: [UNID, OUTRA] });
+		expect(r.policiais).toEqual([]);
+	});
+});

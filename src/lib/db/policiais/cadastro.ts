@@ -51,8 +51,11 @@ export type PolicialListado = Omit<schema.Policial, 'senha'> & {
  *   chama `decifrarCpfDoDB`;
  * - `lotacao === '__todas__'` é sentinela de "sem filtro" (o `<select>` da UI
  *   manda essa string); `semLotacao` tem precedência sobre `lotacao` e traz os
- *   registros com lotação vazia/nula, que são os que a sincronização não
- *   conseguiu casar com nenhuma unidade;
+ *   servidores SEM UNIDADE no sistema — `unidade_id` vazio. Desde a E51 o id é
+ *   o vínculo e o texto é só o que a tela mostra: entra aqui tanto quem tem a
+ *   lotação em branco quanto quem tem um nome que não casou com unidade
+ *   nenhuma (grafia antiga da planilha), porque nos dois casos ninguém o
+ *   administra — são justamente os que precisam ser achados para acertar;
  * - `seccionalId` casa por NOME de unidade (a própria seccional ou qualquer
  *   unidade que aponte para ela), porque `policiais.lotacao` é texto, não FK;
  * - `escopoLotacoes` é o RECORTE DE PERMISSÃO do administrador que está olhando
@@ -92,7 +95,7 @@ export async function listarPoliciais(
 	const baseConditions = [eq(policiais.ativo, 1)];
 
 	if (semLotacao) {
-		baseConditions.push(or(eq(policiais.lotacao, ''), isNull(policiais.lotacao))!);
+		baseConditions.push(isNull(policiais.unidade_id));
 	} else if (lotacao && lotacao !== '__todas__') {
 		baseConditions.push(eq(policiais.lotacao, lotacao));
 	}
