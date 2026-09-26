@@ -17,8 +17,9 @@
  * SLOT de unidade: na CRAJUBAR são as delegacias do Crato e de Barbalha que
  * entram por slot, e ignorá-los deixaria de fora justamente quem o plano nomeia.
  */
-import { eq, inArray } from 'drizzle-orm';
-import { unidades, giseModeloFormulario } from '$lib/server/schema';
+import { inArray } from 'drizzle-orm';
+import { giseModeloFormulario } from '$lib/server/schema';
+import { unidadesAdministradas } from '$lib/server/policial-permissao';
 import { isAdminGeral, isAdminSeccional, isAdminUnidade } from '$lib/auth';
 import { unidadesParticipantesDaOperacao, listarOperacoes } from '$lib/db/operacoes';
 import { extrairIndicadoresDeModelos, indicadoresComLinhaBase } from '$lib/gise/indicadores';
@@ -34,7 +35,15 @@ import type { Database } from '$lib/db';
  * mas está sem `papel_unidade_id`. O chamador transforma vazio em 403; nunca em
  * "então mostra tudo".
  *
- * Admin Geral recebe todas as participantes (não `null`): a tela precisa da
+ * O "administra" é a régua única de escopo (E75), e não uma cópia dela. Até a
+ * E75 havia uma aqui dentro: a seccional expandida uma volta só, o admin de
+ * unidade com a própria unidade e nada mais, e o Admin Geral com TODAS as
+ * participantes em qualquer chapéu. Isso contrariava duas decisões dele — a
+ * seccional vê tudo abaixo (E75) e, no chapéu de unidade, o Admin Geral vê só
+ * os dados da unidade (E71) — sem que ninguém notasse, porque uma cópia de
+ * regra não quebra teste nenhum quando a original muda.
+ *
+ * O Super Admin recebe todas as participantes (não `null`): a tela precisa da
  * lista concreta para renderizar as linhas, e um `null` de "irrestrito" só
  * empurraria a expansão para cada call site.
  */
@@ -46,34 +55,14 @@ export async function unidadesLinhaBaseAdministradas(
 	if (!u) return new Set();
 
 	const participantes = await unidadesParticipantesDaOperacao(db, operacaoId);
-	const idsParticipantes = new Set(participantes.map((p) => p.id));
+	const idsParticipantes = participantes.map((p) => p.id);
 
-	if (isAdminGeral(u)) return idsParticipantes;
-
-	// O escopo vem do PAPEL, não da lotação (FLW-RBAC-003) — mesma regra de
-	// `lotacoesAdministradas`. Sem unidade de papel não há escopo algum.
-	const papelUnidadeId = u.papel_unidade_id;
-	if (papelUnidadeId == null) return new Set();
-
-	if (isAdminUnidade(u)) {
-		return idsParticipantes.has(papelUnidadeId) ? new Set([papelUnidadeId]) : new Set();
-	}
-
-	if (isAdminSeccional(u)) {
-		// A própria seccional mais as unidades subordinadas a ela — mesma expansão
-		// de `lotacoesDaSeccional`, por id em vez de por nome, porque aqui o alvo é
-		// `operacao_linha_base.unidade_id`.
-		const subordinadas = await db
-			.select({ id: unidades.id })
-			.from(unidades)
-			.where(eq(unidades.seccional_id, papelUnidadeId))
-			.all();
-
-		const doEscopo = new Set<number>([papelUnidadeId, ...subordinadas.map((s) => s.id)]);
-		return new Set([...doEscopo].filter((id) => idsParticipantes.has(id)));
-	}
-
-	return new Set();
+	// Em ids, porque o alvo é `operacao_linha_base.unidade_id`. O escopo vem do
+	// PAPEL e não da lotação (FLW-RBAC-003) — a régua única já cuida disso, e de
+	// devolver vazio a quem tem papel sem unidade.
+	const escopo = await unidadesAdministradas(db, u);
+	if (escopo === null) return new Set(idsParticipantes);
+	return new Set(idsParticipantes.filter((id) => escopo.has(id)));
 }
 
 /**

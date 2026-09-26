@@ -26,11 +26,29 @@
  * pendendo do nó: é a diferença entre "o departamento que administra as
  * delegacias" e "o departamento que é uma casa com os seus servidores".
  *
- * Nada aqui é a autorização das outras telas: `/servidores` continua com
- * `lotacoesAdministradas`, escalas com `verificarPermissaoEscala`. Este
- * resolvedor responde só "que unidades este usuário ENXERGA na gestão de
- * unidade" — e, por `trilhaDaUnidade`, "de onde ele olha", para a barra do
- * topo.
+ * **Desde a E75 esta é a ÚNICA régua de "quem administra o quê".** Até ali
+ * havia quatro: esta, as gêmeas `lotacoesAdministradas` e
+ * `unidadesAdministradas` (que expandiam a seccional uma volta só e davam ao
+ * admin de unidade apenas a própria unidade) e uma cópia nas operações. Quatro
+ * respostas para a mesma pergunta é como nasce a divergência entre telas — e
+ * ela nasceu: em 25/09 a lista de servidores e a Gestão de unidade discordavam
+ * sobre quem a 1ª Seccional alcança. Agora as outras delegam para cá.
+ *
+ * A regra da E75, decidida por ele em 25/09:
+ * - **o posto é administrado pela unidade-mãe SE não tiver direção própria.**
+ *   Fortim tem titular registrado: fica pendurada em Aracati, mas Aracati não
+ *   a administra. Quixeré e Aiuaba não têm: Russas e Tauá administram. O
+ *   critério é a DIREÇÃO REGISTRADA (titular ou respondente vigente), e não
+ *   "delegado lotado no posto" — o titular de Fortim está lotado em Aracati;
+ * - **quem está acima vê tudo abaixo** ("se enxerga a mãe, enxerga a filha"):
+ *   a seccional e o Admin Geral no chapéu de rede ficam com a subárvore
+ *   inteira, inclusive o posto que tem chefe próprio;
+ * - **o colaborador vê SOMENTE a sua unidade.** A regra dos postos é de
+ *   administração, e ele não administra: atua na unidade com as chaves que ela
+ *   lhe deu (E61).
+ *
+ * Por `trilhaDaUnidade`, este módulo responde também "de onde ele olha", para
+ * a barra do topo.
  */
 import {
 	ancestraisDe,
@@ -41,6 +59,7 @@ import {
 	type NoUnidade
 } from '$lib/db';
 import { buscarUnidadePorNome } from '$lib/db/unidades';
+import { responsaveisVigentesDe } from '$lib/db/unidades-responsaveis';
 import { nivelTipoUnidade, TIPOS_DE_SUBUNIDADE } from '$lib/unidades/tipos';
 import {
 	colaboradorComAcesso,
@@ -73,9 +92,25 @@ export async function escopoDeUnidades(
 	if (raizId == null) return null;
 	const raiz = arvore.get(raizId);
 	if (!raiz) return null;
+
+	// O colaborador vê SOMENTE a sua unidade (E75) — nem os postos dela.
+	if (colaboradorComAcesso(u)) return { raiz, arvore, nos: [raiz] };
+
 	const nos = subarvoreDe(arvore, raizId);
-	return { raiz, arvore, nos: alcancaSoACasa(u) ? soACasa(nos, raizId) : nos };
+	if (!alcancaSoACasa(u)) return { raiz, arvore, nos };
+
+	// Na casa, o posto com direção própria fica de fora (E75). Só as
+	// subunidades são candidatas, e a consulta só acontece quando há alguma —
+	// para a maioria das unidades, que não tem posto, ela não roda.
+	const candidatas = nos.filter((n) => n.id !== raizId && ehSubunidade(n)).map((n) => n.id);
+	const comDirecao =
+		candidatas.length > 0
+			? new Set((await responsaveisVigentesDe(db, candidatas)).keys())
+			: new Set<number>();
+	return { raiz, arvore, nos: soACasa(nos, raizId, comDirecao) };
 }
+
+const ehSubunidade = (n: NoUnidade) => (TIPOS_DE_SUBUNIDADE as readonly string[]).includes(n.tipo);
 
 /**
  * O escopo do Super Admin: a árvore inteira, inclusive o que está fora de
@@ -105,11 +140,15 @@ async function escopoIrrestrito(
  *   administra as unidades abaixo e uma casa com os seus próprios servidores,
  *   que pede diária, lança férias e monta a escala como qualquer outra —, e o
  *   seletor diz qual vale agora;
- * - **admin de unidade e colaborador**: sempre a casa. Quem administra uma
- *   UNIDADE administra aquela unidade e os postos dela, nunca outras unidades
- *   penduradas no mesmo nó. Isto passou despercebido enquanto ninguém era
- *   administrador de um departamento; no dia em que ele se tornou (22/09), o
- *   papel de unidade passou a enxergar as 61 unidades do DPI SUL.
+ * - **admin de unidade**: sempre a casa. Quem administra uma UNIDADE
+ *   administra aquela unidade e os postos dela SEM direção própria (E75),
+ *   nunca outras unidades penduradas no mesmo nó. Isto passou despercebido
+ *   enquanto ninguém era administrador de um departamento; no dia em que ele
+ *   se tornou (22/09), o papel de unidade passou a enxergar as 61 unidades do
+ *   DPI SUL.
+ *
+ * O colaborador não passa por aqui: `escopoDeUnidades` o resolve antes, com a
+ * unidade dele e nada mais (E75).
  */
 function alcancaSoACasa(u: UsuarioLogado | null): boolean {
 	if (temChapeu(u)) return u?.atuandoComo === 'unidade';
@@ -135,7 +174,7 @@ export function temChapeu(u: UsuarioLogado | null): boolean {
  * departamento e entra; a 1ª Seccional também pende dele e não entra. Uma
  * subunidade de subunidade continua dentro, porque continua sendo a casa.
  */
-function soACasa(nos: NoUnidade[], raizId: number): NoUnidade[] {
+function soACasa(nos: NoUnidade[], raizId: number, comDirecao: ReadonlySet<number>): NoUnidade[] {
 	const dentro = new Set<number>([raizId]);
 	// `subarvoreDe` devolve em largura: o pai sempre vem antes do filho, então
 	// uma passada basta para decidir cada nó pelo pai já classificado.
@@ -144,7 +183,10 @@ function soACasa(nos: NoUnidade[], raizId: number): NoUnidade[] {
 		if (
 			n.seccional_id != null &&
 			dentro.has(n.seccional_id) &&
-			(TIPOS_DE_SUBUNIDADE as readonly string[]).includes(n.tipo)
+			ehSubunidade(n) &&
+			// O posto com chefe próprio não é da casa da mãe (E75) — e, como o
+			// filho só entra se o pai entrou, o que pende dele também fica fora.
+			!comDirecao.has(n.id)
 		) {
 			dentro.add(n.id);
 		}
