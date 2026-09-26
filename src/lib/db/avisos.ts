@@ -7,14 +7,18 @@
  * resolver), que continua calculada ao vivo das tabelas de origem, em
  * `lib/server/avisos/pendencias.ts`, e nunca se grava aqui.
  *
- * O destinatário é um só por linha: o Admin Geral, ou uma LOTAÇÃO pelo nome.
+ * O destinatário é um só por linha: o Admin Geral, ou uma LOTAÇÃO. Desde a
+ * E51 a lotação é gravada em par — o NOME, para exibir, e o ID da unidade, que é
+ * por onde a caixa filtra. Pelo nome, renomear a unidade fazia todo aviso que
+ * ela recebeu antes sumir da própria caixa: nada dava erro, a caixa só
+ * aparecia vazia.
  * A lotação é lida por quem a administra — o admin da unidade e o da
  * seccional acima —, e "lido" é da linha, não da pessoa: a caixa da unidade
  * é uma só. Quem emite (`lib/server/avisos/emitir.ts`) decide o outro lado;
  * aqui só se grava, lê, conta e marca.
  */
 import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
-import { avisos, type Aviso } from '../server/schema';
+import { avisos, unidades, type Aviso } from '../server/schema';
 import { batchNonEmpty, type Database } from './core';
 
 /**
@@ -28,8 +32,12 @@ import { batchNonEmpty, type Database } from './core';
  */
 export interface CaixaDeAvisos {
 	adminGeral: boolean;
-	/** As lotações administradas; vazio para quem não administra nenhuma. */
-	lotacoes: string[];
+	/**
+	 * Os IDS das unidades administradas (E51); vazio para quem não administra
+	 * nenhuma. Vem de `unidadesAdministradas`, gêmea exata da régua de nomes —
+	 * trocar uma pela outra aqui não muda quem lê o quê.
+	 */
+	unidades: number[];
 }
 
 /** Uma notícia a gravar. */
@@ -47,8 +55,36 @@ export interface NovoAviso {
 	autor: { id: number; nome: string } | null;
 }
 
+/**
+ * O id de cada nome de unidade, numa consulta só. Nome que não casa fica fora
+ * do mapa, e o aviso nasce com o id nulo — que é resposta, não falha: há
+ * destinos que nunca foram unidade.
+ *
+ * Em fatias de 90 por causa do limite de 100 parâmetros por consulta do D1; na
+ * prática um lote de avisos tem poucos destinos, mas o limite não avisa antes.
+ */
+async function idsPorNome(db: Database, nomes: readonly string[]): Promise<Map<string, number>> {
+	const unicos = [...new Set(nomes.filter((n) => n.trim() !== ''))];
+	const mapa = new Map<string, number>();
+	for (let i = 0; i < unicos.length; i += 90) {
+		const linhas = await db
+			.select({ id: unidades.id, nome: unidades.nome })
+			.from(unidades)
+			.where(inArray(unidades.nome, unicos.slice(i, i + 90)));
+		for (const l of linhas) mapa.set(l.nome, l.id);
+	}
+	return mapa;
+}
+
 /** Grava várias notícias num lote só (uma por destinatário). */
 export async function criarAvisos(db: Database, novos: readonly NovoAviso[]): Promise<void> {
+	// O par nome + id, como toda escrita desde a E51. A migração `0103` tem um
+	// gatilho que faz o mesmo no banco — é a rede para quem esquecer; aqui é o
+	// caminho explícito, que não depende dela.
+	const idDe = await idsPorNome(
+		db,
+		novos.map((n) => n.destinatario.lotacao ?? '')
+	);
 	await batchNonEmpty(
 		db,
 		novos.map((n) =>
@@ -57,6 +93,7 @@ export async function criarAvisos(db: Database, novos: readonly NovoAviso[]): Pr
 				// Na caixa do Admin Geral a lotação não é o destinatário e sim o
 				// ASSUNTO: é por ela que o recorte por nó filtra (E65).
 				destinatario_lotacao: n.destinatario.lotacao ?? null,
+				destinatario_unidade_id: idDe.get(n.destinatario.lotacao ?? '') ?? null,
 				cartao: n.cartao,
 				tipo: n.tipo,
 				titulo: n.titulo,
@@ -74,12 +111,16 @@ function daCaixa(caixa: CaixaDeAvisos) {
 	const partes = [];
 	if (caixa.adminGeral) {
 		partes.push(
-			caixa.lotacoes.length > 0
+			caixa.unidades.length > 0
 				? and(
 						eq(avisos.destinatario_tipo, 'admin_geral'),
 						or(
+							// O "sem assunto" continua decidido pelo TEXTO, de propósito.
+							// Pelo id, um aviso cujo texto nunca foi unidade (id nulo)
+							// passaria a aparecer para TODO Admin Geral, como se fosse
+							// aviso sem assunto — alargar a caixa de carona.
 							isNull(avisos.destinatario_lotacao),
-							inArray(avisos.destinatario_lotacao, caixa.lotacoes.slice(0, 90))
+							inArray(avisos.destinatario_unidade_id, caixa.unidades.slice(0, 90))
 						)
 					)
 				: eq(avisos.destinatario_tipo, 'admin_geral')
@@ -87,11 +128,11 @@ function daCaixa(caixa: CaixaDeAvisos) {
 	}
 	// A caixa da ponta: as lotações são o DESTINATÁRIO. No Admin Geral as
 	// mesmas lotações já entraram acima como assunto, e não se repetem aqui.
-	if (!caixa.adminGeral && caixa.lotacoes.length > 0) {
+	if (!caixa.adminGeral && caixa.unidades.length > 0) {
 		partes.push(
 			and(
 				eq(avisos.destinatario_tipo, 'lotacao'),
-				inArray(avisos.destinatario_lotacao, caixa.lotacoes.slice(0, 90))
+				inArray(avisos.destinatario_unidade_id, caixa.unidades.slice(0, 90))
 			)
 		);
 	}

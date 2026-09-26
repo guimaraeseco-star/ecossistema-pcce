@@ -41,9 +41,17 @@ export async function resumoRecebidosAdmin(db: Database): Promise<{
 	return { naoVistos, stamp: `${naoVistos}:${total}:${maxId}` };
 }
 
-/** Contagem + stamp das solicitações de assinatura visíveis ao DPC admin.
- * `lotacoesPermitidas` é o escopo do PAPEL (`lotacoesAdministradas`) — não a
- * lotação atual. Sem lista, admin_unidade não vê nada (SEC-06). */
+/**
+ * Contagem + stamp das solicitações de assinatura visíveis ao DPC admin.
+ *
+ * `unidadesPermitidas` é o escopo do PAPEL em IDS (`unidadesAdministradas`) —
+ * não a lotação atual. Sem lista, admin_unidade não vê nada (SEC-06).
+ *
+ * Recebe ids desde a E51 parte 2b: o recorte compara `escalas.unidade_id`, que
+ * sobrevive a uma renomeação de unidade. Pelo nome, renomear a unidade zerava a
+ * contagem de pendências desta caixa até alguém recarregar a tela — e um
+ * carimbo que para de mudar não avisa que parou.
+ */
 export async function resumoEscalasPendentes(
 	db: Database,
 	usuario: {
@@ -51,22 +59,22 @@ export async function resumoEscalasPendentes(
 		papel?: string | null;
 		lotacao?: string | null;
 	},
-	lotacoesPermitidas?: string[]
+	unidadesPermitidas?: number[]
 ): Promise<{ pendentes: number; stamp: string }> {
 	const baseWhere = sql`${escalaDocumentos.escala_id} IS NULL`;
 
 	let scopeCondition: SQL | undefined;
 	if (usuario.papel === 'admin_unidade') {
-		if (!lotacoesPermitidas?.length) return { pendentes: 0, stamp: '0:0' };
+		if (!unidadesPermitidas?.length) return { pendentes: 0, stamp: '0:0' };
 		scopeCondition = and(
 			eq(escalaSolicitacoesAssinatura.tipo, 'unidade'),
-			inArray(escalas.lotacao, lotacoesPermitidas)
+			inArray(escalas.unidade_id, unidadesPermitidas)
 		);
-	} else if (usuario.papel === 'admin_seccional' && lotacoesPermitidas?.length) {
+	} else if (usuario.papel === 'admin_seccional' && unidadesPermitidas?.length) {
 		scopeCondition = or(
 			and(
 				eq(escalaSolicitacoesAssinatura.tipo, 'unidade'),
-				inArray(escalas.lotacao, lotacoesPermitidas)
+				inArray(escalas.unidade_id, unidadesPermitidas)
 			),
 			and(
 				eq(escalaSolicitacoesAssinatura.tipo, 'respondencia'),

@@ -8,7 +8,7 @@
 import { contarNaoLidos, type CaixaDeAvisos } from '$lib/db/avisos';
 import type { Database } from '$lib/db/core';
 import { colaboradorTemAcesso, isAdminGeral, type UsuarioLogado } from '$lib/auth';
-import { lotacoesAdministradas } from '$lib/server/policial-permissao';
+import { unidadesAdministradas } from '$lib/server/policial-permissao';
 import { pendenciasDoUsuario } from './pendencias';
 
 export interface ResumoDeAvisos {
@@ -22,9 +22,11 @@ export interface ResumoDeAvisos {
 
 /** A caixa que este usuário lê. */
 export async function caixaDoUsuario(db: Database, u: UsuarioLogado): Promise<CaixaDeAvisos> {
-	const escopo = await lotacoesAdministradas(db, u);
+	// Em IDS (E51): a caixa filtra `avisos.destinatario_unidade_id`, que
+	// sobrevive a uma renomeação. A régua é a gêmea exata da de nomes.
+	const escopo = await unidadesAdministradas(db, u);
 	// `null` é o Super Admin: caixa sem recorte, como o resto do sistema.
-	return { adminGeral: isAdminGeral(u), lotacoes: escopo ? [...escopo] : [] };
+	return { adminGeral: isAdminGeral(u), unidades: escopo ? [...escopo] : [] };
 }
 
 /** Só quem tem home de módulos tem caixa: Admin Geral, admin de seccional e de unidade. */
