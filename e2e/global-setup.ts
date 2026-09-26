@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import { manterAcordadoEnquantoVivo } from './sem-dormir';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { VERSAO as TERMO_VERSAO, calcularHashTermo } from '../src/lib/server/termo/termo-vigente';
@@ -93,6 +94,10 @@ function aplicarMigracoesLocais(): boolean {
 }
 
 export default async function globalSetup() {
+	// Primeiro de tudo: uma suíte que cochila no meio produz falhas que não são
+	// de código (ver `sem-dormir.ts`, e a corrida de 5,4 h de 25/09).
+	manterAcordadoEnquantoVivo();
+
 	if (!aplicarMigracoesLocais()) {
 		console.warn(
 			'[global-setup] Falha ao aplicar migrations no D1 local — specs que dependem do banco vão falhar/pular.'
