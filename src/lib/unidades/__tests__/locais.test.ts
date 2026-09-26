@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { NoUnidade } from '$lib/db/unidades';
-import { locaisDaUnidade, localValido, rotuloDoLocal } from '../locais';
+import { locaisDaUnidade, localValido, quemPerdeOLocal, rotuloDoLocal } from '../locais';
 
 const no = (id: number, nome: string, seccional_id: number | null, tipo = 'delegacia'): NoUnidade =>
 	({
@@ -69,5 +69,42 @@ describe('rotuloDoLocal', () => {
 		expect(rotuloDoLocal('Aracati', { id: 58, nome: 'Posto de Fortim' })).toBe('Posto de Fortim');
 		expect(rotuloDoLocal('Aracati', { id: 20, nome: 'Aracati' })).toBeNull();
 		expect(rotuloDoLocal('Aracati', null)).toBeNull();
+	});
+});
+
+describe('quemPerdeOLocal — a trava da troca de mãe (E73)', () => {
+	// Os quatro de Fortim: lotados em Aracati, trabalhando no posto.
+	const deFortim = { nome: 'LOTADO EM ARACATI', unidade_id: 20, local_id: 58 };
+	// Lotado na 1ª Seccional e trabalhando em Fortim — vale, porque Fortim está
+	// abaixo da seccional.
+	const daSeccional = { nome: 'LOTADO NA SECCIONAL', unidade_id: 4, local_id: 58 };
+	const naSede = { nome: 'NA SEDE', unidade_id: 20, local_id: null };
+
+	it('Fortim pendurada em Russas: quem é lotado em Aracati perde o local', () => {
+		expect(quemPerdeOLocal(ARVORE, 58, 51, [deFortim, naSede])).toEqual([deFortim]);
+	});
+
+	it('a mãe leva os postos junto: mudar Aracati de lugar não afeta quem é lotado nela', () => {
+		// Aracati sai da 1ª Seccional para o departamento; Fortim vai junto.
+		expect(quemPerdeOLocal(ARVORE, 20, 2, [deFortim])).toEqual([]);
+	});
+
+	it('mas afeta quem é lotado ACIMA e trabalha lá dentro', () => {
+		// Lotado na 1ª Seccional, trabalhando em Fortim. Aracati (com Fortim) sai
+		// da seccional: Fortim deixa de estar abaixo da lotação dele.
+		expect(quemPerdeOLocal(ARVORE, 20, 2, [daSeccional])).toEqual([daSeccional]);
+	});
+
+	it('sem troca de mãe, ninguém perde nada', () => {
+		expect(quemPerdeOLocal(ARVORE, 58, 20, [deFortim])).toEqual([]);
+	});
+
+	it('quem já estava fora da regra não é consequência desta troca e não trava', () => {
+		const jaErrado = { nome: 'JÁ ERRADO', unidade_id: 51, local_id: 58 };
+		expect(quemPerdeOLocal(ARVORE, 58, 51, [jaErrado])).toEqual([]);
+	});
+
+	it('unidade fora da árvore (desativada) não trava', () => {
+		expect(quemPerdeOLocal(ARVORE, 9999, 51, [deFortim])).toEqual([]);
 	});
 });

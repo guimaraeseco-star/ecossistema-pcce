@@ -42,6 +42,7 @@ import { ehViolacaoUnique, mensagemComCausas } from '$lib/server/db-errors';
 import { ConflitoDeRenomeacaoUnidade } from '$lib/db/unidades';
 import { logger } from '$lib/server/logger';
 import { detectarTipoImagem } from '$lib/server/assinatura/selfie-upload';
+import { travaDaDesativacao, travaDaTrocaDeMae } from '$lib/server/unidades/travas';
 
 /** Teto da foto da fachada: 3 MB já é uma foto de celular em boa resolução. */
 const FOTO_MAX_BYTES = 3 * 1024 * 1024;
@@ -219,6 +220,10 @@ export const actions: Actions = {
 		// Trocar o pai é a única edição capaz de fechar um ciclo na árvore.
 		const recusa = await motivoParaRecusarSuperior(db, id, parsed.data.seccional_id);
 		if (recusa) return fail(400, { error: recusa });
+		// E a única capaz de deixar alguém com o "trabalha em" fora da lotação
+		// (E73): se deixaria, recusa e diz o que fazer antes.
+		const trava = await travaDaTrocaDeMae(db, id, parsed.data.seccional_id ?? null);
+		if (trava) return fail(409, { error: trava });
 
 		// Estado anterior para o diff da auditoria (a linha muda logo abaixo).
 		const antes = await db.select().from(unidades).where(eq(unidades.id, id)).get();
@@ -292,6 +297,14 @@ export const actions: Actions = {
 		const db = getDB(platform);
 		const unidade = await db.select().from(unidades).where(eq(unidades.id, id)).get();
 		if (!unidade) return fail(404, { error: 'Unidade não encontrada' });
+
+		// Desativar com gente ou unidade viva dependendo dela é recusado (E73):
+		// primeiro se movem as pessoas, depois se mexe na estrutura. Reativar
+		// nunca é travado.
+		if (!ativo) {
+			const trava = await travaDaDesativacao(db, id);
+			if (trava) return fail(409, { error: trava });
+		}
 
 		await definirUnidadeAtiva(db, id, ativo);
 

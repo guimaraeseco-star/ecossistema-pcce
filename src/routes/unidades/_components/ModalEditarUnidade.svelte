@@ -21,6 +21,7 @@
 	import { CIDADES_CEARA } from '$lib/constants/cidades';
 	import { TIPOS_UNIDADE, nivelTipoUnidade } from '$lib/unidades/tipos';
 	import type { Unidade } from '$lib/types';
+	import RecusaDaEstrutura from './RecusaDaEstrutura.svelte';
 
 	let {
 		open = $bindable(false),
@@ -112,8 +113,15 @@
 
 	const ehDepartamento = $derived(tipo === 'departamento' || tipo === 'sub_departamento');
 
+	/** A recusa da trava (E73), com os passos — some ao fechar a janela. */
+	let recusa = $state<string | null>(null);
+	$effect(() => {
+		if (!open) recusa = null;
+	});
+
 	function handleEditar() {
 		pending = true;
+		recusa = null;
 		return async ({ result }: { result: ActionResult }) => {
 			pending = false;
 			if (result.type === 'success') {
@@ -125,7 +133,7 @@
 					result.type === 'failure'
 						? (result.data as Record<string, unknown> | undefined)
 						: undefined;
-				toaster.create({ title: String(d?.error || 'Erro ao atualizar unidade'), type: 'error' });
+				recusa = String(d?.error || 'Erro ao atualizar unidade');
 			}
 		};
 	}
@@ -136,6 +144,9 @@
 </script>
 
 <ModalShell bind:open title="Editar unidade" largura="2xl" {pending} cancelLabel="Cancelar">
+	{#if recusa}
+		<RecusaDaEstrutura texto={recusa} />
+	{/if}
 	{#if unidade}
 		<form
 			id={formId}

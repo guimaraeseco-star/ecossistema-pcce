@@ -61,6 +61,38 @@ export function localValido(
 }
 
 /**
+ * Quem ficaria com o "trabalha em" FORA da regra se a unidade `unidadeId`
+ * passasse a pender de `novaMaeId` (E73, a trava da troca de mãe).
+ *
+ * O caso que motivou: Fortim é um posto sob Aracati, e quatro servidores
+ * LOTADOS em Aracati TRABALHAM em Fortim. Se Fortim fosse pendurada em Russas,
+ * o local deles deixaria de estar dentro da lotação — a combinação que
+ * `localValido` recusa na ficha do servidor, só que criada pela porta dos
+ * fundos, sem ninguém tocar na ficha.
+ *
+ * A troca é SIMULADA na árvore em memória, e a régua é a mesma `localValido`
+ * de sempre: nada de uma segunda regra que um dia discorde da primeira. Entra
+ * na resposta só quem estava dentro da regra ANTES e sai DEPOIS — quem já
+ * estava fora não é consequência desta troca e não pode travá-la.
+ */
+export function quemPerdeOLocal<T extends { unidade_id: number | null; local_id: number | null }>(
+	arvore: Map<number, NoUnidade>,
+	unidadeId: number,
+	novaMaeId: number | null,
+	servidores: readonly T[]
+): T[] {
+	const no = arvore.get(unidadeId);
+	if (!no || no.seccional_id === novaMaeId) return [];
+	const simulada = new Map(arvore);
+	simulada.set(unidadeId, { ...no, seccional_id: novaMaeId });
+	return servidores.filter(
+		(s) =>
+			localValido(arvore, s.unidade_id, s.local_id) &&
+			!localValido(simulada, s.unidade_id, s.local_id)
+	);
+}
+
+/**
  * Como a ficha diz onde a pessoa trabalha. Na sede (ou sem local) não há o que
  * dizer — a lotação já respondeu.
  */
