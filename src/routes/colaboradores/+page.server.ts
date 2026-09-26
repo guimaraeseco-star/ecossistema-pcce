@@ -69,7 +69,13 @@ export const load: PageServerLoad = async ({ locals, platform, depends }) => {
 		colaboradores,
 		// Para o campo "Unidade" (E61): só o que uma delegacia/seccional é — o
 		// colaborador é lotado onde há admin de unidade para liberar acessos.
-		unidades: unidades.map((u) => ({ id: u.id, nome: u.nome, tipo: u.tipo }))
+		unidades: unidades.map((u) => ({
+			id: u.id,
+			nome: u.nome,
+			tipo: u.tipo,
+			// A mãe aparece embaixo do nome na lista de escolha (E76).
+			seccional_id: u.seccional_id
+		}))
 	};
 };
 

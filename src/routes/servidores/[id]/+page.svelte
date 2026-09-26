@@ -44,6 +44,8 @@
 	import SolicitacoesServidor from './_components/SolicitacoesServidor.svelte';
 	import CartaoFerias from './_components/CartaoFerias.svelte';
 	import BotaoVoltar from '$lib/components/BotaoVoltar.svelte';
+	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
+	import { opcoesDeNomesDeUnidades, opcoesDeUnidades } from '$lib/unidades/opcoes';
 	import { COR_SITUACAO, rotuloAfastamento } from '$lib/servidores/afastamentos';
 	import { formatarData } from '$lib/utils/datas';
 
@@ -63,6 +65,11 @@
 	const unidadesParaAdmin = $derived(
 		data.unidades.filter((u: { tipo: string }) => u.tipo !== 'seccional')
 	);
+	/** A sede é o "trabalha em" vazio: a primeira opção, com o nome dela. */
+	const sedeDoLocal = $derived(data.locais.find((l) => l.sede));
+	const opcoesLocal = $derived(
+		data.locais.filter((l) => !l.sede).map((l) => ({ value: String(l.id), label: l.nome }))
+	);
 
 	let nome = $state('');
 	let matricula = $state('');
@@ -72,6 +79,8 @@
 	let classe = $state('');
 	let regime = $state('');
 	let lotacao = $state('');
+	// A ficha ainda grava a lotação pelo NOME; a escolha devolve o nome.
+	const opcoesLotacao = $derived(opcoesDeNomesDeUnidades(data.lotacoes));
 	let email = $state('');
 	/** Id do catálogo como TEXTO — é o que o `<select>` e o `FormData` trafegam. */
 	let designacaoId = $state('');
@@ -79,6 +88,11 @@
 	let seguirPlanilha = $state(false);
 	let papel = $state<string | null>(null);
 	let papelUnidadeId = $state<number | null>(null);
+	const opcoesPapelUnidade = $derived(
+		opcoesDeUnidades(papel === 'admin_seccional' ? seccionaisParaPapel : unidadesParaAdmin, {
+			maes: data.unidades
+		})
+	);
 	let justificativa = $state('');
 
 	$effect(() => {
@@ -406,12 +420,13 @@
 					{/if}
 				</span>
 				{#if isAdmin}
-					<select class="select py-1 px-3 text-sm" name="lotacao" bind:value={lotacao}>
-						<option value="">— Sem lotação —</option>
-						{#each data.lotacoes as u (u)}
-							<option value={u}>{u}</option>
-						{/each}
-					</select>
+					<SearchableSelect
+						name="lotacao"
+						ariaLabel="Lotação"
+						bind:value={() => lotacao || null, (v) => (lotacao = v == null ? '' : String(v))}
+						options={opcoesLotacao}
+						opcaoVazia="— Sem lotação —"
+					/>
 				{:else}
 					<!-- Sem `name`: no modo solicitação a lotação não é enviada, para não
 					     existir um segundo caminho de transferência sem portaria. -->
@@ -436,12 +451,13 @@
 						>
 					</span>
 					{#if isAdmin}
-						<select class="select py-1 px-3 text-sm" name="local_id" bind:value={localId}>
-							{#each data.locais as l (l.id)}
-								<option value={l.sede ? '' : String(l.id)}>{l.nome}{l.sede ? ' (sede)' : ''}</option
-								>
-							{/each}
-						</select>
+						<SearchableSelect
+							name="local_id"
+							ariaLabel="Trabalha em"
+							bind:value={() => localId || null, (v) => (localId = v == null ? '' : String(v))}
+							options={opcoesLocal}
+							opcaoVazia={`${sedeDoLocal?.nome ?? lotacao} (sede)`}
+						/>
 					{:else}
 						<input
 							class="input py-1 px-3 text-sm bg-surface-200 dark:bg-surface-800 cursor-not-allowed opacity-75"
@@ -560,16 +576,16 @@
 									? 'Seccional de responsabilidade'
 									: 'Unidade de responsabilidade'}
 							</span>
-							<select
-								class="select py-1 px-3 text-sm"
+							<SearchableSelect
 								name="papel_unidade_id"
-								bind:value={papelUnidadeId}
-							>
-								<option value={null}>Selecionar...</option>
-								{#each papel === 'admin_seccional' ? seccionaisParaPapel : unidadesParaAdmin as u (u.id)}
-									<option value={u.id}>{u.nome}</option>
-								{/each}
-							</select>
+								ariaLabel={papel === 'admin_seccional'
+									? 'Seccional de responsabilidade'
+									: 'Unidade de responsabilidade'}
+								bind:value={
+									() => papelUnidadeId, (v) => (papelUnidadeId = v == null ? null : Number(v))
+								}
+								options={opcoesPapelUnidade}
+							/>
 						</label>
 					{/if}
 				</div>

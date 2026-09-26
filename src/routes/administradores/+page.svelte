@@ -14,18 +14,25 @@
 	import { toaster } from '$lib/toast';
 	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
 	import { buscarPoliciaisOptions } from '$lib/busca-policiais';
+	import { ehUnidadeTecnica } from '$lib/unidades/opcoes';
 	import BotaoVoltar from '$lib/components/BotaoVoltar.svelte';
 
 	const { data }: PageProps = $props();
 
 	let policialId = $state<number | null>(null);
-	let noNovo = $state('');
+	let noNovo = $state<unknown>(null);
 	let enviando = $state(false);
 
 	const buscarServidores = buscarPoliciaisOptions({ cargo: '', valorNumerico: true });
 
 	/** Só o nó do DPI SUL existe hoje; a lista já aceita mais de um. */
 	const nos = $derived(data.nos);
+	/** O tipo do nó vai embaixo do nome ("Departamento", "Seccional") e entra na busca. */
+	const opcoesNos = $derived(
+		nos
+			.filter((n) => !ehUnidadeTecnica(n.nome))
+			.map((n) => ({ value: n.id, label: n.nome, detalhe: n.tipoRotulo }))
+	);
 
 	function aoEnviar(mensagem: string) {
 		enviando = true;
@@ -34,7 +41,7 @@
 			if (result.type === 'success') {
 				toaster.create({ title: mensagem, type: 'success' });
 				policialId = null;
-				noNovo = '';
+				noNovo = null;
 				await invalidateAll();
 			} else if (result.type === 'failure') {
 				const d = result.data as Record<string, unknown> | undefined;
@@ -78,12 +85,13 @@
 				<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70">
 					Nó que ele administra
 				</span>
-				<select class="select px-3 py-1 text-sm" name="unidade_id" bind:value={noNovo} required>
-					<option value="" disabled>— Escolha —</option>
-					{#each nos as n (n.id)}
-						<option value={n.id}>{n.nome} ({n.tipoRotulo})</option>
-					{/each}
-				</select>
+				<SearchableSelect
+					name="unidade_id"
+					bind:value={noNovo}
+					options={opcoesNos}
+					ariaLabel="Nó que ele administra"
+					class="h-9 w-full"
+				/>
 			</label>
 		</div>
 		<div class="mt-3 flex justify-end">
@@ -140,17 +148,15 @@
 								class="flex items-center gap-2"
 							>
 								<input type="hidden" name="admin_id" value={c.id} />
-								<select
-									class="select px-2 py-1 text-xs"
+								<SearchableSelect
+									class="w-64"
 									name="unidade_id"
-									value={c.unidade_id ?? ''}
-									onchange={(e) => e.currentTarget.form?.requestSubmit()}
-								>
-									<option value="">— não opera —</option>
-									{#each nos as n (n.id)}
-										<option value={n.id}>{n.nome}</option>
-									{/each}
-								</select>
+									value={c.unidade_id}
+									options={opcoesNos}
+									opcaoVazia="— não opera —"
+									ariaLabel="Nó de {c.login}"
+									onchange={(_v, campo) => campo.form?.requestSubmit()}
+								/>
 							</form>
 							{#if c.unidade_id == null}
 								<span

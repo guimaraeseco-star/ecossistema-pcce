@@ -35,6 +35,8 @@
 	import GiseActionButton from './GiseActionButton.svelte';
 	import SeccionalRelatoriosDownloads from './SeccionalRelatoriosDownloads.svelte';
 	import GiseSlotUnidade from './GiseSlotUnidade.svelte';
+	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
+	import { opcoesDeUnidades } from '$lib/unidades/opcoes';
 	import GiseAbasUnidades from './GiseAbasUnidades.svelte';
 	import PenLine from '@lucide/svelte/icons/pen-line';
 	import Clock from '@lucide/svelte/icons/clock';
@@ -94,6 +96,18 @@
 	// GiseEquipeCard. Vive numa classe única porque é mutuamente exclusivo
 	// entre as equipes/slots renderizados por esta seccional.
 	const estado = new GiseSeccionalEstado();
+
+	/** As delegacias da seccional que ainda não têm quadro nesta escala. */
+	const opcoesNovoSlot = $derived(
+		opcoesDeUnidades(
+			todasUnidades.filter(
+				(d: Unidade) =>
+					d.tipo === 'delegacia' &&
+					d.seccional_id === sec.seccional_id &&
+					!(sec.unidades ?? []).some((s: GiseUnidadeSlot) => s.unidade_id === d.id)
+			)
+		)
+	);
 
 	// `btn-sm` + `py-2` (~40px): o `.btn` cheio inflava o Finalizar acima do
 	// Cancelar e dos pills de download da mesma barra.
@@ -652,16 +666,15 @@
 								class="text-xs font-medium text-surface-600 dark:text-surface-400 block mb-1"
 								>Unidade (opcional — pode deixar em branco)</label
 							>
-							<select
+							<SearchableSelect
 								id="novo-slot-unidade-{sec.id}"
-								bind:value={estado.novoSlotUnidadeId}
-								class="w-full px-2 py-1.5 rounded-xl border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
-							>
-								<option value="">Slot em branco (Adm Seccional preenche depois)</option>
-								{#each todasUnidades.filter((d: Unidade) => d.tipo === 'delegacia' && d.seccional_id === sec.seccional_id && !(sec.unidades ?? []).some((s: GiseUnidadeSlot) => s.unidade_id === d.id)) as d (d.id)}
-									<option value={d.id}>{d.nome}</option>
-								{/each}
-							</select>
+								bind:value={
+									() => (estado.novoSlotUnidadeId === '' ? null : estado.novoSlotUnidadeId),
+									(v) => (estado.novoSlotUnidadeId = v == null ? '' : Number(v))
+								}
+								options={opcoesNovoSlot}
+								opcaoVazia="Slot em branco (Adm Seccional preenche depois)"
+							/>
 						</div>
 						<!-- No mobile os dois botões dividem UMA linha em partes iguais
 						     (`w-full` + `flex-1`); em sm+ voltam à largura natural. -->

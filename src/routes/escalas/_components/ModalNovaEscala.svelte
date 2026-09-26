@@ -37,6 +37,8 @@
 	import type { Unidade } from '$lib/types';
 	import type { ActionResult } from '@sveltejs/kit';
 	import SeletorHoraMinuto from '$lib/components/SeletorHoraMinuto.svelte';
+	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
+	import { opcoesDeUnidades } from '$lib/unidades/opcoes';
 
 	let {
 		open = $bindable(false),
@@ -92,6 +94,8 @@
 	});
 
 	const delegacias = $derived(unidades.filter((u: Unidade) => u.tipo === 'delegacia'));
+	// A escala ainda se liga à unidade pelo NOME (`lotacao`), então a escolha devolve o nome.
+	const opcoesDelegacia = $derived(opcoesDeUnidades(delegacias, { valor: 'nome', maes: unidades }));
 	const unidadeSelecionada = $derived(
 		isAdmin
 			? (delegacias.find((u: Unidade) => u.nome === lotacao) ?? null)
@@ -335,12 +339,11 @@
 				{#if isAdmin}
 					<label class="label mb-4">
 						<span class="label-text font-semibold">Unidade</span>
-						<select class="select" bind:value={lotacao}>
-							<option value="" disabled>Selecione uma unidade...</option>
-							{#each delegacias as del (del.id)}
-								<option value={del.nome}>{del.nome}</option>
-							{/each}
-						</select>
+						<SearchableSelect
+							bind:value={() => lotacao || null, (v) => (lotacao = v == null ? '' : String(v))}
+							options={opcoesDelegacia}
+							ariaLabel="Unidade"
+						/>
 					</label>
 				{/if}
 
