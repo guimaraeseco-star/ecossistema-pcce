@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { FIXTURE } from './global-setup';
 import { autenticarPagina, execD1Local, queryD1Local, expandirMaisFiltros } from './session';
+import { escolherNaCaixa, opcoesDaCaixa } from './caixa-de-escolha';
 
 /**
  * Ano das fixtures = ano CORRENTE, não `2026` fixo.
@@ -9,7 +10,7 @@ import { autenticarPagina, execD1Local, queryD1Local, expandirMaisFiltros } from
  *  - desde o B-1 o painel abre recortado ao ANO CORRENTE no servidor; fixture
  *    de 2026 ficaria fora da janela em 01/jan/2027 e a tela abriria vazia;
  *  - o seletor `#f-ano` oferece só QUATRO anos (`currentYear-3`…`currentYear`),
- *    então `selectOption('2026')` deixaria de existir em 2030.
+ *    então escolher "2026" ali deixaria de ser possível em 2030.
  */
 const ANO = new Date().getFullYear();
 
@@ -184,7 +185,7 @@ async function abrirPainel(page: import('@playwright/test').Page, nome: string) 
 	if (id == null) return false;
 	await page.goto(`/operacoes/produtividade?operacaoId=${id}`);
 	await expandirMaisFiltros(page);
-	await page.locator('#f-ano').selectOption(String(ANO));
+	await escolherNaCaixa(page.locator('#f-ano'), String(ANO));
 	return true;
 }
 
@@ -375,11 +376,11 @@ test('o tipo de lista APOSENTADO não é oferecido para pergunta nova', async ({
 
 	// Nenhuma pergunta deste formulário usa os três, então nenhum aparece. O
 	// genérico "Quantidade + Lista" faz o mesmo e ainda se repete.
-	const seletor = page.locator('select[id^="p-tp-"]').first();
-	await expect(seletor.locator('option[value="mandados_maiores"]')).toHaveCount(0);
-	await expect(seletor.locator('option[value="prisoes_maiores"]')).toHaveCount(0);
-	await expect(seletor.locator('option[value="apreensoes_menores"]')).toHaveCount(0);
-	await expect(seletor.locator('option[value="lista_detalhada"]')).toHaveCount(1);
+	const tipos = await opcoesDaCaixa(page.locator('input[id^="p-tp-"]').first());
+	expect(tipos).not.toContain('Mandados Maiores (legado)');
+	expect(tipos).not.toContain('Prisões Maiores (legado)');
+	expect(tipos).not.toContain('Apreensões Menores (legado)');
+	expect(tipos).toContain('Quantidade + Lista Nome/Procedimento (reutilizável)');
 });
 
 test('desmarcar no editor e salvar tira o card do painel', async ({ page }) => {
@@ -499,7 +500,7 @@ test('o título gravado substitui o enunciado no card do painel', async ({ page 
 
 	await page.goto(`/operacoes/produtividade?operacaoId=${id}`);
 	await expandirMaisFiltros(page);
-	await page.locator('#f-ano').selectOption(String(ANO));
+	await escolherNaCaixa(page.locator('#f-ano'), String(ANO));
 	await expect(page.getByText('Atendimentos do dia', { exact: true })).toBeVisible();
 	await expect(page.getByText('ATENDIMENTOS REALIZADOS')).toHaveCount(0);
 

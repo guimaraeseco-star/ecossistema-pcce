@@ -862,15 +862,17 @@
 							<span class="text-xs font-medium text-surface-700 dark:text-surface-200"
 								>Tipo de diária</span
 							>
-							<select
+							<SearchableSelect
 								name="diaria_tipo"
+								ariaLabel="Tipo de diária"
 								bind:value={diariaTipo}
 								form={idForm}
-								class="select w-full"
-							>
-								<option value="estadual">Estadual</option>
-								<option value="interestadual">Interestadual</option>
-							</select>
+								options={[
+									{ value: 'estadual', label: 'Estadual' },
+									{ value: 'interestadual', label: 'Interestadual' }
+								]}
+								obrigatorio
+							/>
 						</label>
 						<label class="block min-w-[8rem] flex-1 space-y-1">
 							<span class="text-xs font-medium text-surface-700 dark:text-surface-200">

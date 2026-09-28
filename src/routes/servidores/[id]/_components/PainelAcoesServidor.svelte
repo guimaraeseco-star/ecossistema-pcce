@@ -440,24 +440,26 @@
 						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"
 							>Tipo de Afastamento</span
 						>
-						<!-- Por categoria, como na tabela do responsável; as medidas disciplinares
-						     só aparecem para o Admin Geral. Férias não estão aqui (cartão Férias). -->
-						<select
-							class="select py-1 px-3 text-sm"
+						<!-- Por categoria, como na tabela do responsável (a categoria vai
+						     embaixo de cada tipo); as medidas disciplinares só aparecem para
+						     o Admin Geral. Férias não estão aqui (cartão Férias). Sem tipo, o
+						     botão fica bloqueado (`bloqueado`). -->
+						<SearchableSelect
 							name="subtipo"
-							bind:value={subtipo}
+							ariaLabel="Tipo de Afastamento"
+							bind:value={
+								() => subtipo || null, (v) => (subtipo = (v ?? '') as SubtipoAfastamento | '')
+							}
+							options={grupos.flatMap((g) =>
+								g.subtipos.map((s) => ({
+									value: s,
+									label: AFASTAMENTOS[s].rotulo,
+									detalhe: g.rotulo
+								}))
+							)}
+							obrigatorio
 							onchange={aoMudarTipo}
-							required
-						>
-							<option value="" disabled>Selecione o tipo…</option>
-							{#each grupos as g (g.categoria)}
-								<optgroup label={g.rotulo}>
-									{#each g.subtipos as s (s)}
-										<option value={s}>{AFASTAMENTOS[s].rotulo}</option>
-									{/each}
-								</optgroup>
-							{/each}
-						</select>
+						/>
 					</label>
 					<!-- O NUP ao lado do tipo (pedido dele, 20/09): o processo é o fundamento
 					     — sem descrição, PDF ou justificativa à parte. -->

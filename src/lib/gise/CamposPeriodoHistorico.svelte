@@ -11,13 +11,14 @@
 	import {
 		CLASSE_CAMPO_CICLO,
 		CLASSE_CAMPO_FILTRO,
-		CLASSE_ENVOLVE_SELECT_CICLO,
+		CLASSE_ENVOLVE_ANO_CICLO,
+		CLASSE_ENVOLVE_NUMERO_CICLO,
 		CLASSE_INPUT_FILTRO,
+		CLASSE_INPUT_SEARCHABLE,
 		CLASSE_LINHA_CICLO,
-		CLASSE_ROTULO_FILTRO,
-		CLASSE_SELECT_ANO_CICLO,
-		CLASSE_SELECT_NUMERO_CICLO
+		CLASSE_ROTULO_FILTRO
 	} from './filtro-historico-ui';
+	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
 
 	const uid = $props.id();
 	const {
@@ -43,35 +44,37 @@
 		onMesAno: (valor: string) => void;
 		onData: (valor: string) => void;
 	} = $props();
+
+	const opcoesAno = $derived(anosCiclo.map((ano) => ({ value: String(ano), label: String(ano) })));
+	const opcoesCiclo = CICLOS.map((c) => ({ value: String(c.n), label: c.label }));
 </script>
 
 {#if modoPeriodo === 'ciclo'}
 	<div class={CLASSE_CAMPO_CICLO}>
 		<span class={CLASSE_ROTULO_FILTRO}>Ciclo</span>
 		<div class={CLASSE_LINHA_CICLO}>
-			<label class="sr-only" for="{uid}-ano">Ano do ciclo</label>
-			<select
-				id="{uid}-ano"
-				class={CLASSE_SELECT_ANO_CICLO}
-				value={anoCiclo}
-				onchange={(e) => onAnoCiclo(e.currentTarget.value)}
-			>
-				{#each anosCiclo as ano (ano)}
-					<option value={ano}>{ano}</option>
-				{/each}
-			</select>
-			<label class="sr-only" for="{uid}-numero">Número do ciclo</label>
-			<div class={CLASSE_ENVOLVE_SELECT_CICLO}>
-				<select
+			<div class={CLASSE_ENVOLVE_ANO_CICLO}>
+				<SearchableSelect
+					id="{uid}-ano"
+					ariaLabel="Ano do ciclo"
+					class={CLASSE_INPUT_SEARCHABLE}
+					value={String(anoCiclo)}
+					options={opcoesAno}
+					numerica
+					obrigatorio
+					onchange={(v) => onAnoCiclo(String(v))}
+				/>
+			</div>
+			<div class={CLASSE_ENVOLVE_NUMERO_CICLO}>
+				<SearchableSelect
 					id="{uid}-numero"
-					class={CLASSE_SELECT_NUMERO_CICLO}
-					value={numeroCiclo}
-					onchange={(e) => onNumeroCiclo(e.currentTarget.value)}
-				>
-					{#each CICLOS as c (c.n)}
-						<option value={c.n}>{c.label}</option>
-					{/each}
-				</select>
+					ariaLabel="Número do ciclo"
+					class={CLASSE_INPUT_SEARCHABLE}
+					value={String(numeroCiclo)}
+					options={opcoesCiclo}
+					obrigatorio
+					onchange={(v) => onNumeroCiclo(String(v))}
+				/>
 			</div>
 		</div>
 	</div>

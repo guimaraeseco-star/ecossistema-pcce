@@ -26,6 +26,7 @@
 	import { enhance } from '$app/forms';
 	import { loading } from '$lib/loading.svelte';
 	import BotaoVoltar from '$lib/components/BotaoVoltar.svelte';
+	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	// Os limites dos campos de breve relatório: MESMA constante que a action
 	// grava e que o modal de `/operacoes/gise/[id]` usa nos campos equivalentes.
@@ -230,12 +231,13 @@
 					<label for="f_base" class="block text-sm font-medium mb-1 mt-3">
 						Basear o formulário em
 					</label>
-					<select id="f_base" name="basear_em" class={CAMPO}>
-						<option value="">Começar em branco (formulário padrão)</option>
-						{#each baseaveis as op (op.id)}
-							<option value={op.id}>{op.nome}</option>
-						{/each}
-					</select>
+					<SearchableSelect
+						id="f_base"
+						name="basear_em"
+						value={null}
+						options={baseaveis.map((op) => ({ value: op.id, label: op.nome }))}
+						opcaoVazia="Começar em branco (formulário padrão)"
+					/>
 					<p class="text-2xs text-surface-600 dark:text-surface-400 mt-1">
 						Copia as perguntas da operação escolhida para editar a partir delas, em vez de montar o
 						formulário do zero. Só os tipos de equipe marcados acima são copiados.

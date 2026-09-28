@@ -19,6 +19,12 @@
 	import ToggleSwitch from '$lib/components/ToggleSwitch.svelte';
 	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
 	import { opcoesDeUnidades } from '$lib/unidades/opcoes';
+	import {
+		OPCOES_CARGO,
+		OPCOES_PAPEL,
+		OPCOES_REGIME,
+		opcoesDeClasse
+	} from '$lib/servidores/opcoes-cadastro';
 	import { limparTelefone, formatarCPF, limparCPF } from '$lib/utils/formato';
 	import type { Unidade } from '$lib/types';
 	import type { ActionResult } from '@sveltejs/kit';
@@ -225,10 +231,13 @@
 			</label>
 			<label class="label sm:col-span-3">
 				<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1">Cargo</span>
-				<select class="select py-1 px-3 text-sm" name="cargo" bind:value={cargo}>
-					<option value="DPC">DPC - Delegado</option>
-					<option value="OIP">OIP - Investigador</option>
-				</select>
+				<SearchableSelect
+					name="cargo"
+					ariaLabel="Cargo"
+					bind:value={cargo}
+					options={OPCOES_CARGO}
+					obrigatorio
+				/>
 			</label>
 		</div>
 
@@ -278,21 +287,24 @@
 			</label>
 			<label class="label sm:col-span-2">
 				<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1">Classe</span>
-				<select class="select py-1 px-3 text-sm" name="classe" bind:value={classe} required>
-					<option value="" disabled>-</option>
-					{#each classesDisponiveis as c (c)}
-						<option value={c}>{c}</option>
-					{/each}
-				</select>
+				<SearchableSelect
+					name="classe"
+					ariaLabel="Classe"
+					bind:value={() => classe || null, (v) => (classe = v == null ? '' : String(v))}
+					options={opcoesDeClasse(classesDisponiveis, '')}
+					obrigatorio
+				/>
 			</label>
 			<label class="label sm:col-span-3">
 				<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"
 					>Regime de Trabalho</span
 				>
-				<select class="select py-1 px-3 text-sm" bind:value={regime}>
-					<option value="plantao">Plantão</option>
-					<option value="expediente">Expediente</option>
-				</select>
+				<SearchableSelect
+					ariaLabel="Regime de Trabalho"
+					bind:value={regime}
+					options={OPCOES_REGIME}
+					obrigatorio
+				/>
 			</label>
 			<label class="label sm:col-span-4">
 				<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1">Lotação</span>
@@ -389,13 +401,14 @@
 					</p>
 					<label class="label">
 						<span class="label-text text-2xs font-bold opacity-70 ml-1">Papel</span>
-						<select class="select py-1 px-3 text-sm" bind:value={papel}>
-							<option value={null}>Servidor (sem papel)</option>
-							{#if isAdminOrSeccional}
-								<option value="admin_seccional">Admin Seccional</option>
-							{/if}
-							<option value="admin_unidade">Admin Unidade</option>
-						</select>
+						<SearchableSelect
+							ariaLabel="Papel"
+							bind:value={() => papel, (v) => (papel = v == null ? null : String(v))}
+							options={OPCOES_PAPEL.filter(
+								(o) => o.value !== 'admin_seccional' || isAdminOrSeccional
+							)}
+							opcaoVazia="Servidor (sem papel)"
+						/>
 					</label>
 					{#if papel && !(isAdminUnidade && papel === 'admin_unidade')}
 						<label class="label">
@@ -504,7 +517,10 @@
 			type="submit"
 			form={formId}
 			class="btn btn-sm sm:btn-md preset-filled-primary-500 flex items-center justify-center gap-2"
-			disabled={pending || papelSemUnidade || (concederAdminGeral && !moduloEscalas && !moduloGise)}
+			disabled={pending ||
+				!classe ||
+				papelSemUnidade ||
+				(concederAdminGeral && !moduloEscalas && !moduloGise)}
 		>
 			{pending ? 'Cadastrando...' : 'Cadastrar Policial'}
 		</button>

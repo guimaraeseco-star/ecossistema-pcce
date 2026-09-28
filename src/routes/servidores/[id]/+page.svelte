@@ -46,6 +46,13 @@
 	import BotaoVoltar from '$lib/components/BotaoVoltar.svelte';
 	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
 	import { opcoesDeNomesDeUnidades, opcoesDeUnidades } from '$lib/unidades/opcoes';
+	import { opcoesDesignacao } from '$lib/servidores/opcoes-designacao';
+	import {
+		OPCOES_CARGO,
+		OPCOES_PAPEL,
+		OPCOES_REGIME,
+		opcoesDeClasse
+	} from '$lib/servidores/opcoes-cadastro';
 	import { COR_SITUACAO, rotuloAfastamento } from '$lib/servidores/afastamentos';
 	import { formatarData } from '$lib/utils/datas';
 
@@ -82,7 +89,7 @@
 	// A ficha ainda grava a lotação pelo NOME; a escolha devolve o nome.
 	const opcoesLotacao = $derived(opcoesDeNomesDeUnidades(data.lotacoes));
 	let email = $state('');
-	/** Id do catálogo como TEXTO — é o que o `<select>` e o `FormData` trafegam. */
+	/** Id do catálogo como TEXTO — é o que a caixa de escolha e o `FormData` trafegam. */
 	let designacaoId = $state('');
 	/** Devolver a caneta à folha de pessoal (só aparece quando a tela a tomou). */
 	let seguirPlanilha = $state(false);
@@ -285,10 +292,13 @@
 			</label>
 			<label class="label sm:col-span-3">
 				<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1">Cargo</span>
-				<select class="select py-1 px-3 text-sm" name="cargo" bind:value={cargo}>
-					<option value="DPC">DPC - Delegado</option>
-					<option value="OIP">OIP - Investigador</option>
-				</select>
+				<SearchableSelect
+					name="cargo"
+					ariaLabel="Cargo"
+					bind:value={() => cargo || null, (v) => (cargo = v == null ? '' : String(v))}
+					options={OPCOES_CARGO}
+					obrigatorio
+				/>
 			</label>
 			<label class="label sm:col-span-3">
 				<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1">Telefone</span>
@@ -351,29 +361,25 @@
 		<div class="grid grid-cols-1 sm:grid-cols-12 gap-x-2 gap-y-4">
 			<label class="label sm:col-span-2">
 				<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1">Classe</span>
-				<select
-					class="select py-1 px-3 text-sm"
+				<SearchableSelect
 					name="classe"
-					bind:value={classe}
-					required={!solicitando}
-				>
-					<option value="" disabled>-</option>
-					{#each classesDisponiveis as c (c)}
-						<option value={c}>{c}</option>
-					{/each}
-					{#if classe && !classesDisponiveis.includes(classe)}
-						<option value={classe}>{classe} (Atual)</option>
-					{/if}
-				</select>
+					ariaLabel="Classe"
+					bind:value={() => classe || null, (v) => (classe = v == null ? '' : String(v))}
+					options={opcoesDeClasse(classesDisponiveis, classe)}
+					obrigatorio={!solicitando}
+				/>
 			</label>
 			<label class="label sm:col-span-3">
 				<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1"
 					>Regime de Trabalho</span
 				>
-				<select class="select py-1 px-3 text-sm" name="regime" bind:value={regime}>
-					<option value="plantao">Plantão</option>
-					<option value="expediente">Expediente</option>
-				</select>
+				<SearchableSelect
+					name="regime"
+					ariaLabel="Regime de Trabalho"
+					bind:value={() => regime || null, (v) => (regime = v == null ? '' : String(v))}
+					options={OPCOES_REGIME}
+					obrigatorio
+				/>
 			</label>
 			<!-- Designação = a FUNÇÃO exercida (catálogo `designacoes`). O Admin
 			     Geral troca direto; o administrador de seccional/unidade PROPÕE, e
@@ -387,14 +393,18 @@
 						<span class="normal-case font-normal opacity-70">· {designacaoDaTela}</span>
 					{/if}
 				</span>
-				<select class="select py-1 px-3 text-sm" name="designacao_id" bind:value={designacaoId}>
-					<!-- No modo solicitação "sem designação" não é pedido: campo vazio
-					     quer dizer "não quero mudar isto", a mesma convenção dos demais. -->
-					<option value="" disabled={solicitando}>— Sem designação —</option>
-					{#each data.designacoes as d (d.id)}
-						<option value={String(d.id)}>{d.nome}{d.simbolo ? ` (${d.simbolo})` : ''}</option>
-					{/each}
-				</select>
+				<!-- No modo solicitação "sem designação" não é pedido: campo vazio
+				     quer dizer "não quero mudar isto", a mesma convenção dos demais —
+				     por isso a opção "— Sem designação —" só existe no modo direto. -->
+				<SearchableSelect
+					name="designacao_id"
+					ariaLabel="Designação"
+					bind:value={
+						() => designacaoId || null, (v) => (designacaoId = v == null ? '' : String(v))
+					}
+					options={opcoesDesignacao(data.designacoes)}
+					opcaoVazia={solicitando ? undefined : '— Sem designação —'}
+				/>
 			</label>
 			<!-- A VOLTA. Sem ela, o primeiro salvamento tirava o servidor da folha
 			     para sempre neste campo, e só o banco o devolveria. -->
@@ -563,11 +573,13 @@
 				<div class="grid grid-cols-1 sm:grid-cols-12 gap-x-2 gap-y-4">
 					<label class="label sm:col-span-5">
 						<span class="label-text text-2xs font-bold uppercase opacity-70 ml-1">Papel</span>
-						<select class="select py-1 px-3 text-sm" name="papel" bind:value={papel}>
-							<option value={null}>Servidor (sem papel)</option>
-							<option value="admin_seccional">Admin Seccional</option>
-							<option value="admin_unidade">Admin Unidade</option>
-						</select>
+						<SearchableSelect
+							name="papel"
+							ariaLabel="Papel"
+							bind:value={() => papel, (v) => (papel = v == null ? null : String(v))}
+							options={OPCOES_PAPEL}
+							opcaoVazia="Servidor (sem papel)"
+						/>
 					</label>
 					{#if papel}
 						<label class="label sm:col-span-7">

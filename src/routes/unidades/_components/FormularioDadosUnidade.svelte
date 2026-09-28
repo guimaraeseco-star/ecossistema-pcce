@@ -24,6 +24,7 @@
 	import { TIPOS_UNIDADE } from '$lib/unidades/tipos';
 	import type { Unidade } from '$lib/types';
 	import RecusaDaEstrutura from './RecusaDaEstrutura.svelte';
+	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
 
 	const { unidade, onSalvo }: { unidade: Unidade; onSalvo?: () => void } = $props();
 
@@ -114,11 +115,13 @@
 	<div class="grid gap-3 sm:grid-cols-2">
 		<label class="label">
 			<span class={ROTULO}>Tipo</span>
-			<select class="select text-sm" name="tipo" bind:value={tipo}>
-				{#each TIPOS_UNIDADE as t (t.valor)}
-					<option value={t.valor}>{t.rotulo}</option>
-				{/each}
-			</select>
+			<SearchableSelect
+				name="tipo"
+				ariaLabel="Tipo"
+				bind:value={tipo}
+				options={TIPOS_UNIDADE.map((t) => ({ value: t.valor, label: t.rotulo }))}
+				obrigatorio
+			/>
 		</label>
 		<label class="label">
 			<span class={ROTULO}>Cidade</span>

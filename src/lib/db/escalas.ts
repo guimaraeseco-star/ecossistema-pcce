@@ -138,7 +138,10 @@ export async function listarEscalas(
 	}
 
 	if (opts?.lotacaoBusca) {
-		conditions.push(likeContains(escalas.lotacao, opts.lotacaoBusca.trim()));
+		// Busca por partes, a régua de toda busca por nome (E70/E76): "jua nor"
+		// acha a delegacia de Juazeiro do Norte. Era um LIKE com o texto inteiro.
+		const porPartes = buscaPorPartes([escalas.lotacao], opts.lotacaoBusca);
+		if (porPartes) conditions.push(porPartes);
 	}
 
 	if (opts?.dataBusca) {

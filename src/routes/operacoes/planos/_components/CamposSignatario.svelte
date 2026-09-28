@@ -18,8 +18,9 @@
 	 *
 	 * O nome sai do cadastro (mesma busca do coordenador) e vai CONGELADO no
 	 * plano — renomear o servidor depois não altera documento emitido. O cargo é
-	 * `<select>` porque vai impresso sob a assinatura: campo livre coloca um erro
-	 * de digitação no papel, e ninguém revisa o rodapé de um PDF.
+	 * lista FECHADA (a caixa de busca só escolhe entre as opções) porque vai
+	 * impresso sob a assinatura: campo livre coloca um erro de digitação no
+	 * papel, e ninguém revisa o rodapé de um PDF.
 	 */
 	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
 	import { buscarCoordenadores, MIN_BUSCA } from './buscas';
@@ -63,12 +64,14 @@
 		{/if}
 	</div>
 
-	<label class="block space-y-1">
-		<span class="text-sm font-medium text-surface-700 dark:text-surface-200">Cargo</span>
-		<select name="diretor_cargo" bind:value={cargo} class="select w-full">
-			{#each cargos as opcao (opcao)}
-				<option value={opcao}>{opcao}</option>
-			{/each}
-		</select>
-	</label>
+	<div class="space-y-1">
+		<span class="block text-sm font-medium text-surface-700 dark:text-surface-200">Cargo</span>
+		<SearchableSelect
+			name="diretor_cargo"
+			ariaLabel="Cargo"
+			bind:value={() => cargo || null, (v) => (cargo = v == null ? '' : String(v))}
+			options={cargos.map((opcao) => ({ value: opcao, label: opcao }))}
+			obrigatorio
+		/>
+	</div>
 </div>

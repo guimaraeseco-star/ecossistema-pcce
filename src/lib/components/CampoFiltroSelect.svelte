@@ -6,11 +6,15 @@
 	 *
 	 * Rótulo e tamanho do input seguem a caixa de `/operacoes/produtividade` (`text-3xs` /
 	 * `text-xs`), via tokens em `$lib/gise/filtro-historico-ui`.
+	 *
+	 * `opcaoVazia` é o "Todas" do filtro como PRIMEIRA opção da lista (E76,
+	 * etapa 2) — antes ele era só o texto de fundo do campo vazio, e voltar a
+	 * ver tudo exigia achar o X.
 	 */
 	import SearchableSelect from './SearchableSelect.svelte';
 	import { CLASSE_INPUT_SEARCHABLE, CLASSE_ROTULO_FILTRO } from '$lib/gise/filtro-historico-ui';
 
-	type Option = { value: unknown; label: string };
+	type Option = { value: unknown; label: string; detalhe?: string };
 
 	let {
 		label,
@@ -18,7 +22,9 @@
 		options,
 		value = $bindable<unknown>(null),
 		ariaLabel,
-		placeholder = 'Selecione...'
+		placeholder = undefined,
+		opcaoVazia = undefined,
+		numerica = false
 	}: {
 		label: string;
 		/** Classe(s) de largura no breakpoint lg, ex.: "lg:w-36". */
@@ -27,6 +33,10 @@
 		value: unknown;
 		ariaLabel: string;
 		placeholder?: string;
+		/** O "Todas"/"Todos" do filtro, como primeira opção da lista. */
+		opcaoVazia?: string;
+		/** Lista de números (o ano): o aviso pede o número. */
+		numerica?: boolean;
 	} = $props();
 </script>
 
@@ -37,6 +47,8 @@
 		bind:value
 		{ariaLabel}
 		{placeholder}
+		{opcaoVazia}
+		{numerica}
 		class={CLASSE_INPUT_SEARCHABLE}
 	/>
 </div>

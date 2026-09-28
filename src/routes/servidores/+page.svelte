@@ -74,6 +74,7 @@
 	} from '$lib/gise/filtro-historico-ui';
 	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
 	import { opcoesDeUnidades } from '$lib/unidades/opcoes';
+	import { opcoesDesignacao } from '$lib/servidores/opcoes-designacao';
 	import { SEM_LOTACAO, TODAS_UNIDADES } from './filtro-lotacao';
 
 	const { data }: PageProps = $props();
@@ -426,16 +427,16 @@
 			     unidade precisa da mesma pergunta dentro do escopo dele. -->
 			<label class="flex flex-col gap-1.5 flex-1 min-w-[240px] lg:max-w-xs">
 				<span class={CLASSE_ROTULO_FILTRO}>Designação</span>
-				<select
-					class="{CLASSE_INPUT_FILTRO} w-full"
-					bind:value={filtroDesignacao}
+				<SearchableSelect
+					class="w-full {CLASSE_INPUT_SEARCHABLE}"
+					ariaLabel="Designação"
+					bind:value={
+						() => filtroDesignacao || null, (v) => (filtroDesignacao = v == null ? '' : String(v))
+					}
+					options={opcoesDesignacao(designacoes)}
+					opcaoVazia="Todas as designações"
 					onchange={navegarComFiltros}
-				>
-					<option value="">Todas as designações</option>
-					{#each designacoes as d (d.id)}
-						<option value={String(d.id)}>{d.nome}{d.simbolo ? ` (${d.simbolo})` : ''}</option>
-					{/each}
-				</select>
+				/>
 			</label>
 
 			{#if isAdmin}

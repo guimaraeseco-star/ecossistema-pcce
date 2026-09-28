@@ -31,6 +31,7 @@
 	import { LABEL_SUBTIPO_AFASTAMENTO } from '$lib/schemas/policial-historico';
 	import { AFASTAMENTOS, PORTARIA_39, SUBTIPOS_CADASTRAVEIS } from '$lib/servidores/afastamentos';
 	import Paginador from '$lib/components/Paginador.svelte';
+	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
 	import ArrowRightLeft from '@lucide/svelte/icons/arrow-right-left';
 	import CalendarOff from '@lucide/svelte/icons/calendar-off';
 	import UserMinus from '@lucide/svelte/icons/user-minus';
@@ -330,15 +331,16 @@
 										<input type="hidden" name="historico_id" value={ev.id} />
 										<label class="label col-span-2">
 											<span class="label-text text-2xs font-bold uppercase opacity-70">Tipo</span>
-											<select
-												class="select px-2 py-1 text-xs"
+											<SearchableSelect
 												name="subtipo"
+												ariaLabel="Tipo"
 												value={ev.subtipo ?? 'outros'}
-											>
-												{#each SUBTIPOS_CADASTRAVEIS as s (s)}
-													<option value={s}>{AFASTAMENTOS[s].rotulo}</option>
-												{/each}
-											</select>
+												options={SUBTIPOS_CADASTRAVEIS.map((s) => ({
+													value: s,
+													label: AFASTAMENTOS[s].rotulo
+												}))}
+												obrigatorio
+											/>
 										</label>
 										<label class="label">
 											<span class="label-text text-2xs font-bold uppercase opacity-70">Início</span>
@@ -374,15 +376,16 @@
 											<span class="label-text text-2xs font-bold uppercase opacity-70"
 												>CID (LTS)</span
 											>
-											<select
-												class="select px-2 py-1 text-xs"
+											<SearchableSelect
 												name="tipo_cid"
-												value={ev.tipo_cid ?? ''}
-											>
-												<option value="">—</option>
-												<option value="CID-Outras">CID-Outras</option>
-												<option value="CID-F">CID-F</option>
-											</select>
+												ariaLabel="CID (LTS)"
+												value={ev.tipo_cid || null}
+												options={[
+													{ value: 'CID-Outras', label: 'CID-Outras' },
+													{ value: 'CID-F', label: 'CID-F' }
+												]}
+												opcaoVazia="—"
+											/>
 										</label>
 										<label class="label col-span-2 sm:col-span-4">
 											<span class="label-text text-2xs font-bold uppercase opacity-70">Motivo</span>

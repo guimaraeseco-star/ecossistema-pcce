@@ -7,6 +7,7 @@ import {
 	queryD1Local,
 	seedSession
 } from './session';
+import { escolherNaCaixa, opcoesDaCaixa } from './caixa-de-escolha';
 
 /**
  * A metade mais consequente do fluxo de solicitação: o AFASTAMENTO pedido pela
@@ -97,12 +98,11 @@ test('admin de unidade PEDE o afastamento — nada entra no histórico', async (
 	await page.getByRole('button', { name: /Afastamento/ }).click();
 	const modal = page.getByRole('dialog').filter({ hasText: 'Registrar Afastamento' });
 	// Abre SEM tipo: "Selecione o tipo…" é a primeira coisa que o usuário vê.
-	await expect(modal.locator('select[name="subtipo"]')).toHaveValue('');
+	await expect(modal.locator('input[type="hidden"][name="subtipo"]')).toHaveValue('');
 	// Férias não estão na lista: entram pelo cartão Férias.
-	await expect(modal.locator('select[name="subtipo"] option', { hasText: 'Férias' })).toHaveCount(
-		0
-	);
-	await modal.locator('select[name="subtipo"]').selectOption('lts');
+	const tipo = modal.getByRole('combobox', { name: 'Tipo de Afastamento' });
+	expect((await opcoesDaCaixa(tipo)).some((t) => t.includes('Férias'))).toBe(false);
+	await escolherNaCaixa(tipo, 'Tratamento de saúde (LTS ordinária)');
 	// LTS pede o CID; CID-F abre a Portaria 39 na hora, para quem cadastra.
 	await modal.getByLabel(/CID-F/).check();
 	await expect(modal.getByRole('alert')).toContainText('Portaria nº 39/2026');

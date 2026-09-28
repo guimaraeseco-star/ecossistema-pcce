@@ -33,9 +33,15 @@
 		datasPlantaoParaJson,
 		tratarResultadoAdicionarPlantao
 	} from './plantao-datas';
+	import CampoTipoDeEscala from './CampoTipoDeEscala.svelte';
 	import type { ActionResult } from '@sveltejs/kit';
 	import type { Escala } from '$lib/server/schema';
 	import type { EscalaPolicialComDados } from '$lib/types';
+
+	const OPCOES_CARGO = [
+		{ value: 'DPC', label: 'DPC' },
+		{ value: 'OIP', label: 'OIP' }
+	];
 
 	const {
 		escala,
@@ -197,17 +203,14 @@
 {#snippet camposCargoServidor(colSpanServidor: string)}
 	<label class="label sm:col-span-1">
 		<span class="label-text">Cargo</span>
-		<select
-			class="select h-9 py-0 px-2"
-			bind:value={cargoBusca}
+		<SearchableSelect
+			ariaLabel="Cargo"
+			bind:value={() => cargoBusca || null, (v) => (cargoBusca = (v ?? '') as 'DPC' | 'OIP' | '')}
+			options={OPCOES_CARGO}
 			onchange={() => {
 				policialId = '';
 			}}
-		>
-			<option value="">...</option>
-			<option value="DPC">DPC</option>
-			<option value="OIP">OIP</option>
-		</select>
+		/>
 	</label>
 	<label class="label {colSpanServidor} self-center">
 		<span class="label-text">Servidor</span>
@@ -291,9 +294,13 @@
 							<div class="grid grid-cols-1 sm:grid-cols-12 gap-4 mb-4 items-end">
 								<label class="label sm:col-span-2">
 									<span class="label-text">Equipe</span>
-									<select class="select h-9 py-0 px-2" name="equipe" bind:value={addEquipe}>
-										{#each equipesDisponiveis as n (n)}<option value={n}>Equipe {n}</option>{/each}
-									</select>
+									<SearchableSelect
+										name="equipe"
+										ariaLabel="Equipe"
+										bind:value={addEquipe}
+										options={equipesDisponiveis.map((n) => ({ value: n, label: `Equipe ${n}` }))}
+										obrigatorio
+									/>
 								</label>
 								<label class="label sm:col-span-4">
 									<span class="label-text">DPC Chefe</span>
@@ -307,13 +314,7 @@
 										/>
 									{/key}
 								</label>
-								<label class="label sm:col-span-2">
-									<span class="label-text">Tipo de Escala</span>
-									<select class="select h-9 py-0 px-2" bind:value={addTipoEscala}>
-										<option value="1x3">1×3</option>
-										<option value="2x6">2×6</option>
-									</select>
-								</label>
+								<CampoTipoDeEscala bind:value={addTipoEscala} />
 								<div class="sm:col-span-2">
 									<span class="label-text block text-sm mb-1">1º dia (DPC)</span>
 									<div class="flex items-center gap-1 h-9">
@@ -390,16 +391,13 @@
 					{@render camposCargoServidor('sm:col-span-3')}
 					<label class="label sm:col-span-2">
 						<span class="label-text">Data</span>
-						<select
+						<SearchableSelect
 							name="data_plantao"
-							class="select h-9 py-0 px-2"
+							ariaLabel="Data"
 							bind:value={dataPlantao}
-							required
-						>
-							{#each diasEscalaLocal as d (d)}
-								<option value={d}>{formatarData(d)}</option>
-							{/each}
-						</select>
+							options={diasEscalaLocal.map((d) => ({ value: d, label: formatarData(d) }))}
+							obrigatorio
+						/>
 					</label>
 					<div class="sm:col-span-2">
 						<span class="label-text text-xs">Entrada</span>

@@ -37,7 +37,9 @@
 	 *   e com acento.
 	 * - O aviso "Digite um nome ou partes dele" aparece em toda caixa: a lupa
 	 *   no campo, o texto do campo vazio e a primeira linha da lista aberta —
-	 *   esta última continua lá quando o campo já mostra uma escolha.
+	 *   esta última continua lá quando o campo já mostra uma escolha. Nas
+	 *   listas de números (`numerica`: hora, quantidade, ano) o aviso é
+	 *   "Digite o número".
 	 * - `detalhe` (opcional) é o segundo texto da opção — o nome da mãe, numa
 	 *   lista de unidades. Aparece embaixo do nome E entra na busca: "fortim
 	 *   aracati" acha o posto de Fortim.
@@ -48,6 +50,11 @@
 	 * - `onchange` avisa depois que a escolha já está no campo escondido, e
 	 *   entrega o próprio campo — as telas que enviam o formulário ao escolher
 	 *   fazem `campo.form?.requestSubmit()`, como faziam com o `<select>`.
+	 * - `obrigatorio` tira o X de limpar: é a única porta para esvaziar a
+	 *   escolha (apagar o texto e sair do campo devolve a escolha anterior), e
+	 *   listas como cargo e regime não têm "nenhum" válido (E76, etapa 2).
+	 * - `compacto` é para células estreitas (hora e minuto): sem lupa nem seta
+	 *   no campo; o aviso continua na primeira linha da lista aberta.
 	 */
 	import { tick } from 'svelte';
 	import {
@@ -66,6 +73,12 @@
 
 	/** O aviso que toda caixa mostra (decisão dele em 26/09). */
 	const AVISO_DE_BUSCA = 'Digite um nome ou partes dele';
+	/**
+	 * O aviso das listas de NÚMEROS — hora, minuto, quantidade, ano, prefixo
+	 * ordinal —, onde "um nome" não faz sentido (decisão dele em 28/09: "mude
+	 * somente nesses casos").
+	 */
+	const AVISO_DE_NUMERO = 'Digite o número';
 
 	/**
 	 * O valor interno da opção vazia. A lista do Skeleton trabalha com texto e
@@ -82,9 +95,13 @@
 		minSearchChars = 0,
 		showTrigger = true,
 		value = $bindable<unknown>(null),
-		placeholder = AVISO_DE_BUSCA,
+		placeholder = undefined,
+		numerica = false,
 		opcaoVazia = undefined,
 		onchange = undefined,
+		obrigatorio = false,
+		compacto = false,
+		form = undefined,
 		id = '',
 		ariaLabel = '',
 		name = '',
@@ -99,10 +116,18 @@
 		showTrigger?: boolean;
 		value: unknown;
 		placeholder?: string;
+		/** Lista de números (hora, quantidade, ano): o aviso pede o número, não um nome. */
+		numerica?: boolean;
 		/** Rótulo do vazio com sentido próprio; vira a primeira opção da lista. */
 		opcaoVazia?: string;
 		/** Chamado depois que a pessoa escolhe, com o campo escondido já atualizado. */
 		onchange?: (value: unknown, campo: HTMLInputElement) => void;
+		/** Sem o X de limpar: a escolha não pode voltar a ficar vazia. */
+		obrigatorio?: boolean;
+		/** Para células estreitas (hora, minuto): sem lupa nem seta no campo, letra menor. */
+		compacto?: boolean;
+		/** Id do formulário, quando a caixa fica fora dele (o atributo `form` do HTML). */
+		form?: string;
 		id?: string;
 		ariaLabel?: string;
 		name?: string;
@@ -111,6 +136,10 @@
 	} = $props();
 
 	const isAsync = $derived(typeof loadOptions === 'function');
+
+	const aviso = $derived(numerica ? AVISO_DE_NUMERO : AVISO_DE_BUSCA);
+	/** O texto do campo vazio: o que a tela pediu ou, sem pedido, o aviso. */
+	const textoDoCampoVazio = $derived(placeholder ?? aviso);
 
 	function isValueEmpty(v: unknown): boolean {
 		return v === null || v === undefined || v === '';
@@ -217,12 +246,13 @@
 		type="hidden"
 		bind:this={campoEscondido}
 		{name}
+		{form}
 		value={isValueEmpty(value) ? '' : String(value)}
 	/>
 	<Combobox
 		value={comboboxValue}
 		{collection}
-		{placeholder}
+		placeholder={textoDoCampoVazio}
 		{disabled}
 		{onValueChange}
 		{onOpenChange}
@@ -235,15 +265,21 @@
 				? 'opacity-60 cursor-not-allowed'
 				: ''}"
 		>
-			<!-- A lupa diz, antes de qualquer clique, que aqui se digita para achar. -->
-			<Search class="ml-2.5 h-3.5 w-3.5 shrink-0 text-surface-400" aria-hidden="true" />
+			<!-- A lupa diz, antes de qualquer clique, que aqui se digita para achar.
+			     No modo compacto (hora e minuto, em células de 3 cm) não cabe: o
+			     aviso fica só na primeira linha da lista aberta. -->
+			{#if !compacto}
+				<Search class="ml-2.5 h-3.5 w-3.5 shrink-0 text-surface-400" aria-hidden="true" />
+			{/if}
 			<Combobox.Input
 				id={id || undefined}
 				aria-label={ariaLabel || undefined}
 				onfocus={selecionarAoEntrar}
-				class="flex-1 min-w-0 !m-0 !min-h-0 !rounded-none !border-0 !bg-transparent !pl-2 !pr-3 !py-1.5 !shadow-none !ring-0 text-sm text-surface-900 dark:text-surface-50 placeholder:text-surface-400 focus:!outline-none focus:!ring-0 disabled:cursor-not-allowed"
+				class="flex-1 min-w-0 !m-0 !min-h-0 !rounded-none !border-0 !bg-transparent {compacto
+					? '!px-1.5 !py-1 text-xs'
+					: '!pl-2 !pr-3 !py-1.5 text-sm'} !shadow-none !ring-0 text-surface-900 dark:text-surface-50 placeholder:text-surface-400 focus:!outline-none focus:!ring-0 disabled:cursor-not-allowed"
 			/>
-			{#if !isValueEmpty(value)}
+			{#if !isValueEmpty(value) && !obrigatorio}
 				<Combobox.ClearTrigger
 					aria-label="Limpar seleção"
 					class="flex !h-6 !w-6 !min-h-0 !min-w-0 shrink-0 items-center justify-center !rounded-full !border-0 !bg-transparent !p-0 !shadow-none text-surface-400 transition-colors hover:!bg-error-500/15 hover:!text-error-600 dark:hover:!text-error-400"
@@ -251,7 +287,7 @@
 					<X class="h-3.5 w-3.5" aria-hidden="true" />
 				</Combobox.ClearTrigger>
 			{/if}
-			{#if showTrigger}
+			{#if showTrigger && !compacto}
 				<Combobox.Trigger
 					class="!static !inset-auto mr-1 flex !h-6 !w-6 !min-h-0 !min-w-0 shrink-0 items-center justify-center !rounded-md !border-0 !bg-transparent !p-0 !shadow-none text-surface-400 transition-colors hover:text-surface-600 dark:hover:text-surface-300 [&_svg]:h-3.5 [&_svg]:w-3.5"
 				/>
@@ -268,7 +304,7 @@
 						aria-hidden="true"
 					>
 						<Search class="h-3 w-3 shrink-0" />
-						{AVISO_DE_BUSCA}
+						{aviso}
 					</div>
 					{#if busca.buscando}
 						<div

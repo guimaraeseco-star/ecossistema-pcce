@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { FIXTURE } from './global-setup';
 import { autenticarPagina, execD1Local, queryD1Local, expandirMaisFiltros } from './session';
+import { escolherNaCaixa } from './caixa-de-escolha';
 
 /**
  * Ano das fixtures = ano CORRENTE, não `2026` fixo.
@@ -9,7 +10,7 @@ import { autenticarPagina, execD1Local, queryD1Local, expandirMaisFiltros } from
  *  - desde o B-1 o painel abre recortado ao ANO CORRENTE no servidor; fixture
  *    de 2026 ficaria fora da janela em 01/jan/2027 e a tela abriria vazia;
  *  - o seletor `#f-ano` oferece só QUATRO anos (`currentYear-3`…`currentYear`),
- *    então `selectOption('2026')` deixaria de existir em 2030.
+ *    então escolher "2026" ali deixaria de ser possível em 2030.
  */
 const ANO = new Date().getFullYear();
 
@@ -166,7 +167,7 @@ test('trocar o eixo não muda o total, só a quebra', async ({ page }) => {
 
 	await page.goto(`/operacoes/produtividade?operacaoId=${id}`);
 	await expandirMaisFiltros(page);
-	await page.locator('#f-ano').selectOption(String(ANO));
+	await escolherNaCaixa(page.locator('#f-ano'), String(ANO));
 
 	// Seccionais (padrão): tudo numa linha só, com o total do período.
 	await expect(page.getByText(C.seccional.nome.split(' do ')[0]).first()).toBeVisible();
@@ -190,7 +191,7 @@ test('a equipe sem slot aparece como linha própria no modo Delegacias', async (
 
 	await page.goto(`/operacoes/produtividade?operacaoId=${id}`);
 	await expandirMaisFiltros(page);
-	await page.locator('#f-ano').selectOption(String(ANO));
+	await escolherNaCaixa(page.locator('#f-ano'), String(ANO));
 	await page.getByRole('button', { name: 'Delegacias', exact: true }).click();
 
 	const card = page.locator('.card').filter({ hasText: 'Ranking' }).first();
@@ -211,7 +212,7 @@ test('ordem e quantidade recortam o ranking', async ({ page }) => {
 
 	await page.goto(`/operacoes/produtividade?operacaoId=${id}`);
 	await expandirMaisFiltros(page);
-	await page.locator('#f-ano').selectOption(String(ANO));
+	await escolherNaCaixa(page.locator('#f-ano'), String(ANO));
 	await page.getByRole('button', { name: 'Delegacias', exact: true }).click();
 
 	// Melhores primeiro (padrão): o maior no topo.
@@ -219,12 +220,12 @@ test('ordem e quantidade recortam o ranking', async ({ page }) => {
 	expect(melhores[0]).toBe(5);
 
 	// Piores primeiro: inverte.
-	await page.locator('#f-ordem').selectOption('piores');
+	await escolherNaCaixa(page.locator('#f-ordem'), 'Piores primeiro');
 	const piores = await totaisDoRanking(page);
 	expect(piores[0]).toBeLessThanOrEqual(piores[piores.length - 1]);
 
 	// Top 5 sobre três unidades não corta nada; o controle existe e é aceito.
-	await page.locator('#f-qtd').selectOption('5');
+	await escolherNaCaixa(page.locator('#f-qtd'), '5 unidades');
 	expect((await totaisDoRanking(page)).length).toBeLessThanOrEqual(5);
 });
 

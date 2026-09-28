@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { FIXTURE } from './global-setup';
 import { autenticarPagina, execD1Local, queryD1Local } from './session';
+import { escolherNaCaixa } from './caixa-de-escolha';
 
 /**
  * O tipo de pergunta `proporcao` — "total existente + parte atendida", a meta de
@@ -172,11 +173,11 @@ test('editor: trocar o tipo de meta reconstrói o objeto, sem deixar objetivo pe
 	await expect(page.getByRole('heading', { name: 'Configurar Formulário' })).toBeVisible();
 
 	// Cobertura → percentual: o Objetivo REAPARECE.
-	await page.locator('#ind-tipo-1').selectOption('percentual');
+	await escolherNaCaixa(page.locator('#ind-tipo-1'), 'Percentual sobre o valor inicial');
 	await expect(page.locator('#ind-obj-1')).toBeVisible();
 
 	// E de volta: some outra vez.
-	await page.locator('#ind-tipo-1').selectOption('proporcao');
+	await escolherNaCaixa(page.locator('#ind-tipo-1'), 'Cobertura — % do total atendido');
 	await expect(page.locator('#ind-obj-1')).toHaveCount(0);
 
 	await page

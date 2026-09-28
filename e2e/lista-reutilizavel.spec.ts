@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { FIXTURE } from './global-setup';
 import { autenticarPagina, execD1Local, queryD1Local } from './session';
+import { escolherNaCaixa } from './caixa-de-escolha';
 
 /**
  * O tipo de pergunta `lista_detalhada` — "quantidade + lista de nome e
@@ -97,7 +98,7 @@ test('tipo reutilizável: quantidade + detalhamento, e duas perguntas não se mi
 	await expect(cartao1.getByPlaceholder('Nome Completo')).toHaveValue('Fulano');
 
 	// Quantidade 2 na primeira → dois blocos de item.
-	await cartao1.locator('select').first().selectOption('2');
+	await escolherNaCaixa(cartao1.getByRole('combobox').first(), '2');
 	await expect(cartao1.getByPlaceholder('Nome Completo')).toHaveCount(2);
 
 	await page.getByRole('button', { name: 'Finalizar entrega' }).click();

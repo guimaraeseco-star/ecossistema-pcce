@@ -65,9 +65,11 @@
 	import {
 		CLASSE_CAIXA_FILTRO_CROMO,
 		CLASSE_INPUT_FILTRO,
+		CLASSE_INPUT_SEARCHABLE,
 		CLASSE_ROTULO_FILTRO,
 		CLASSE_TITULO_FILTRO
 	} from '$lib/gise/filtro-historico-ui';
+	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
 
 	const { data }: PageProps = $props();
 	const p = useProdutividade(() => data);
@@ -84,10 +86,10 @@
 		(secao, de, para) => p.moverCard(secao, de, para)
 	);
 
-	// Rótulo, campo e segmento: constantes em vez de string repetida. Era assim
-	// que o "Tipo de equipe" e a "Seccional" já divergiam em padding entre si.
+	// Rótulo e segmento: constantes em vez de string repetida. Era assim que o
+	// "Tipo de equipe" e a "Seccional" já divergiam em padding entre si. As
+	// listas de escolha são caixas de busca (E76) com `CLASSE_INPUT_SEARCHABLE`.
 	const ROTULO = `${CLASSE_ROTULO_FILTRO} block`;
-	const CAMPO = `${CLASSE_INPUT_FILTRO} w-full`;
 	const SEGMENTO = 'flex-1 rounded-lg py-1.5 text-xs font-bold transition-colors';
 	const SEG_ON = 'bg-white dark:bg-surface-700 shadow text-primary-600';
 	const SEG_OFF = 'text-surface-600 dark:text-surface-400';
@@ -191,21 +193,24 @@
 								     os modelos, e o rascunho do arraste passaria a valer para cards
 								     de outra operação. Impedir a troca perde menos que avisar
 								     depois da perda. -->
-								<select
-									id="f-op"
-									value={p.data.operacaoSelecionadaId ?? ''}
-									disabled={p.organizando}
+								<div
 									title={p.organizando
 										? 'Salve ou saia da organização do painel antes de trocar de operação'
 										: undefined}
-									onchange={(e) =>
-										goto(`/operacoes/produtividade?operacaoId=${e.currentTarget.value}`)}
-									class="{CAMPO} disabled:opacity-50 disabled:cursor-not-allowed"
 								>
-									{#each p.data.operacoes ?? [] as op (op.id)}
-										<option value={op.id}>{op.nome}</option>
-									{/each}
-								</select>
+									<SearchableSelect
+										id="f-op"
+										class={CLASSE_INPUT_SEARCHABLE}
+										value={p.data.operacaoSelecionadaId ?? null}
+										disabled={p.organizando}
+										options={(p.data.operacoes ?? []).map((op) => ({
+											value: op.id,
+											label: op.nome
+										}))}
+										obrigatorio
+										onchange={(v) => goto(`/operacoes/produtividade?operacaoId=${v}`)}
+									/>
+								</div>
 							</div>
 						{/if}
 
@@ -298,42 +303,48 @@
 									     o rótulo longo quebrava em três linhas, e as opções ("5 unidades",
 									     "10 unidades") já dizem de que quantidade se trata. -->
 									<label for="f-qtd" class={ROTULO}>Quantidade</label>
-									<select
+									<SearchableSelect
 										id="f-qtd"
+										class={CLASSE_INPUT_SEARCHABLE}
 										value={String(p.quantidade)}
-										onchange={(e) =>
-											(p.quantidade =
-												e.currentTarget.value === 'todas'
-													? 'todas'
-													: (Number(e.currentTarget.value) as 5 | 10))}
-										class={CAMPO}
-									>
-										<option value="5">5 unidades</option>
-										<option value="10">10 unidades</option>
-										<option value="todas">Todas</option>
-									</select>
+										options={[
+											{ value: '5', label: '5 unidades' },
+											{ value: '10', label: '10 unidades' },
+											{ value: 'todas', label: 'Todas' }
+										]}
+										obrigatorio
+										onchange={(v) =>
+											(p.quantidade = v === 'todas' ? 'todas' : (Number(v) as 5 | 10))}
+									/>
 								</div>
 
 								<div class="space-y-1.5">
 									<label for="f-ordem" class={ROTULO}>Ordem</label>
-									<select id="f-ordem" bind:value={p.ordem} class={CAMPO}>
-										<option value="melhores">Melhores primeiro</option>
-										<option value="piores">Piores primeiro</option>
-									</select>
+									<SearchableSelect
+										id="f-ordem"
+										class={CLASSE_INPUT_SEARCHABLE}
+										bind:value={p.ordem}
+										options={[
+											{ value: 'melhores', label: 'Melhores primeiro' },
+											{ value: 'piores', label: 'Piores primeiro' }
+										]}
+										obrigatorio
+									/>
 								</div>
 								<div class="space-y-1.5">
 									<label for="f-ano" class={ROTULO}>Período</label>
 									<div class="flex flex-wrap lg:flex-nowrap items-end gap-2">
-										<select
+										<SearchableSelect
 											id="f-ano"
+											class="w-full lg:w-44 {CLASSE_INPUT_SEARCHABLE}"
 											bind:value={p.filterAno}
-											class="{CLASSE_INPUT_FILTRO} w-full lg:w-auto min-w-[120px]"
-										>
-											{#each p.anos as ano (ano)}
-												<option value={String(ano)}>{ano}</option>
-											{/each}
-											<option value="personalizado">Personalizado</option>
-										</select>
+											options={[
+												...p.anos.map((ano) => ({ value: String(ano), label: String(ano) })),
+												{ value: 'personalizado', label: 'Personalizado' }
+											]}
+											obrigatorio
+											numerica
+										/>
 
 										{#if p.filterAno === 'personalizado'}
 											<div class="flex items-end gap-2 w-full lg:w-auto">

@@ -98,11 +98,16 @@
 			method="GET"
 			class="{CLASSE_FORM_FILTRO_GET} {filtrosExpandidos ? 'grid' : 'hidden lg:grid'}"
 		>
-			<CampoFiltroGet label="Nível" name="level">
-				<option value="" selected={!data.filtros.level}>Todos</option>
-				<option value="warn" selected={data.filtros.level === 'warn'}>Aviso</option>
-				<option value="error" selected={data.filtros.level === 'error'}>Erro</option>
-			</CampoFiltroGet>
+			<CampoFiltroGet
+				label="Nível"
+				name="level"
+				value={data.filtros.level ?? ''}
+				opcaoVazia="Todos"
+				opcoes={[
+					{ value: 'warn', label: 'Aviso' },
+					{ value: 'error', label: 'Erro' }
+				]}
+			/>
 			<CampoFiltroGet
 				label="Busca (mensagem / contexto / rota)"
 				name="busca"

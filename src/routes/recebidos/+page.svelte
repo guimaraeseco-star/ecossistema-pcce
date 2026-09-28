@@ -48,6 +48,8 @@
 	import type { ActionResult } from '@sveltejs/kit';
 	import { loading as loadingService } from '$lib/loading.svelte';
 	import CampoFiltroSelect from '$lib/components/CampoFiltroSelect.svelte';
+	import CamposFiltroAnoMes from '$lib/components/CamposFiltroAnoMes.svelte';
+	import { opcoesDeUnidades } from '$lib/unidades/opcoes';
 	import ModalShell from '$lib/components/ModalShell.svelte';
 	import BadgeTipoEscala from '$lib/components/BadgeTipoEscala.svelte';
 	import EstadoVazio from '$lib/components/EstadoVazio.svelte';
@@ -187,7 +189,7 @@
 
 	const unidadesArray = $derived(Array.isArray(unidades) ? unidades : []);
 	const seccionais = $derived(unidadesArray.filter((u) => u.tipo === 'seccional'));
-	const seccionaisOptions = $derived(seccionais.map((s) => ({ value: s.id, label: s.nome })));
+	const seccionaisOptions = $derived(opcoesDeUnidades(seccionais));
 
 	const meses = opcoesMeses();
 	const anos = [0, ...Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 1 + i)];
@@ -367,7 +369,7 @@
 				options={seccionaisOptions}
 				bind:value={filtroSeccional}
 				ariaLabel="Filtrar por seccional"
-				placeholder="Todas"
+				opcaoVazia="Todas as seccionais"
 			/>
 
 			<label class="flex flex-col gap-1.5 w-full lg:w-64">
@@ -378,27 +380,16 @@
 						type="text"
 						class="{CLASSE_INPUT_FILTRO} w-full pl-10"
 						bind:value={filtroUnidade}
-						placeholder="Buscar por unidade..."
+						placeholder="Digite um nome ou partes dele"
 					/>
 				</div>
 			</label>
 
-			<CampoFiltroSelect
-				label="Ano"
-				width="lg:w-28"
-				options={anosOptions}
-				bind:value={filtroAno}
-				ariaLabel="Filtrar por ano"
-				placeholder="Todos"
-			/>
-
-			<CampoFiltroSelect
-				label="Mês"
-				width="lg:w-36"
-				options={mesesOptions}
-				bind:value={filtroMes}
-				ariaLabel="Filtrar por mês"
-				placeholder="Todos"
+			<CamposFiltroAnoMes
+				bind:ano={filtroAno}
+				bind:mes={filtroMes}
+				anos={anosOptions}
+				meses={mesesOptions}
 			/>
 
 			<div class="flex items-center justify-between sm:justify-start gap-4 pb-2 lg:pb-3 lg:pl-2">

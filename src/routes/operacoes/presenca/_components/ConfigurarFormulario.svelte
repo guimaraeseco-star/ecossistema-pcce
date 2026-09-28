@@ -48,6 +48,8 @@
 	import { formasDaMarca } from '$lib/produtividade';
 	import { temAlgumaForma, tituloNoPainel } from '$lib/produtividade/apresentacao';
 	import RodapeAcoes from '$lib/components/RodapeAcoes.svelte';
+	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
+	import { opcoesDoTipoDoCampo } from './opcoes-tipo-do-campo';
 	import Target from '@lucide/svelte/icons/target';
 	import ChartColumn from '@lucide/svelte/icons/chart-column';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
@@ -163,16 +165,13 @@
 						>
 							Operação
 						</label>
-						<select
+						<SearchableSelect
 							id="cfg-operacao"
-							class="w-full rounded-xl border border-surface-300 bg-white px-3 py-2.5 text-sm font-bold dark:border-surface-700 dark:bg-surface-900"
-							value={editor.operacaoSelecionadaId ?? ''}
-							onchange={(e) => editor.trocarOperacao(Number(e.currentTarget.value))}
-						>
-							{#each editor.operacoes as op (op.id)}
-								<option value={op.id}>{op.nome}</option>
-							{/each}
-						</select>
+							value={editor.operacaoSelecionadaId ?? null}
+							options={editor.operacoes.map((op) => ({ value: op.id, label: op.nome }))}
+							obrigatorio
+							onchange={(v) => editor.trocarOperacao(Number(v))}
+						/>
 					</div>
 
 					<div class="flex w-full gap-2 rounded-xl bg-surface-100 p-1 dark:bg-surface-800 sm:w-fit">
@@ -400,57 +399,14 @@
 							class="text-3xs font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-widest"
 							>Tipo do Campo</label
 						>
-						<select
+						<!-- Os grupos (básicos, inteligentes, aposentado) vêm como o
+						     segundo texto de cada opção: ver `opcoes-tipo-do-campo.ts`. -->
+						<SearchableSelect
 							id="p-tp-{p.id}"
 							bind:value={p.tipo}
-							class="w-full px-4 py-3 rounded-xl border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-900 text-sm font-bold focus:ring-2 focus:ring-primary-500 transition-colors shadow-sm"
-						>
-							<optgroup label="Campos Básicos">
-								<option value="texto">Texto Curto</option>
-								<option value="textarea">Texto Longo</option>
-								<option value="numero">Número</option>
-								<option value="sim_nao">Sim / Não (Condicional)</option>
-								<option value="select_99">Quantitativo (0-99)</option>
-								<!-- Dois campos numa pergunta só (total e parte). É o que
-								     permite meta de COBERTURA: "atender 100% das ocorrências"
-								     não se mede com um número solto. -->
-								<option value="proporcao">Cobertura (total e atendidas)</option>
-							</optgroup>
-							<optgroup label="Campos Inteligentes (Sistemáticos)">
-								<!-- Primeiro da lista por ser o ÚNICO que pode se repetir no
-								     formulário: os demais gravam em chave fixa e só funcionam
-								     uma vez (ver `$lib/gise/tipos-pergunta`). -->
-								<option value="lista_detalhada"
-									>Quantidade + Lista Nome/Procedimento (reutilizável)</option
-								>
-								<option value="vtr_placa">VTR e Placa (Inteligente)</option>
-								<option value="drogas_complex">Drogas Detalhado (Auto-Listagem)</option>
-								<option value="armas_complex">Armas Detalhado (Auto-Listagem)</option>
-								<option value="celulares_complex">Extração Celular (Auto-Listagem)</option>
-								<option value="analise_complex">Análise de Dados (Auto-Listagem)</option>
-								<option value="relatorios_seint_complex">Relatórios SEINT (Auto-Listagem)</option>
-								<option value="foragidos_complex">Alvos Foragidos (Auto-Listagem)</option>
-								<option value="operacoes_seint_complex">Operações SEINT (Auto-Listagem)</option>
-								<option value="operacoes_seint_pura">Operações SEINT (Lista Pura)</option>
-							</optgroup>
-							<!-- APOSENTADOS: só aparecem na pergunta que JÁ está com um deles.
-							     Escondê-los sempre faria o `<select>` não achar o valor atual e
-							     cair na primeira opção — a pergunta trocaria de tipo sozinha ao
-							     ser salva, e trocar o tipo troca a chave da resposta.
-							     Fazem o mesmo que "Quantidade + Lista", só que em chave fixa,
-							     o que os limita a uma ocorrência por formulário. -->
-							{#if TIPOS_LISTA_APOSENTADOS.includes(p.tipo)}
-								<optgroup label="Aposentados — prefira Quantidade + Lista">
-									{#if p.tipo === 'mandados_maiores'}
-										<option value="mandados_maiores">Mandados Maiores (legado)</option>
-									{:else if p.tipo === 'prisoes_maiores'}
-										<option value="prisoes_maiores">Prisões Maiores (legado)</option>
-									{:else}
-										<option value="apreensoes_menores">Apreensões Menores (legado)</option>
-									{/if}
-								</optgroup>
-							{/if}
-						</select>
+							options={opcoesDoTipoDoCampo(p.tipo)}
+							obrigatorio
+						/>
 						{#if TIPOS_LISTA_APOSENTADOS.includes(p.tipo)}
 							<p class="mt-1 text-3xs text-warning-700 dark:text-warning-400">
 								Tipo aposentado. <strong>Quantidade + Lista Nome/Procedimento</strong> faz o mesmo e pode
@@ -795,14 +751,15 @@
 											class="block text-3xs font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-widest mb-1"
 											>Objetivo</label
 										>
-										<select
+										<SearchableSelect
 											id="ind-obj-{p.id}"
 											bind:value={meta.objetivo}
-											class="w-full px-3 py-2 rounded-xl border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-900 text-sm"
-										>
-											<option value="diminuir">Diminuir (reduzir o número)</option>
-											<option value="aumentar">Aumentar (elevar o número)</option>
-										</select>
+											options={[
+												{ value: 'diminuir', label: 'Diminuir (reduzir o número)' },
+												{ value: 'aumentar', label: 'Aumentar (elevar o número)' }
+											]}
+											obrigatorio
+										/>
 									</div>
 								{/if}
 
@@ -813,19 +770,22 @@
 										>Tipo de meta</label
 									>
 									<!-- `onchange` e não `bind:value`: trocar o tipo RECONSTRÓI o
-									     objeto, porque cada variante tem campos diferentes. -->
-									<select
+									     objeto, porque cada variante tem campos diferentes.
+									     Cobertura só é opção para o campo de Cobertura (a caixa de
+									     busca não tem opção desabilitada: ela não aparece). -->
+									<SearchableSelect
 										id="ind-tipo-{p.id}"
 										value={meta.metaTipo}
-										onchange={(e) => editor.definirMetaTipoIndicador(p, e.currentTarget.value)}
-										class="w-full px-3 py-2 rounded-xl border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-900 text-sm"
-									>
-										<option value="percentual">Percentual sobre o valor inicial</option>
-										<option value="absoluto">Número fixo (sem valor inicial)</option>
-										<option value="proporcao" disabled={!ehProporcao(p.tipo)}>
-											Cobertura — % do total atendido
-										</option>
-									</select>
+										options={[
+											{ value: 'percentual', label: 'Percentual sobre o valor inicial' },
+											{ value: 'absoluto', label: 'Número fixo (sem valor inicial)' },
+											...(ehProporcao(p.tipo)
+												? [{ value: 'proporcao', label: 'Cobertura — % do total atendido' }]
+												: [])
+										]}
+										obrigatorio
+										onchange={(v) => editor.definirMetaTipoIndicador(p, String(v))}
+									/>
 									{#if !ehProporcao(p.tipo)}
 										<p class="mt-1 text-3xs text-surface-500 dark:text-surface-500">
 											Cobertura exige o tipo de campo <strong>Cobertura (total e atendidas)</strong

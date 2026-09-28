@@ -13,6 +13,7 @@
 	import { enhance } from '$app/forms';
 	import { buscarPoliciaisOptions } from '$lib/busca-policiais';
 	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
+	import CampoTipoDeEscala from './CampoTipoDeEscala.svelte';
 	import {
 		ultimoDiaMes,
 		mesAnoFormatado,
@@ -82,13 +83,7 @@
 				class="w-full h-9"
 			/>
 		</label>
-		<label class="label sm:col-span-2">
-			<span class="label-text">Tipo de Escala</span>
-			<select class="select h-9 py-0 px-2" bind:value={addTipoEscala}>
-				<option value="1x3">1×3</option>
-				<option value="2x6">2×6</option>
-			</select>
-		</label>
+		<CampoTipoDeEscala bind:value={addTipoEscala} />
 		<div class="sm:col-span-2">
 			<span class="label-text block text-sm mb-1">1º dia</span>
 			<div class="flex items-center gap-1 h-9">

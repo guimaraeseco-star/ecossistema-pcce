@@ -68,7 +68,10 @@
 
 	const cidadesOptions = CIDADES_CEARA.map((c) => ({ value: c, label: c }));
 	/** Prefixos ordinais ("1ª"…"99ª") usados por delegacias e seccionais. */
-	const ORDINAIS = Array.from({ length: 99 }, (_, i) => `${i + 1}ª`);
+	const OPCOES_ORDINAIS = Array.from({ length: 99 }, (_, i) => ({
+		value: `${i + 1}ª`,
+		label: `${i + 1}ª`
+	}));
 
 	/** Nome final, na fórmula oficial de cada tipo de unidade. */
 	const novoNome = $derived(
@@ -185,11 +188,12 @@
 			<div class="flex flex-col gap-3 animate-in fade-in duration-300">
 				<label class="label">
 					<span class="label-text">O que é</span>
-					<select class="select" bind:value={subTipo}>
-						{#each TIPOS_DE_SUBUNIDADE as t (t.valor)}
-							<option value={t.valor}>{t.rotulo}</option>
-						{/each}
-					</select>
+					<SearchableSelect
+						ariaLabel="O que é"
+						bind:value={subTipo}
+						options={TIPOS_DE_SUBUNIDADE.map((t) => ({ value: t.valor, label: t.rotulo }))}
+						obrigatorio
+					/>
 				</label>
 				<label class="label">
 					<span class="label-text">Pertence a</span>
@@ -219,12 +223,17 @@
 				<div class="grid grid-cols-[6rem_1fr] gap-2">
 					<label class="label">
 						<span class="label-text">Prefixo</span>
-						<select class="select" bind:value={delegaciaPrefixo}>
-							<option value="">—</option>
-							{#each ORDINAIS as ord (ord)}
-								<option value={ord}>{ord}</option>
-							{/each}
-						</select>
+						<SearchableSelect
+							ariaLabel="Prefixo"
+							bind:value={
+								() => delegaciaPrefixo || null,
+								(v) => (delegaciaPrefixo = v == null ? '' : String(v))
+							}
+							options={OPCOES_ORDINAIS}
+							numerica
+							opcaoVazia="—"
+							compacto
+						/>
 					</label>
 					<label class="label">
 						<span class="label-text">Local (cidade / nome)</span>
@@ -237,12 +246,17 @@
 				<div class="grid grid-cols-[6rem_1fr] gap-2">
 					<label class="label">
 						<span class="label-text">Prefixo</span>
-						<select class="select" bind:value={seccionalPrefixo}>
-							<option value="">—</option>
-							{#each ORDINAIS as ord (ord)}
-								<option value={ord}>{ord}</option>
-							{/each}
-						</select>
+						<SearchableSelect
+							ariaLabel="Prefixo"
+							bind:value={
+								() => seccionalPrefixo || null,
+								(v) => (seccionalPrefixo = v == null ? '' : String(v))
+							}
+							options={OPCOES_ORDINAIS}
+							numerica
+							opcaoVazia="—"
+							compacto
+						/>
 					</label>
 					<label class="label">
 						<span class="label-text">Local</span>

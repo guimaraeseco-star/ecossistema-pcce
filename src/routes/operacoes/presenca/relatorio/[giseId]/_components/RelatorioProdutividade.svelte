@@ -25,6 +25,7 @@
 	 * "Não" por engano e voltar atrás não custa o preenchimento.
 	 */
 	import type { GiseModeloPerguntaConfig } from '$lib/types';
+	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
 	import {
 		ITEM_PADRAO,
 		TIPOS_COM_FILHOS,
@@ -35,6 +36,23 @@
 		chavesListaComFallback,
 		chavesProporcao
 	} from '$lib/gise/tipos-pergunta';
+
+	// As contagens do relatório viraram caixas de busca (E76, etapa 2): digitar
+	// "12" acha 12 sem rolar cem opções no celular.
+	const DE_0_A_99 = Array.from({ length: 100 }, (_, i) => ({ value: i, label: String(i) }));
+	const DE_1_A_99 = DE_0_A_99.slice(1);
+
+	/**
+	 * A caixa de busca diz `null` para "nada escolhido"; o relatório guarda ''
+	 * (o que o `<select>` com "Selecione" guardava) — as leituras e o que já
+	 * está gravado nos relatórios contam com isso.
+	 */
+	function vazioComoNulo(v: unknown): unknown {
+		return v === '' || v == null ? null : v;
+	}
+	function vazioComoTexto(v: unknown): unknown {
+		return v == null ? '' : v;
+	}
 
 	/** Número para exibição; `null` quando o campo está vazio ou não é numérico. */
 	function num(v: unknown): number | null {
@@ -247,16 +265,15 @@
 						{/if}
 					</div>
 				{:else if q.tipo === 'select_99'}
-					<select
+					<SearchableSelect
 						id="q-{q.id}"
-						class="select w-full md:w-48 text-sm font-bold"
-						bind:value={respostas[q.key]}
-					>
-						<option value="">Selecione</option>
-						{#each Array(100) as _, i (i)}
-							<option value={i}>{i}</option>
-						{/each}
-					</select>
+						class="w-full md:w-48"
+						bind:value={
+							() => vazioComoNulo(respostas[q.key]), (v) => (respostas[q.key] = vazioComoTexto(v))
+						}
+						options={DE_0_A_99}
+						numerica
+					/>
 				{:else if q.tipo === 'sim_nao'}
 					{@render botoesSimNao(q)}
 				{:else if q.tipo === 'textarea'}
@@ -283,24 +300,22 @@
 											class="text-3xs font-black text-surface-600 dark:text-surface-400 uppercase tracking-widest block"
 											>{q.subtexto_qtd || 'Quantidade:'}</span
 										>
-										<select
-											class="select w-24 text-sm font-bold"
+										<SearchableSelect
+											class="w-28"
+											ariaLabel={q.subtexto_qtd || 'Quantidade'}
 											bind:value={respostas[resQtdKey]}
-											onchange={(e) => {
-												const n = Number((e.currentTarget as HTMLSelectElement).value);
+											options={DE_1_A_99}
+											numerica
+											obrigatorio
+											onchange={(v) => {
+												const n = Number(v);
 												if (!respostas[resKey]) respostas[resKey] = [];
 												const defaultItem = ITEM_PADRAO[q.tipo] ?? { nome: '', mandado: '' };
 												respostas[resKey] = Array(n)
 													.fill(0)
 													.map((_, idx) => (respostas[resKey] || [])[idx] || { ...defaultItem });
 											}}
-										>
-											{#each Array(99)
-												.fill(0)
-												.map((_, idx) => idx + 1) as n (n)}
-												<option value={n}>{n}</option>
-											{/each}
-										</select>
+										/>
 									</label>
 								</div>
 
@@ -445,15 +460,17 @@
 														class="text-3xs font-bold text-surface-600 dark:text-surface-400 uppercase"
 														for="res-{q.id}-{i}">Resultado</label
 													>
-													<select
+													<SearchableSelect
 														id="res-{q.id}-{i}"
-														class="input text-xs font-bold"
-														bind:value={item.resultado}
-													>
-														<option value="">Selecione</option>
-														<option value="Positivo">Positivo</option>
-														<option value="Negativo">Negativo</option>
-													</select>
+														bind:value={
+															() => vazioComoNulo(item.resultado),
+															(v) => (item.resultado = vazioComoTexto(v))
+														}
+														options={[
+															{ value: 'Positivo', label: 'Positivo' },
+															{ value: 'Negativo', label: 'Negativo' }
+														]}
+													/>
 												</div>
 											</div>
 										{:else if q.tipo === 'operacoes_seint_complex' || q.tipo === 'operacoes_seint_pura'}
@@ -646,14 +663,14 @@
 													>{a}:</span
 												>
 
-												<select
-													class="select flex-1 min-w-0 sm:flex-none sm:w-32 text-xs font-bold"
+												<SearchableSelect
+													class="flex-1 min-w-0 sm:flex-none sm:w-32"
+													ariaLabel="Quantidade de {a}"
 													bind:value={respostas.armas_detalhe[a]}
-												>
-													{#each Array(100) as _, i (i)}
-														<option value={i}>{i}</option>
-													{/each}
-												</select>
+													options={DE_0_A_99}
+													numerica
+													obrigatorio
+												/>
 											</div>
 										{/each}
 									</div>

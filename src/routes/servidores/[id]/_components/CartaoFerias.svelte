@@ -33,6 +33,7 @@
 	import { formatarData, hojeLocalISO } from '$lib/utils/datas';
 	import { formatarNUP } from '$lib/utils/formato';
 	import { MAX_JUSTIFICATIVA } from '$lib/cadastro-campos';
+	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
 	import type { FeriasDoPolicial, FracaoCompleta } from '$lib/db';
 	import { conflitosDasFerias, type PeriodoOcupado } from '$lib/servidores/conflitos';
 	import {
@@ -859,17 +860,29 @@
 					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70"
 						>Dias convertidos</span
 					>
-					<select class="select px-3 py-1 text-sm" name="posicao" bind:value={aPosicao}>
-						<option value="iniciais">10 iniciais</option>
-						<option value="finais">10 finais</option>
-					</select>
+					<SearchableSelect
+						name="posicao"
+						ariaLabel="Dias convertidos"
+						bind:value={aPosicao}
+						options={[
+							{ value: 'iniciais', label: '10 iniciais' },
+							{ value: 'finais', label: '10 finais' }
+						]}
+						obrigatorio
+					/>
 				</label>
 				<label class="label">
 					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70">Decisão</span>
-					<select class="select px-3 py-1 text-sm" name="status" bind:value={aStatus}>
-						<option value="deferido">Deferido</option>
-						<option value="indeferido">Indeferido</option>
-					</select>
+					<SearchableSelect
+						name="status"
+						ariaLabel="Decisão"
+						bind:value={aStatus}
+						options={[
+							{ value: 'deferido', label: 'Deferido' },
+							{ value: 'indeferido', label: 'Indeferido' }
+						]}
+						obrigatorio
+					/>
 				</label>
 			</div>
 			<label class="label">

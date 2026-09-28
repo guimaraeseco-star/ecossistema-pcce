@@ -314,30 +314,42 @@
 			method="GET"
 			class="{CLASSE_FORM_FILTRO_GET} {filtrosExpandidos ? 'grid' : 'hidden lg:grid'}"
 		>
-			<CampoFiltroGet label="Categoria" name="categoria">
-				<option value="" selected={!data.filtros.categoria}>Todas</option>
-				{#each data.facetas.categorias as c (c)}
-					<option value={c} selected={data.filtros.categoria === c}>{CATEGORIA[c] ?? c}</option>
-				{/each}
-			</CampoFiltroGet>
-			<CampoFiltroGet label="Ação" name="acao">
-				<option value="" selected={!data.filtros.acao}>Todas</option>
-				{#each data.facetas.acoes as a (a.valor)}
-					<option value={a.valor} selected={data.filtros.acao === a.valor}>{a.label}</option>
-				{/each}
-			</CampoFiltroGet>
-			<CampoFiltroGet label="Severidade" name="severidade">
-				<option value="" selected={!data.filtros.severidade}>Todas</option>
-				<option value="info" selected={data.filtros.severidade === 'info'}>Info</option>
-				<option value="aviso" selected={data.filtros.severidade === 'aviso'}>Aviso</option>
-				<option value="critico" selected={data.filtros.severidade === 'critico'}>Crítico</option>
-			</CampoFiltroGet>
-			<CampoFiltroGet label="Resultado" name="resultado">
-				<option value="" selected={!data.filtros.resultado}>Todos</option>
-				<option value="sucesso" selected={data.filtros.resultado === 'sucesso'}>Sucesso</option>
-				<option value="falha" selected={data.filtros.resultado === 'falha'}>Falha</option>
-				<option value="negado" selected={data.filtros.resultado === 'negado'}>Negado</option>
-			</CampoFiltroGet>
+			<CampoFiltroGet
+				label="Categoria"
+				name="categoria"
+				value={data.filtros.categoria ?? ''}
+				opcaoVazia="Todas"
+				opcoes={data.facetas.categorias.map((c) => ({ value: c, label: CATEGORIA[c] ?? c }))}
+			/>
+			<CampoFiltroGet
+				label="Ação"
+				name="acao"
+				value={data.filtros.acao ?? ''}
+				opcaoVazia="Todas"
+				opcoes={data.facetas.acoes.map((a) => ({ value: a.valor, label: a.label }))}
+			/>
+			<CampoFiltroGet
+				label="Severidade"
+				name="severidade"
+				value={data.filtros.severidade ?? ''}
+				opcaoVazia="Todas"
+				opcoes={[
+					{ value: 'info', label: 'Info' },
+					{ value: 'aviso', label: 'Aviso' },
+					{ value: 'critico', label: 'Crítico' }
+				]}
+			/>
+			<CampoFiltroGet
+				label="Resultado"
+				name="resultado"
+				value={data.filtros.resultado ?? ''}
+				opcaoVazia="Todos"
+				opcoes={[
+					{ value: 'sucesso', label: 'Sucesso' },
+					{ value: 'falha', label: 'Falha' },
+					{ value: 'negado', label: 'Negado' }
+				]}
+			/>
 			<CampoFiltroGet
 				label="Busca (ator / detalhes / alvo)"
 				name="busca"

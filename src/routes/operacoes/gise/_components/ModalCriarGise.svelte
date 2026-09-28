@@ -25,6 +25,7 @@
 	import { loading } from '$lib/loading.svelte';
 	import { Dialog } from '@skeletonlabs/skeleton-svelte';
 	import CalendarioNavMes from '$lib/components/CalendarioNavMes.svelte';
+	import SearchableSelect from '$lib/components/SearchableSelect.svelte';
 	import { page } from '$app/state';
 	import type { ActionResult } from '@sveltejs/kit';
 
@@ -380,16 +381,16 @@
 					>
 						Operação
 					</label>
-					<select
+					<SearchableSelect
 						id="nova-operacao"
-						bind:value={operacaoId}
+						bind:value={
+							() => (operacaoId === '' ? null : operacaoId),
+							(v) => (operacaoId = v == null ? '' : Number(v))
+						}
+						options={operacoes.map((op) => ({ value: op.id, label: op.nome }))}
+						obrigatorio
 						onchange={() => aplicarHorarioDaOperacao(operacaoId)}
-						class="w-full px-2.5 py-1.5 rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-sm"
-					>
-						{#each operacoes as op (op.id)}
-							<option value={op.id}>{op.nome}</option>
-						{/each}
-					</select>
+					/>
 				</div>
 			{/if}
 
@@ -448,18 +449,18 @@
 							class="text-3xs font-medium text-surface-600 dark:text-surface-400 block mb-0.5"
 							>Escolha a escala de origem</label
 						>
-						<select
+						<SearchableSelect
 							id="clonarDe"
-							bind:value={clonarDeId}
-							class="w-full px-2.5 py-1.5 rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 text-xs sm:text-sm"
-						>
-							{#each escalas.slice(0, 10) as esc (esc.id)}
-								<option value={esc.id}>
-									GISE — {diaSemana(esc.data_inicio)}
-									{fmtDate(esc.data_inicio)} ({esc.status})
-								</option>
-							{/each}
-						</select>
+							bind:value={
+								() => (clonarDeId === '' ? null : clonarDeId),
+								(v) => (clonarDeId = v == null ? '' : Number(v))
+							}
+							options={escalas.slice(0, 10).map((esc) => ({
+								value: esc.id,
+								label: `GISE — ${diaSemana(esc.data_inicio)} ${fmtDate(esc.data_inicio)} (${esc.status})`
+							}))}
+							obrigatorio
+						/>
 					</div>
 				{/if}
 			</div>

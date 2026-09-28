@@ -390,10 +390,16 @@
 			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
 				<label class="label">
 					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70">Papel</span>
-					<select class="select px-3 py-1 text-sm" name="papel" bind:value={papel}>
-						<option value="titular">Titular — designado para {unidadeNome}</option>
-						<option value="respondente">Respondente — dirige sem ser lotado aqui</option>
-					</select>
+					<SearchableSelect
+						name="papel"
+						ariaLabel="Papel"
+						bind:value={papel}
+						options={[
+							{ value: 'titular', label: `Titular — designado para ${unidadeNome}` },
+							{ value: 'respondente', label: 'Respondente — dirige sem ser lotado aqui' }
+						]}
+						obrigatorio
+					/>
 				</label>
 				<label class="label">
 					<span class="label-text ml-1 text-2xs font-bold uppercase opacity-70">Delegado (DPC)</span

@@ -40,6 +40,8 @@
 	import ModalShell from '$lib/components/ModalShell.svelte';
 	import { browser } from '$app/environment';
 	import CampoFiltroSelect from '$lib/components/CampoFiltroSelect.svelte';
+	import CamposFiltroAnoMes from '$lib/components/CamposFiltroAnoMes.svelte';
+	import { opcoesDeNomesDeUnidades, opcoesDeUnidades } from '$lib/unidades/opcoes';
 	import BotaoLimparFiltros from '$lib/components/BotaoLimparFiltros.svelte';
 	import { toaster } from '$lib/toast';
 	import type { ItemCompliance } from '$lib/types';
@@ -222,9 +224,16 @@
 		ignorados: ignorados.size
 	});
 
-	const seccionaisOptions = $derived(seccionais.map((s) => ({ value: s.id, label: s.nome })));
+	// "Todas as seccionais" é uma escolha de verdade ('todas'), e a PRIMEIRA da
+	// lista (E76, etapa 2). O vazio ('') continua sendo "ainda não escolheu",
+	// que mostra o convite a escolher — por isso não é `opcaoVazia`.
+	const seccionaisOptions = $derived([
+		{ value: 'todas', label: 'Todas as seccionais' },
+		...opcoesDeUnidades(seccionais)
+	]);
 
-	const unidadesDropdownOptions = $derived(unidadesDropdown.map((u) => ({ value: u, label: u })));
+	// Os nomes vêm dos dados da conformidade: a unidade técnica sai daqui também.
+	const unidadesDropdownOptions = $derived(opcoesDeNomesDeUnidades(unidadesDropdown));
 
 	const mesesOptions = opcoesMeses(true);
 
@@ -458,7 +467,6 @@
 				options={seccionaisOptions}
 				bind:value={filtroSeccional}
 				ariaLabel="Filtrar por seccional"
-				placeholder="Selecione"
 			/>
 
 			<CampoFiltroSelect
@@ -467,25 +475,14 @@
 				options={unidadesDropdownOptions}
 				bind:value={filtroUnidade}
 				ariaLabel="Filtrar por unidade"
-				placeholder="Todas as unidades"
+				opcaoVazia="Todas as unidades"
 			/>
 
-			<CampoFiltroSelect
-				label="Ano"
-				width="lg:w-28"
-				options={anosOptions}
-				bind:value={filtroAno}
-				ariaLabel="Filtrar por ano"
-				placeholder="Todos"
-			/>
-
-			<CampoFiltroSelect
-				label="Mês"
-				width="lg:w-36"
-				options={mesesOptions}
-				bind:value={filtroMes}
-				ariaLabel="Filtrar por mês"
-				placeholder="Todos"
+			<CamposFiltroAnoMes
+				bind:ano={filtroAno}
+				bind:mes={filtroMes}
+				anos={anosOptions}
+				meses={mesesOptions}
 			/>
 		</div>
 

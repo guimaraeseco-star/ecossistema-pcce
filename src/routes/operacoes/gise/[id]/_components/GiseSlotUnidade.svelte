@@ -261,9 +261,18 @@
 							class="mb-1 block text-sm font-medium text-surface-600 dark:text-surface-400"
 							>Tipo</label
 						>
-						<select
+						<!-- Só os tipos que a operação usa. Não é a autorização — quem
+						     recusa o POST é `adicionarEquipe`; isto evita oferecer uma
+						     opção que daria erro. -->
+						<SearchableSelect
 							id="novaEquipeTipo-{slot.id}"
+							class="w-44"
 							bind:value={estado.novaEquipeTipo}
+							options={[
+								{ value: 'operacional', label: 'Operacional' },
+								{ value: 'seint', label: 'SEINT' }
+							].filter((t) => tiposEquipePermitidos.includes(t.value))}
+							obrigatorio
 							onchange={() => {
 								if (estado.novaEquipeTipo === 'operacional') {
 									estado.novaEquipeDpc = 1;
@@ -273,18 +282,7 @@
 									estado.novaEquipeOip = 2;
 								}
 							}}
-							class="rounded-xl border border-surface-300 bg-white px-2 py-1.5 text-sm dark:border-surface-700 dark:bg-surface-800"
-						>
-							<!-- Só os tipos que a operação usa. Não é a autorização — quem
-							     recusa o POST é `adicionarEquipe`; isto evita oferecer uma
-							     opção que daria erro. -->
-							{#if tiposEquipePermitidos.includes('operacional')}
-								<option value="operacional">Operacional</option>
-							{/if}
-							{#if tiposEquipePermitidos.includes('seint')}
-								<option value="seint">SEINT</option>
-							{/if}
-						</select>
+						/>
 					</div>
 					<div>
 						<label
