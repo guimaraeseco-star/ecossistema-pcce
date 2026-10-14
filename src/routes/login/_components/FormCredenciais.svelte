@@ -183,8 +183,9 @@
 	</div>
 	<!-- As duas portas alternativas com o MESMO peso: certificado e colaborador.
 	     "Sou colaborador(a)" era um link miúdo na linha de ajuda e ninguém o
-	     achava (pedido de 13/09/2026). -->
-	<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+	     achava (pedido de 13/09/2026). Uma embaixo da outra: na caixa de 460 px
+	     (14/10/2026) as duas lado a lado não cabem sem apertar a letra. -->
+	<div class="grid grid-cols-1 gap-3">
 		<button
 			type="button"
 			class="btn preset-outlined-surface-500 w-full py-3 flex items-center justify-center gap-2 text-sm"

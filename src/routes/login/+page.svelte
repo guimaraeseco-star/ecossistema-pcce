@@ -40,6 +40,7 @@
 	import Form2FA from './_components/Form2FA.svelte';
 	import FormPrimeiroAcesso from './_components/FormPrimeiroAcesso.svelte';
 	import FormRecuperacaoSenha from './_components/FormRecuperacaoSenha.svelte';
+	import FundoEntrada from './_components/FundoEntrada.svelte';
 	import { mensagemDeErro } from '$lib/utils/erro';
 
 	type ActionData = Record<string, unknown> | undefined;
@@ -413,10 +414,18 @@
 	<title>{tituloDaAba} | Ecossistema PCCE</title>
 </svelte:head>
 
-<div class="min-h-screen flex items-center justify-center p-4">
-	<!-- `p-6 sm:p-8`, brasão `h-20` e `mb-4`: a tela inteira tem de caber em
-	     720 px de altura sem rolar (pedido de 13/09/2026). -->
-	<div class="w-full max-w-xl p-6 sm:p-8 rounded-3xl card-glass-auth">
+<!-- Fundo da entrada no desenho do Plantão Eleições (14/10/2026): brasões,
+     luzes e o botão de modo claro/escuro. O conteúdo sobe para `z-10`. -->
+<FundoEntrada />
+
+<div class="relative z-10 min-h-screen flex items-center justify-center p-4">
+	<!-- Caixa do tamanho da entrada do Plantão Eleições: 460 px, brasão de
+	     84 px (`h-21`), título de 1,3rem. A tela inteira tem de caber em 720 px
+	     de altura sem rolar (pedido de 13/09/2026) — com a caixa mais estreita, os
+	     botões de certificado e colaborador ficam um embaixo do outro e a caixa
+	     chega a ~665 px. `card-entrada` deixa o vidro mais transparente (só aqui;
+	     `card-glass-auth` também serve /alterar-senha e /redefinir-senha). -->
+	<div class="w-full max-w-[460px] p-6 sm:p-8 rounded-3xl card-glass-auth card-entrada">
 		{#if !recuperacao && !primeiroAcesso}
 			<div class="text-center mb-4">
 				<!-- Brasão institucional (static/brasao-pcce.png, 273×360, fundo
@@ -426,12 +435,12 @@
 				<img
 					src="/brasao-pcce.png"
 					alt="Brasão da Polícia Civil do Estado do Ceará"
-					class="h-20 w-auto mx-auto mb-2 drop-shadow-md"
+					class="h-21 w-auto mx-auto mb-2 drop-shadow-md"
 					width="273"
 					height="360"
 					decoding="async"
 				/>
-				<h1 class="h1 text-xl font-bold mb-1">Ecossistema PCCE</h1>
+				<h1 class="h1 text-[1.3rem] font-bold mb-1">Ecossistema PCCE</h1>
 				<p class="text-xs text-surface-600 dark:text-surface-400 tracking-wide">
 					{CORPORACAO_PROSA}
 				</p>
@@ -502,3 +511,25 @@
 		{/if}
 	</div>
 </div>
+
+<style>
+	/* Vidro fosco da entrada (desenho do Plantão Eleições): mais transparente que o
+	   `card-glass-auth` comum, para o fundo de brasões e luzes aparecer. Estilo sem
+	   camada, ganha do utilitário do Tailwind. */
+	.card-entrada {
+		background: oklch(100% 0 0deg / 0.72);
+		backdrop-filter: blur(24px) saturate(1.4);
+		-webkit-backdrop-filter: blur(24px) saturate(1.4);
+		border: 1px solid oklch(15% 0.03 265deg / 0.09);
+		box-shadow:
+			0 1px 0 rgb(255 255 255 / 0.35) inset,
+			0 18px 50px -12px rgb(15 23 43 / 0.25);
+	}
+	:global(.dark) .card-entrada {
+		background: oklch(21% 0.04 265deg / 0.62);
+		border-color: rgb(255 255 255 / 0.09);
+		box-shadow:
+			0 1px 0 rgb(255 255 255 / 0.06) inset,
+			0 18px 50px -12px rgb(0 0 0 / 0.6);
+	}
+</style>
